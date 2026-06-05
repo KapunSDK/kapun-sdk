@@ -96,6 +96,10 @@ default = [
     "reqwest",
     "reqwest_cookies",
     "kapun-credentials-rust/bbs",
+    "kapun-credentials-rust/sdjwt",
+    "kapun-credentials-rust/w3c",
+    "kapun-credentials-rust/mdoc",
+    "kapun-credentials-rust/openbadges",
     "rdf-util",
     "next-gen-signatures",
 
