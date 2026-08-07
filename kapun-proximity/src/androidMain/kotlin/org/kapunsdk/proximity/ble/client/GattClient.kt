@@ -134,12 +134,12 @@ internal class GattClient(
             .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
             .build()
 
-        try {
-            val scanner = bluetoothManager.adapter.bluetoothLeScanner
-            if (!bluetoothManager.adapter.isEnabled || scanner == null) {
-                scannerListener?.onError("Bluetooth is turned off")
-                return
-            }
+		try {
+			val scanner = bluetoothManager.adapter.bluetoothLeScanner
+			if (!bluetoothManager.adapter.isEnabled || scanner == null) {
+				scannerListener?.onError("Bluetooth is turned off")
+				return
+			}
             scanner.startScan(listOf(filter), settings, scanCallback)
             this.scanner = scanner
         } catch (e: Exception) {
