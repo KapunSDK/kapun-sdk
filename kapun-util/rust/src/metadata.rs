@@ -3,13 +3,15 @@ use std::collections::HashMap;
 use openidconnect_federation::models::trust_chain::{TrustAnchor, TrustStore};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 pub struct FederationResult {
     is_valid: bool,
     metadata: HashMap<String, crate::value::Value>,
 }
 
-#[derive(uniffi::Error, Debug)]
+#[derive(Debug)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Error))]
 pub enum MetadataFetchError {
     FetchFailed(String),
     BuildTrustError(String),
@@ -28,7 +30,7 @@ impl std::fmt::Display for MetadataFetchError {
     }
 }
 
-#[uniffi::export(async_runtime = "tokio")]
+#[cfg_attr(feature = "uniffi", uniffi::export(async_runtime = "tokio"))]
 /// Use openid-federation to fetch a certain entity types
 pub async fn fetch_metadata_from_issuer_url(
     url: &str,
