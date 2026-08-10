@@ -22,6 +22,7 @@ package org.kapunsdk.util.json
 
 import org.kapunsdk.credentials.ClaimsPointer
 import org.kapunsdk.credentials.SdJwt
+import org.kapunsdk.credentials.W3C
 import org.kapunsdk.credentials.asSelector
 import org.kapunsdk.credentials.get
 
@@ -30,6 +31,9 @@ import org.kapunsdk.util.extensions.asArray
 import org.kapunsdk.util.extensions.asLong
 import org.kapunsdk.util.extensions.asString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import uniffi.kapun_crypto_rust.base64UrlDecode
 import uniffi.kapun_crypto_rust.SoftwareKeyPair
 import uniffi.kapun_credentials_rust.BuilderException
 
@@ -43,6 +47,53 @@ import kotlin.test.assertFailsWith
 
 
 class SdJwtTests {
+    @Test
+    fun sdJwtVcHeaderUsesDcSdJwtTyp() {
+        val claims: Value = Json.decodeFromString(
+            """
+            {
+              "iss": "https://issuer.example.com",
+              "vct": "test",
+              "given_name": "John"
+            }
+            """.trimIndent()
+        )
+        val sdJwt = SdJwt.create(
+            claims,
+            listOf(listOf("given_name").toClaimsPointer()!!),
+            "default",
+            TestSigner(SoftwareKeyPair()),
+            null
+        )!!
+
+        assertEquals("dc+sd-jwt", sdJwt.innerJwt.originalJwt.headerTyp())
+    }
+
+    @Test
+    fun w3cSdJwtHeaderUsesVcSdJwtTyp() {
+        val claims: Value = Json.decodeFromString(
+            """
+            {
+              "@context": ["https://www.w3.org/ns/credentials/v2"],
+              "type": ["VerifiableCredential", "TestCredential"],
+              "issuer": "https://issuer.example.com",
+              "credentialSubject": {
+                "given_name": "John"
+              }
+            }
+            """.trimIndent()
+        )
+        val credential = W3C.SdJwt.create(
+            claims,
+            listOf(listOf("credentialSubject", "given_name").toClaimsPointer()!!),
+            "default",
+            TestSigner(SoftwareKeyPair()),
+            null
+        )!!
+
+        assertEquals("vc+sd-jwt", credential.inner.originalJwt.headerTyp())
+    }
+
     @Test
     fun recursiveDisclosure() {
         val jwt = "eyJhbGciOiAiRVMyNTYiLCAidHlwIjogImV4YW1wbGUrc2Qtand0In0.eyJfc2QiOiBbIkNyUWU3UzVrcUJBSHQtbk1ZWGdjNmJkdDJTSDVhVFkxc1VfTS1QZ2tqUEkiLCAiSnpZakg0c3ZsaUgwUjNQeUVNZmVadTZKdDY5dTVxZWhabzdGN0VQWWxTRSIsICJQb3JGYnBLdVZ1Nnh5bUphZ3ZrRnNGWEFiUm9jMkpHbEFVQTJCQTRvN2NJIiwgIlRHZjRvTGJnd2Q1SlFhSHlLVlFaVTlVZEdFMHc1cnREc3JaemZVYW9tTG8iLCAiWFFfM2tQS3QxWHlYN0tBTmtxVlI2eVoyVmE1TnJQSXZQWWJ5TXZSS0JNTSIsICJYekZyendzY002R242Q0pEYzZ2Vks4QmtNbmZHOHZPU0tmcFBJWmRBZmRFIiwgImdiT3NJNEVkcTJ4Mkt3LXc1d1BFemFrb2I5aFYxY1JEMEFUTjNvUUw5Sk0iLCAianN1OXlWdWx3UVFsaEZsTV8zSmx6TWFTRnpnbGhRRzBEcGZheVF3TFVLNCJdLCAiaXNzIjogImh0dHBzOi8vaXNzdWVyLmV4YW1wbGUuY29tIiwgImlhdCI6IDE2ODMwMDAwMDAsICJleHAiOiAxODgzMDAwMDAwLCAic3ViIjogInVzZXJfNDIiLCAibmF0aW9uYWxpdGllcyI6IFt7Ii4uLiI6ICJwRm5kamtaX1ZDem15VGE2VWpsWm8zZGgta284YUlLUWM5RGxHemhhVllvIn0sIHsiLi4uIjogIjdDZjZKa1B1ZHJ5M2xjYndIZ2VaOGtoQXYxVTFPU2xlclAwVmtCSnJXWjAifV0sICJfc2RfYWxnIjogInNoYS0yNTYiLCAiY25mIjogeyJqd2siOiB7Imt0eSI6ICJFQyIsICJjcnYiOiAiUC0yNTYiLCAieCI6ICJUQ0FFUjE5WnZ1M09IRjRqNFc0dmZTVm9ISVAxSUxpbERsczd2Q2VHZW1jIiwgInkiOiAiWnhqaVdXYlpNUUdIVldLVlE0aGJTSWlyc1ZmdWVjQ0U2dDRqVDlGMkhaUSJ9fX0.qsI0EJs0DdWOwWjl4acRpVISStrvl1mwrumox26e-hRVtoEPy520qw1QX5pMdcZ0rKrpAuWJW0RRmKueQwaK5Q~WyIyR0xDNDJzS1F2ZUNmR2ZyeU5STjl3IiwgImdpdmVuX25hbWUiLCAiSm9obiJd~WyJlbHVWNU9nM2dTTklJOEVZbnN4QV9BIiwgImZhbWlseV9uYW1lIiwgIkRvZSJd~WyI2SWo3dE0tYTVpVlBHYm9TNXRtdlZBIiwgImVtYWlsIiwgImpvaG5kb2VAZXhhbXBsZS5jb20iXQ~WyJlSThaV205UW5LUHBOUGVOZW5IZGhRIiwgInBob25lX251bWJlciIsICIrMS0yMDItNTU1LTAxMDEiXQ~WyJRZ19PNjR6cUF4ZTQxMmExMDhpcm9BIiwgInBob25lX251bWJlcl92ZXJpZmllZCIsIHRydWVd~WyJBSngtMDk1VlBycFR0TjRRTU9xUk9BIiwgImFkZHJlc3MiLCB7InN0cmVldF9hZGRyZXNzIjogIjEyMyBNYWluIFN0IiwgImxvY2FsaXR5IjogIkFueXRvd24iLCAicmVnaW9uIjogIkFueXN0YXRlIiwgImNvdW50cnkiOiAiVVMifV0~WyJQYzMzSk0yTGNoY1VfbEhnZ3ZfdWZRIiwgImJpcnRoZGF0ZSIsICIxOTQwLTAxLTAxIl0~WyJHMDJOU3JRZmpGWFE3SW8wOXN5YWpBIiwgInVwZGF0ZWRfYXQiLCAxNTcwMDAwMDAwXQ~WyJsa2x4RjVqTVlsR1RQVW92TU5JdkNBIiwgIlVTIl0~WyJuUHVvUW5rUkZxM0JJZUFtN0FuWEZBIiwgIkRFIl0~"
@@ -60,6 +111,7 @@ class SdJwtTests {
             p.addDisclosure(listOf(PointerPart.String("irgend"), PointerPart.String("en"), PointerPart.String("gugus")))
         }
     }
+
     @Test
     // https://www.ietf.org/archive/id/draft-ietf-oauth-selective-disclosure-jwt-14.html#name-considerations-on-nested-da
     fun testNestedObjects() {
@@ -317,4 +369,12 @@ class SdJwtTests {
 //            assertEquals(e, o.value)
 //        }
 //    }
+
+    private fun String.headerTyp(): String? {
+        val header = split(".").first()
+        return Json.parseToJsonElement(base64UrlDecode(header).decodeToString())
+            .jsonObject["typ"]
+            ?.jsonPrimitive
+            ?.content
+    }
 }

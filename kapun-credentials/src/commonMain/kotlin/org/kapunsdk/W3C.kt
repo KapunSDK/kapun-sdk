@@ -37,7 +37,6 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.encoding.decodeStructure
 import kotlinx.serialization.encoding.encodeStructure
-import kotlinx.serialization.json.Json
 import uniffi.kapun_credentials_rust.*
 import uniffi.kapun_crypto_rust.base64UrlEncode
 import uniffi.kapun_util_rust.Value
@@ -94,7 +93,7 @@ sealed class W3C {
                     return null;
                 }
 
-                val header = Header(alg = key.alg(), kid = keyId)
+                val header = Header(typ = "vc+sd-jwt", alg = key.alg(), kid = keyId)
                 val keyClaims = claims.asObject()!!.toMutableMap()
 
                 if (pubKeyJwk != null) {
@@ -106,11 +105,11 @@ sealed class W3C {
                 val sdJwt = createDisclosureForObject(claimObject, disclosures, 1, sdJwtHasher = SdJwtHasher.fromStr(hashAlg))
 
                 val headerEncoded = base64UrlEncode(
-                    Json.encodeToString(Header.serializer(), header).encodeToByteArray()
+                    json.encodeToString(Header.serializer(), header).encodeToByteArray()
                 )
                 val sdJwtDisclosure = sdJwt.getOrNull() ?: return null
                 val bodyEncoded = base64UrlEncode(
-                    Json.encodeToString(sdJwtDisclosure.disclosedObject).encodeToByteArray()
+                    json.encodeToString(sdJwtDisclosure.disclosedObject).encodeToByteArray()
                 )
                 val msgPayload = "$headerEncoded.$bodyEncoded"
                 val signature = base64UrlEncode(key.sign(msgPayload.encodeToByteArray()))
@@ -196,7 +195,7 @@ sealed class W3C {
         override fun isSignatureValid(): Boolean = data.isValid
 
         fun serialized(): String =
-            Json.encodeToString(this.data)
+            json.encodeToString(this.data)
 
         fun asW3CCredential(): W3cVerifiableCredential =
             data.credential.originalData
@@ -224,11 +223,11 @@ sealed class W3C {
             }
 
             fun parseSerialized(credential: String): OpenBadge303 {
-                val newFormat = runCatching { Json.decodeFromString(OpenBadge303.Data.serializer(), credential) }.getOrNull()
+                val newFormat = runCatching { json.decodeFromString(OpenBadge303.Data.serializer(), credential) }.getOrNull()
                 if (newFormat != null) {
                     return OpenBadge303(newFormat)
                 }
-                return OpenBadge303(Json.decodeFromString(OpenBadge303.Data.generatedSerializer(), credential))
+                return OpenBadge303(json.decodeFromString(OpenBadge303.Data.generatedSerializer(), credential))
             }
         }
     }
