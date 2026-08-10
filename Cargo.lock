@@ -5269,7 +5269,7 @@ dependencies = [
 [[package]]
 name = "kapun-crypto-provider"
 version = "0.1.0"
-source = "git+https://github.com/heidiverse/kapun-sdk.git?branch=feature%2Fcrypto-provider#f151888250db8aa130f6774a5ac4b79cce681f00"
+source = "git+https://github.com/heidiverse/kapun-sdk.git?branch=feature%2Fcrypto-provider#2381e496a4d04af064dbeeb8b179e22486be78df"
 dependencies = [
  "kapun-util-rust 0.1.0 (git+https://github.com/heidiverse/kapun-sdk.git?branch=feature%2Fcrypto-provider)",
  "oid-registry",
@@ -5391,7 +5391,7 @@ dependencies = [
 [[package]]
 name = "kapun-util-rust"
 version = "0.1.0"
-source = "git+https://github.com/heidiverse/kapun-sdk.git?branch=feature%2Fcrypto-provider#f151888250db8aa130f6774a5ac4b79cce681f00"
+source = "git+https://github.com/heidiverse/kapun-sdk.git?branch=feature%2Fcrypto-provider#2381e496a4d04af064dbeeb8b179e22486be78df"
 dependencies = [
  "base64 0.22.1",
  "chrono",
