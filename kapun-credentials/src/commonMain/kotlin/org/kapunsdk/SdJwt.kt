@@ -22,7 +22,6 @@ package org.kapunsdk.credentials
 
 import org.kapunsdk.credentials.sdjwt.SdJwtVcMetadata
 import org.kapunsdk.credentials.sdjwt.SdJwtVcSignatureResolver
-import kotlinx.serialization.json.Json
 import uniffi.kapun_crypto_rust.base64UrlEncode
 import uniffi.kapun_credentials_rust.*
 import uniffi.kapun_util_rust.Value
@@ -42,6 +41,7 @@ val UNDISCLOSABLE_CLAIMS : List<ClaimsPointer>  = listOf(
     listOf("exp").toClaimsPointer()!!
 )
 data class SdjwtDisclosure(val disclosedObject: Value, val disclosure: List<String>)
+
 sealed interface IssuanceError {
     data class ElementNotDisclosable(val parent: Value, val paths: List<ClaimsPointer>) : IssuanceError, Throwable("$parent cannot disclose ${paths.joinToString(",")}")
     data class DisclosurePathNotResolved(val path: ClaimsPointer) : IssuanceError, Throwable("Slicing does not make sense: $path")
@@ -138,7 +138,7 @@ fun createDisclosureForObject(claims: Value.Object, objectDisclosures: List<Clai
         val nonce = Value.String(nonceStr)
         // encode to string and base64
 
-        val disclosure = base64UrlEncode(Json.encodeToString(Value.Array(listOf(nonce, Value.String(key.v1), d))).encodeToByteArray())
+        val disclosure = base64UrlEncode(json.encodeToString(Value.Array(listOf(nonce, Value.String(key.v1), d))).encodeToByteArray())
 
         // calculate the hash from the base64encoded string
         val hash = sdJwtHasher.hash(disclosure, nonceStr, key.v1, d)
@@ -195,7 +195,7 @@ fun createDisclosureForArray(array: Value.Array, objectDisclosures: List<ClaimsP
         val nonce = Value.String(nonceStr)
         Value.Array(listOf(nonce, element))
         // encode to string and base64
-        val disclosure = base64UrlEncode(Json.encodeToString(Value.Array(listOf(nonce, dis.disclosedObject))).encodeToByteArray())
+        val disclosure = base64UrlEncode(json.encodeToString(Value.Array(listOf(nonce, dis.disclosedObject))).encodeToByteArray())
         // calculate the hash from the base64encoded string
         val hash = sdJwtHasher.hash(disclosure, nonceStr, null, dis.disclosedObject)
         disclosures.add(disclosure)
@@ -212,7 +212,7 @@ class SdJwt(val innerJwt: SdJwtRust) : ClaimGetter {
         }
         fun create(claims: Value, disclosures: List<ClaimsPointer>, keyId: String, key: SignatureCreator, pubKeyJwk: Value?, hashAlg: String = "sha-256") : SdJwt? {
             val sdjwtHasher = SdJwtHasher.fromStr(hashAlg)
-            val header = Header(alg = key.alg(), kid = keyId)
+            val header = Header(typ = "dc+sd-jwt", alg = key.alg(), kid = keyId)
             if (!claims.isObject()) {
                 return null
             }
@@ -227,9 +227,9 @@ class SdJwt(val innerJwt: SdJwtRust) : ClaimGetter {
             if(sdjwt.isFailure) {
                 return null
             }
-            val headerEncoded = base64UrlEncode(Json.encodeToString(Header.serializer(),header).encodeToByteArray())
+            val headerEncoded = base64UrlEncode(json.encodeToString(Header.serializer(),header).encodeToByteArray())
             val sdjwtDisclosure = sdjwt.getOrThrow()
-            val bodyEncoded = base64UrlEncode(Json.encodeToString(sdjwtDisclosure.disclosedObject).encodeToByteArray())
+            val bodyEncoded = base64UrlEncode(json.encodeToString(sdjwtDisclosure.disclosedObject).encodeToByteArray())
             val msgPayload = "$headerEncoded.$bodyEncoded"
             val signature = base64UrlEncode(key.sign(msgPayload.encodeToByteArray()))
             val jwt = "$msgPayload.$signature"
