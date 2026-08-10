@@ -8,7 +8,7 @@ x509-parser = { version = "0.16.0", features = ["validate"] }
 ureq = { workspace = true, optional = true }
 whitespace-sifter = "2.3.7"
 tracing = "^0.1"
-kapun-crypto-provider = { git = "https://github.com/heidiverse/kapun-sdk.git", branch = "feature/crypto-provider" }
+kapun-crypto-provider = { git = "https://github.com/heidiverse/kapun-sdk.git", branch = "feature/crypto-provider", default-features = false }
 
 
 
