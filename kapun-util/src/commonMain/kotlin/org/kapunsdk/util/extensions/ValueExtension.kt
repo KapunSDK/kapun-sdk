@@ -54,6 +54,7 @@ fun Value.isNumber() = this is Value.Number
 fun Value.isBoolean() = this is Value.Boolean
 
 val json = Json {
+    encodeDefaults = true
     ignoreUnknownKeys = true
     explicitNulls = false
 }
