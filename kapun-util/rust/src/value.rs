@@ -23,7 +23,8 @@ use serde_json::Value as JsonValue;
 use std::collections::HashMap;
 use std::fmt::Display;
 
-#[derive(Deserialize, Serialize, Debug, Clone, uniffi::Record, PartialEq, Eq)]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 pub struct OrderedMap {
     entries: Vec<MapEntry>,
 }
@@ -57,13 +58,15 @@ impl Default for OrderedMap {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, uniffi::Record, PartialEq, Eq)]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 pub struct MapEntry {
     key: Value,
     value: Value,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, uniffi::Enum, PartialEq, Eq)]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[serde(untagged)]
 pub enum Value {
     Object(HashMap<String, Value>),
@@ -77,7 +80,8 @@ pub enum Value {
     OrderedObject(OrderedMap),
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Copy, uniffi::Enum, PartialEq)]
+#[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[serde(untagged)]
 pub enum JsonNumber {
     Integer(i64),

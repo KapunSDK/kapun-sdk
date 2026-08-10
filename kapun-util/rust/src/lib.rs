@@ -30,7 +30,8 @@ pub mod log;
 pub mod metadata;
 pub mod value;
 
-#[derive(Debug, Clone, uniffi::Error)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Error))]
 pub enum CborParseError {
     InvalidEncoding,
     NoCbor,
@@ -44,7 +45,8 @@ impl Display for CborParseError {
     }
 }
 
-#[derive(uniffi::Error, Debug)]
+#[derive(Debug)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Error))]
 pub enum DeflateError {
     BufferOverflow,
     Other,
@@ -57,11 +59,11 @@ impl Display for DeflateError {
 
 const MAX_SIZE: u64 = 32 * 1024 * 1024;
 
-#[uniffi::export]
+#[cfg_attr(feature = "uniffi", uniffi::export)]
 pub fn deflate(input: Vec<u8>) -> Vec<u8> {
     deflate_upto_max_size(input, MAX_SIZE).unwrap_or_default()
 }
-#[uniffi::export]
+#[cfg_attr(feature = "uniffi", uniffi::export)]
 pub fn deflate_upto_max_size(input: Vec<u8>, max_size: u64) -> Result<Vec<u8>, DeflateError> {
     let mut zliber = ZlibDecoder::new(&input[..]);
     let mut output = vec![];
@@ -83,7 +85,7 @@ pub fn deflate_upto_max_size(input: Vec<u8>, max_size: u64) -> Result<Vec<u8>, D
 
     Ok(output)
 }
-#[uniffi::export]
+#[cfg_attr(feature = "uniffi", uniffi::export)]
 pub fn deflate_string(input: String) -> Vec<u8> {
     let Ok(input) = BASE64_URL_SAFE_NO_PAD.decode(&input) else {
         return vec![];
@@ -127,14 +129,14 @@ mod test_deflate {
     }
 }
 
-#[uniffi::export]
+#[cfg_attr(feature = "uniffi", uniffi::export)]
 pub fn encode_cbor(cbor: Value) -> Result<Vec<u8>, CborParseError> {
     let cbor_val: CborValue = cbor.into();
     let mut result = vec![];
     ciborium::into_writer(&cbor_val, &mut result).map_err(|_| CborParseError::InvalidEncoding)?;
     Ok(result)
 }
-#[uniffi::export]
+#[cfg_attr(feature = "uniffi", uniffi::export)]
 pub fn decode_cbor(cbor: Vec<u8>) -> Result<Value, CborParseError> {
     ciborium::from_reader::<CborValue, _>(cbor.as_slice())
         .map(Value::from)
@@ -149,4 +151,5 @@ pub unsafe extern "C" fn __deregister_frame() {}
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __register_frame() {}
 
+#[cfg(feature = "uniffi")]
 uniffi::setup_scaffolding!();
