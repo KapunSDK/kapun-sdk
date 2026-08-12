@@ -20,7 +20,6 @@ under the License.
 
 package org.kapunsdk.util.platform
 
-import org.kapunsdk.util.platform.PlatformType
 import platform.Foundation.NSLocale
 import platform.Foundation.currentLocale
 import platform.Foundation.languageCode

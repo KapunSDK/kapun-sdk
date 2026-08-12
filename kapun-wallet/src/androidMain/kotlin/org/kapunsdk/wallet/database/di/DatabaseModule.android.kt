@@ -20,6 +20,7 @@ under the License.
 
 package org.kapunsdk.wallet.database.di
 
+import android.content.Context
 import org.kapunsdk.wallet.database.AndroidSqliteDriverFactory
 import org.kapunsdk.wallet.database.SqliteDriverFactory
 import org.koin.core.module.Module
@@ -27,5 +28,8 @@ import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.bind
 
 actual fun Module.sqliteDriverModule() {
-	singleOf(::AndroidSqliteDriverFactory).bind<SqliteDriverFactory>()
+	singleOf(::create).bind<SqliteDriverFactory>()
+}
+internal fun create(context: Context) : AndroidSqliteDriverFactory {
+	return AndroidSqliteDriverFactory(context, "heidi_database.sqlite")
 }

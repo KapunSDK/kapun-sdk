@@ -20,6 +20,7 @@ under the License.
 
 package org.kapunsdk.issuance.metadata.data
 
+import org.kapunsdk.issuance.metadata.data.CredentialConfigurationSerializer
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable

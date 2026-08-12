@@ -20,7 +20,7 @@ under the License.
 
 package org.kapunsdk.util.platform
 
-import org.kapunsdk.util.platform.PlatformType
+
 import java.util.Locale
 
 actual object Platform {
