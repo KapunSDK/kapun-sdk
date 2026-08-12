@@ -20,7 +20,6 @@ under the License.
 package org.kapunsdk.util.log
 
 import android.util.Log
-import org.kapunsdk.util.log.Logger
 
 actual fun Logger.d(msg: String) {
 	Log.d(this.tag, msg)

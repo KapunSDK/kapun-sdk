@@ -23,7 +23,6 @@ package org.kapunsdk.util.log
 
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.ptr
-import org.kapunsdk.util.log.Logger
 import platform.darwin.*
 
 actual fun Logger.d(msg: String) {
