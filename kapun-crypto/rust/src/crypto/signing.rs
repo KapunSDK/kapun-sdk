@@ -22,6 +22,7 @@ use crate::crypto::{SignatureCreator, base64_url_decode};
 use p256::ecdsa::{Signature, SigningKey, VerifyingKey, signature::Signer};
 use p256::{ecdsa::signature::Verifier, elliptic_curve::sec1::ToEncodedPoint};
 use rand::rngs::OsRng;
+use serde_json::Value;
 use std::sync::Arc;
 
 pub enum KeyType {
@@ -104,6 +105,13 @@ impl KeyPair {
             } => public_key.to_jwk_string(),
         }
     }
+    pub fn jwk_string_with_key_id(&self, key_id: &str) -> String {
+        let mut jwk: Value = serde_json::from_str(&self.jwk_string()).unwrap_or(Value::Null);
+        if let Some(jwk) = jwk.as_object_mut() {
+            jwk.insert("kid".to_string(), Value::String(key_id.to_string()));
+        }
+        serde_json::to_string(&jwk).unwrap_or_else(|_| self.jwk_string())
+    }
     pub fn private_jwk_string(&self) -> String {
         match self {
             Self::P256 {
@@ -176,6 +184,9 @@ impl SoftwareKeyPair {
     pub fn jwk_string(&self) -> String {
         self.0.jwk_string()
     }
+    pub fn jwk_string_with_key_id(&self, key_id: String) -> String {
+        self.0.jwk_string_with_key_id(&key_id)
+    }
     pub fn public_key_sec1(&self) -> Vec<u8> {
         self.0.public_key_sec1()
     }
@@ -202,6 +213,30 @@ impl SignatureCreator for SoftwareKeyPair {
 
     fn sign(&self, bytes: Vec<u8>) -> Result<Vec<u8>, SigningError> {
         self.0.sign_with_key(bytes)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn public_jwk_can_include_key_id() {
+        let key_pair = SoftwareKeyPair::new();
+        let bare_jwk: Value = serde_json::from_str(&key_pair.jwk_string()).unwrap();
+        let jwk_with_key_id: Value =
+            serde_json::from_str(&key_pair.jwk_string_with_key_id("issuer-key".to_string()))
+                .unwrap();
+
+        assert_eq!(bare_jwk.get("kid"), None);
+        assert_eq!(
+            jwk_with_key_id.get("kid").and_then(Value::as_str),
+            Some("issuer-key")
+        );
+        assert_eq!(bare_jwk.get("kty"), jwk_with_key_id.get("kty"));
+        assert_eq!(bare_jwk.get("crv"), jwk_with_key_id.get("crv"));
+        assert_eq!(bare_jwk.get("x"), jwk_with_key_id.get("x"));
+        assert_eq!(bare_jwk.get("y"), jwk_with_key_id.get("y"));
     }
 }
 
