@@ -41,12 +41,27 @@ import uniffi.kapun_credentials_rust.PointerPart
 import uniffi.kapun_util_rust.Value
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
 import org.kapunsdk.util.extensions.get
 import kotlin.test.assertFailsWith
 
 
 class SdJwtTests {
+    @Test
+    fun generatedPublicJwkCanIncludeKeyId() {
+        val keyPair = SoftwareKeyPair()
+        val bareJwk = Json.parseToJsonElement(keyPair.jwkString()).jsonObject
+        val jwkWithKeyId = Json.parseToJsonElement(keyPair.jwkStringWithKeyId("issuer-key")).jsonObject
+
+        assertNull(bareJwk["kid"])
+        assertEquals("issuer-key", jwkWithKeyId["kid"]?.jsonPrimitive?.content)
+        assertEquals(bareJwk["kty"], jwkWithKeyId["kty"])
+        assertEquals(bareJwk["crv"], jwkWithKeyId["crv"])
+        assertEquals(bareJwk["x"], jwkWithKeyId["x"])
+        assertEquals(bareJwk["y"], jwkWithKeyId["y"])
+    }
+
     @Test
     fun sdJwtVcHeaderUsesDcSdJwtTyp() {
         val claims: Value = Json.decodeFromString(
