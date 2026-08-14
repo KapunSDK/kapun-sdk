@@ -30,6 +30,29 @@ allprojects {
 	version = getProjectVersion()
 }
 
+val localMavenPublicationModules = listOf(
+	"kapun-util",
+	"kapun-crypto",
+	"kapun-proximity",
+	"kapun-credentials",
+	"kapun-dcql",
+	"kapun-presentation",
+	"kapun-wallet",
+	"kapun-issuance",
+	"kapun-visualization",
+)
+
+tasks.register("publishJvmToMavenLocal") {
+	group = "publishing"
+	description = "Publishes Kapun SDK JVM artifacts to Maven Local. Override the version with -PARTIFACT_VERSION=1.0.0-LOCAL."
+
+	dependsOn(
+		localMavenPublicationModules.map { module ->
+			project(":$module").tasks.named("publishJvmPublicationToMavenLocal")
+		}
+	)
+}
+
 private fun getProjectVersion(): String {
 	val versionFromGradleProperties = runCatching { property("ARTIFACT_VERSION").toString() }.getOrNull()
 	val versionFromWorkflow = runCatching { property("githubRefName").toString().removePrefix("v") }.getOrNull()
