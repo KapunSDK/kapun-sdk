@@ -18,8 +18,9 @@ specific language governing permissions and limitations
 under the License.
  */
 
-use crate::crypto::{SignatureCreator, base64_url_decode};
-use p256::ecdsa::{Signature, SigningKey, VerifyingKey, signature::Signer};
+use crate::crypto::{base64_url_decode, base64_url_encode, SignatureCreator};
+use josekit::jwk::Jwk;
+use p256::ecdsa::{signature::Signer, Signature, SigningKey, VerifyingKey};
 use p256::{ecdsa::signature::Verifier, elliptic_curve::sec1::ToEncodedPoint};
 use rand::rngs::OsRng;
 use serde_json::Value;
@@ -33,6 +34,7 @@ pub enum KeyPair {
     P256 {
         private_key: p256::SecretKey,
         public_key: p256::PublicKey,
+        key_id: Option<String>,
     },
 }
 
@@ -42,6 +44,7 @@ pub fn generate_keypair() -> KeyPair {
     KeyPair::P256 {
         private_key,
         public_key,
+        key_id: None,
     }
 }
 pub fn from_private_key(private_key: Vec<u8>) -> Option<KeyPair> {
@@ -50,18 +53,39 @@ pub fn from_private_key(private_key: Vec<u8>) -> Option<KeyPair> {
     Some(KeyPair::P256 {
         private_key,
         public_key,
+        key_id: None,
     })
 }
-pub fn from_private_jwk_string(private_key: &str) -> Option<KeyPair> {
-    let private_key = p256::SecretKey::from_jwk_str(private_key).ok()?;
+pub fn from_private_jwk_string(private_key_jwk: &str) -> Option<KeyPair> {
+    let jwk = Jwk::from_bytes(private_key_jwk.as_bytes()).ok()?;
+    let private_key = p256::SecretKey::from_slice(&jwk_private_key_bytes(&jwk)?).ok()?;
     let public_key = private_key.public_key();
+    let key_id = jwk
+        .key_id()
+        .filter(|kid| !kid.is_empty())
+        .map(str::to_string);
     Some(KeyPair::P256 {
         private_key,
         public_key,
+        key_id,
     })
 }
 
 impl KeyPair {
+    pub fn with_key_id(&self, key_id: String) -> Self {
+        match self {
+            Self::P256 {
+                private_key,
+                public_key,
+                ..
+            } => Self::P256 {
+                private_key: private_key.clone(),
+                public_key: public_key.clone(),
+                key_id: Some(key_id),
+            },
+        }
+    }
+
     pub fn sign_with_key(&self, message: Vec<u8>) -> Result<Vec<u8>, SigningError> {
         match self {
             Self::P256 { private_key, .. } => {
@@ -76,6 +100,7 @@ impl KeyPair {
             KeyPair::P256 {
                 private_key,
                 public_key: _,
+                key_id: _,
             } => private_key.to_bytes().to_vec(),
         }
     }
@@ -84,6 +109,7 @@ impl KeyPair {
             Self::P256 {
                 private_key: _,
                 public_key,
+                key_id: _,
             } => public_key.to_sec1_bytes().to_vec(),
         }
     }
@@ -93,32 +119,64 @@ impl KeyPair {
             Self::P256 {
                 private_key: _,
                 public_key,
+                key_id: _,
             } => public_key.to_encoded_point(true).as_bytes().to_vec(),
         }
     }
 
     pub fn jwk_string(&self) -> String {
-        match self {
-            Self::P256 {
-                private_key: _,
-                public_key,
-            } => public_key.to_jwk_string(),
-        }
-    }
-    pub fn jwk_string_with_key_id(&self, key_id: &str) -> String {
-        let mut jwk: Value = serde_json::from_str(&self.jwk_string()).unwrap_or(Value::Null);
-        if let Some(jwk) = jwk.as_object_mut() {
-            jwk.insert("kid".to_string(), Value::String(key_id.to_string()));
-        }
-        serde_json::to_string(&jwk).unwrap_or_else(|_| self.jwk_string())
+        self.to_jose_jwk(false)
+            .map(|jwk| jwk.to_string())
+            .unwrap_or_default()
     }
     pub fn private_jwk_string(&self) -> String {
-        match self {
-            Self::P256 {
-                private_key: pk,
-                public_key: _,
-            } => pk.to_jwk_string().to_string(),
+        self.to_jose_jwk(true)
+            .map(|jwk| jwk.to_string())
+            .unwrap_or_default()
+    }
+
+    fn to_jose_jwk(&self, private: bool) -> Option<Jwk> {
+        let Self::P256 {
+            private_key,
+            public_key,
+            key_id,
+        } = self;
+        let mut jwk = Jwk::new("EC");
+        jwk.set_parameter("crv", Some(Value::String("P-256".to_string())))
+            .ok()?;
+        if let Some(key_id) = key_id {
+            jwk.set_key_id(key_id);
         }
+
+        let public_key = public_key.to_encoded_point(false);
+        jwk.set_parameter(
+            "x",
+            Some(Value::String(base64_url_encode(public_key.x()?.to_vec()))),
+        )
+        .ok()?;
+        jwk.set_parameter(
+            "y",
+            Some(Value::String(base64_url_encode(public_key.y()?.to_vec()))),
+        )
+        .ok()?;
+        if private {
+            jwk.set_parameter(
+                "d",
+                Some(Value::String(base64_url_encode(
+                    private_key.to_bytes().to_vec(),
+                ))),
+            )
+            .ok()?;
+        }
+
+        Some(jwk)
+    }
+}
+
+fn jwk_private_key_bytes(jwk: &Jwk) -> Option<Vec<u8>> {
+    match jwk.parameter("d") {
+        Some(Value::String(value)) => Some(base64_url_decode(value.to_string())),
+        _ => None,
     }
 }
 
@@ -166,6 +224,10 @@ impl SoftwareKeyPair {
         Self(generate_keypair())
     }
     #[cfg_attr(feature = "uniffi", uniffi::constructor)]
+    pub fn new_with_key_id(key_id: String) -> Self {
+        Self(generate_keypair().with_key_id(key_id))
+    }
+    #[cfg_attr(feature = "uniffi", uniffi::constructor)]
     pub fn from_private_key(private_key: Vec<u8>) -> Arc<Self> {
         Arc::new(Self(
             from_private_key(private_key).unwrap_or(generate_keypair()),
@@ -183,9 +245,6 @@ impl SoftwareKeyPair {
     }
     pub fn jwk_string(&self) -> String {
         self.0.jwk_string()
-    }
-    pub fn jwk_string_with_key_id(&self, key_id: String) -> String {
-        self.0.jwk_string_with_key_id(&key_id)
     }
     pub fn public_key_sec1(&self) -> Vec<u8> {
         self.0.public_key_sec1()
@@ -221,22 +280,39 @@ mod tests {
     use super::*;
 
     #[test]
-    fn public_jwk_can_include_key_id() {
+    fn public_jwk_omits_key_id_by_default() {
         let key_pair = SoftwareKeyPair::new();
         let bare_jwk: Value = serde_json::from_str(&key_pair.jwk_string()).unwrap();
-        let jwk_with_key_id: Value =
-            serde_json::from_str(&key_pair.jwk_string_with_key_id("issuer-key".to_string()))
-                .unwrap();
 
         assert_eq!(bare_jwk.get("kid"), None);
+    }
+
+    #[test]
+    fn generated_key_with_key_id_serializes_key_id() {
+        let key_pair = SoftwareKeyPair::new_with_key_id("issuer-key".to_string());
+        let public_jwk: Value = serde_json::from_str(&key_pair.jwk_string()).unwrap();
+        let private_jwk: Value = serde_json::from_str(&key_pair.private_jwk_string()).unwrap();
+
         assert_eq!(
-            jwk_with_key_id.get("kid").and_then(Value::as_str),
+            public_jwk.get("kid").and_then(Value::as_str),
             Some("issuer-key")
         );
-        assert_eq!(bare_jwk.get("kty"), jwk_with_key_id.get("kty"));
-        assert_eq!(bare_jwk.get("crv"), jwk_with_key_id.get("crv"));
-        assert_eq!(bare_jwk.get("x"), jwk_with_key_id.get("x"));
-        assert_eq!(bare_jwk.get("y"), jwk_with_key_id.get("y"));
+        assert_eq!(
+            private_jwk.get("kid").and_then(Value::as_str),
+            Some("issuer-key")
+        );
+    }
+
+    #[test]
+    fn imported_key_with_key_id_serializes_key_id() {
+        let key_pair = SoftwareKeyPair::new_with_key_id("issuer-key".to_string());
+        let imported = SoftwareKeyPair::from_jwk_string(&key_pair.private_jwk_string());
+        let public_jwk: Value = serde_json::from_str(&imported.jwk_string()).unwrap();
+
+        assert_eq!(
+            public_jwk.get("kid").and_then(Value::as_str),
+            Some("issuer-key")
+        );
     }
 }
 
