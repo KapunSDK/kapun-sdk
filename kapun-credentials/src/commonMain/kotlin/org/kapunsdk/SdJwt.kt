@@ -210,7 +210,7 @@ class SdJwt(val innerJwt: SdJwtRust) : ClaimGetter {
         fun parse(str: String): SdJwt {
             return SdJwt(decodeSdjwt(str))
         }
-        fun create(claims: Value, disclosures: List<ClaimsPointer>, keyId: String, key: SignatureCreator, pubKeyJwk: Value?, hashAlg: String = "sha-256") : SdJwt? {
+        fun create(claims: Value, disclosures: List<ClaimsPointer>, keyId: String?, key: SignatureCreator, pubKeyJwk: Value?, hashAlg: String = "sha-256") : SdJwt? {
             val sdjwtHasher = SdJwtHasher.fromStr(hashAlg)
             val header = Header(typ = "dc+sd-jwt", alg = key.alg(), kid = keyId)
             if (!claims.isObject()) {
