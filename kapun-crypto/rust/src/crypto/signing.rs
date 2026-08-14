@@ -24,7 +24,6 @@ use josekit::jwk::{Jwk, KeyPair as JoseKeyPair};
 use p256::ecdsa::{signature::Signer, Signature, SigningKey, VerifyingKey};
 use p256::{ecdsa::signature::Verifier, elliptic_curve::sec1::ToEncodedPoint};
 use rand::rngs::OsRng;
-use serde_json::Value;
 use std::sync::Arc;
 
 pub enum KeyType {
