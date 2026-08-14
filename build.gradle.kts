@@ -45,6 +45,7 @@ val localMavenPublicationModules = listOf(
 	"kapun-presentation",
 	"kapun-wallet",
 	"kapun-issuance",
+	"kapun-trust",
 	"kapun-visualization",
 )
 
