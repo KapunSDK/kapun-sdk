@@ -221,9 +221,6 @@ impl SoftwareKeyPair {
     pub fn jwk_string(&self) -> String {
         self.0.jwk_string()
     }
-    pub fn jwk_string_with_key_id(&self, key_id: String) -> String {
-        self.0.jwk_string_with_key_id(&key_id)
-    }
     pub fn public_key_sec1(&self) -> Vec<u8> {
         self.0.public_key_sec1()
     }
