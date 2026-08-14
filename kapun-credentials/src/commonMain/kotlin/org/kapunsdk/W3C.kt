@@ -84,7 +84,7 @@ sealed class W3C {
             fun create(
                 claims: Value,
                 disclosures: List<ClaimsPointer>,
-                keyId: String,
+                keyId: String?,
                 key: SignatureCreator,
                 pubKeyJwk: Value?,
                 hashAlg: String = "sha-256"

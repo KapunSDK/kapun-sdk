@@ -85,6 +85,28 @@ class SdJwtTests {
     }
 
     @Test
+    fun sdJwtVcCanOmitKidHeader() {
+        val claims: Value = Json.decodeFromString(
+            """
+            {
+              "iss": "https://issuer.example.com",
+              "vct": "test",
+              "given_name": "John"
+            }
+            """.trimIndent()
+        )
+        val sdJwt = SdJwt.create(
+            claims,
+            listOf(listOf("given_name").toClaimsPointer()!!),
+            null,
+            TestSigner(SoftwareKeyPair()),
+            null
+        )!!
+
+        assertNull(sdJwt.innerJwt.originalJwt.headerKid())
+    }
+
+    @Test
     fun w3cSdJwtHeaderUsesVcSdJwtTyp() {
         val claims: Value = Json.decodeFromString(
             """
@@ -107,6 +129,31 @@ class SdJwtTests {
         )!!
 
         assertEquals("vc+sd-jwt", credential.inner.originalJwt.headerTyp())
+    }
+
+    @Test
+    fun w3cSdJwtCanOmitKidHeader() {
+        val claims: Value = Json.decodeFromString(
+            """
+            {
+              "@context": ["https://www.w3.org/ns/credentials/v2"],
+              "type": ["VerifiableCredential", "TestCredential"],
+              "issuer": "https://issuer.example.com",
+              "credentialSubject": {
+                "given_name": "John"
+              }
+            }
+            """.trimIndent()
+        )
+        val credential = W3C.SdJwt.create(
+            claims,
+            listOf(listOf("credentialSubject", "given_name").toClaimsPointer()!!),
+            null,
+            TestSigner(SoftwareKeyPair()),
+            null
+        )!!
+
+        assertNull(credential.inner.originalJwt.headerKid())
     }
 
     @Test
@@ -386,10 +433,17 @@ class SdJwtTests {
 //    }
 
     private fun String.headerTyp(): String? {
-        val header = split(".").first()
-        return Json.parseToJsonElement(base64UrlDecode(header).decodeToString())
-            .jsonObject["typ"]
+        return jwtHeader()["typ"]
             ?.jsonPrimitive
             ?.content
     }
+
+    private fun String.headerKid(): String? {
+        return jwtHeader()["kid"]
+            ?.jsonPrimitive
+            ?.content
+    }
+
+    private fun String.jwtHeader() =
+        Json.parseToJsonElement(base64UrlDecode(split(".").first()).decodeToString()).jsonObject
 }
