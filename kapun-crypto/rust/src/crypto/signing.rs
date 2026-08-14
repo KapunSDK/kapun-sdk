@@ -18,12 +18,12 @@ specific language governing permissions and limitations
 under the License.
  */
 
-use crate::crypto::{base64_url_decode, base64_url_encode, SignatureCreator};
-use josekit::jwk::Jwk;
+use crate::crypto::{base64_url_decode, SignatureCreator};
+use josekit::jwk::alg::ec::{EcCurve, EcKeyPair};
+use josekit::jwk::{Jwk, KeyPair as JoseKeyPair};
 use p256::ecdsa::{signature::Signer, Signature, SigningKey, VerifyingKey};
 use p256::{ecdsa::signature::Verifier, elliptic_curve::sec1::ToEncodedPoint};
 use rand::rngs::OsRng;
-use serde_json::Value;
 use std::sync::Arc;
 
 pub enum KeyType {
@@ -58,7 +58,8 @@ pub fn from_private_key(private_key: Vec<u8>) -> Option<KeyPair> {
 }
 pub fn from_private_jwk_string(private_key_jwk: &str) -> Option<KeyPair> {
     let jwk = Jwk::from_bytes(private_key_jwk.as_bytes()).ok()?;
-    let private_key = p256::SecretKey::from_slice(&jwk_private_key_bytes(&jwk)?).ok()?;
+    let jose_key_pair = EcKeyPair::from_jwk(&jwk).ok()?;
+    let private_key = p256::SecretKey::from_sec1_der(&jose_key_pair.to_raw_private_key()).ok()?;
     let public_key = private_key.public_key();
     let key_id = jwk
         .key_id()
@@ -125,58 +126,24 @@ impl KeyPair {
     }
 
     pub fn jwk_string(&self) -> String {
-        self.to_jose_jwk(false)
-            .map(|jwk| jwk.to_string())
+        self.to_jose_key_pair()
+            .map(|key_pair| key_pair.to_jwk_public_key().to_string())
             .unwrap_or_default()
     }
     pub fn private_jwk_string(&self) -> String {
-        self.to_jose_jwk(true)
-            .map(|jwk| jwk.to_string())
+        self.to_jose_key_pair()
+            .map(|key_pair| key_pair.to_jwk_private_key().to_string())
             .unwrap_or_default()
     }
 
-    fn to_jose_jwk(&self, private: bool) -> Option<Jwk> {
-        let Self::P256 {
-            private_key,
-            public_key,
-            key_id,
-        } = self;
-        let mut jwk = Jwk::new("EC");
-        jwk.set_parameter("crv", Some(Value::String("P-256".to_string())))
-            .ok()?;
+    fn to_jose_key_pair(&self) -> Option<EcKeyPair> {
+        let mut key_pair =
+            EcKeyPair::from_der(self.private_key_bytes(), Some(EcCurve::P256)).ok()?;
+        let Self::P256 { key_id, .. } = self;
         if let Some(key_id) = key_id {
-            jwk.set_key_id(key_id);
+            key_pair.set_key_id(Some(key_id.clone()));
         }
-
-        let public_key = public_key.to_encoded_point(false);
-        jwk.set_parameter(
-            "x",
-            Some(Value::String(base64_url_encode(public_key.x()?.to_vec()))),
-        )
-        .ok()?;
-        jwk.set_parameter(
-            "y",
-            Some(Value::String(base64_url_encode(public_key.y()?.to_vec()))),
-        )
-        .ok()?;
-        if private {
-            jwk.set_parameter(
-                "d",
-                Some(Value::String(base64_url_encode(
-                    private_key.to_bytes().to_vec(),
-                ))),
-            )
-            .ok()?;
-        }
-
-        Some(jwk)
-    }
-}
-
-fn jwk_private_key_bytes(jwk: &Jwk) -> Option<Vec<u8>> {
-    match jwk.parameter("d") {
-        Some(Value::String(value)) => Some(base64_url_decode(value.to_string())),
-        _ => None,
+        Some(key_pair)
     }
 }
 
@@ -278,6 +245,7 @@ impl SignatureCreator for SoftwareKeyPair {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::Value;
 
     #[test]
     fn public_jwk_omits_key_id_by_default() {
