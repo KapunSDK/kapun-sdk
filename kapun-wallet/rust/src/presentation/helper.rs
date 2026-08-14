@@ -24,6 +24,7 @@ use std::sync::Arc;
 
 use anyhow::{Context, anyhow};
 use heidi_jwt::jwt::creator::JwtCreator;
+use heidi_jwt::{ES256, JwsAlgorithm, JwsHeader};
 use regex::Regex;
 use reqwest::Url;
 use sdjwt::{ExternalSigner, Holder, SpecVersion};
@@ -462,7 +463,7 @@ QDVxPuyj2MJjrfJpObqhmKuzjXWhRANCAARoOdx9P/3Pr9TOyWtvRNnv9gyVEJd9
 eQitkfKWSHR/Sco6Jm/PJkO2ozsMJz5R5k7/+bXVJWll7Lo4xfKij8XI
 -----END PRIVATE KEY-----"#;
 
-    let signer = josekit::jws::ES256.signer_from_der(&pem).unwrap();
+    let signer = ES256.signer_from_der(&pem).unwrap();
 
     // let issuer = EncodingKey::from_ec_pem(pem).unwrap();
     let payload = {
@@ -478,8 +479,8 @@ eQitkfKWSHR/Sco6Jm/PJkO2ozsMJz5R5k7/+bXVJWll7Lo4xfKij8XI
         payload["cnf"]["jwk"]["alg"] = serde_json::Value::String("ES256".into());
         payload
     };
-    let mut header = josekit::jws::JwsHeader::new();
-    header.set_algorithm(josekit::jws::ES256.name());
+    let mut header = JwsHeader::new();
+    header.set_algorithm(ES256.name());
     header.set_token_type("vc+sd-jwt");
 
     payload

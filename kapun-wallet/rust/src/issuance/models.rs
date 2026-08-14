@@ -3,6 +3,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use base64::{Engine, prelude::BASE64_URL_SAFE_NO_PAD};
 use heidi_jwt::jwt::creator::JwtCreator;
+use heidi_jwt::JwsHeader;
 use kapun_util_rust::value::Value;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
@@ -531,7 +532,7 @@ pub struct ProofOfPossession {
 }
 
 impl ProofBuilder {
-    fn get_jws_header(&self) -> anyhow::Result<josekit::jws::JwsHeader> {
+    fn get_jws_header(&self) -> anyhow::Result<JwsHeader> {
         if self.use_did_jwk {
             use serde_json::Value as JsonValue;
             let signer = self
@@ -552,13 +553,10 @@ impl ProofBuilder {
                 "kid".to_string(),
                 JsonValue::String(format!("did:jwk:{encoded_jwk}#0")),
             );
-            josekit::jws::JwsHeader::from_map(map)
-                .or_else(|e| Err(anyhow::anyhow!("Invalid Header: {e}")))
+            JwsHeader::from_map(map).or_else(|e| Err(anyhow::anyhow!("Invalid Header: {e}")))
         } else {
-            josekit::jws::JwsHeader::from_bytes(
-                self.signer.as_ref().unwrap().signer.jwt_header().as_bytes(),
-            )
-            .or_else(|e| Err(anyhow::anyhow!("Invalid Header: {e}")))
+            JwsHeader::from_bytes(self.signer.as_ref().unwrap().signer.jwt_header().as_bytes())
+                .or_else(|e| Err(anyhow::anyhow!("Invalid Header: {e}")))
         }
     }
 
