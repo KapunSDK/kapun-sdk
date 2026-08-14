@@ -28,6 +28,12 @@ plugins {
 allprojects {
 	group = "org.kapunsdk"
 	version = getProjectVersion()
+
+	tasks.matching { it.name.startsWith("sign") && it.name.endsWith("Publication") }.configureEach {
+		onlyIf {
+			!isMavenLocalPublicationRequested()
+		}
+	}
 }
 
 val localMavenPublicationModules = listOf(
@@ -58,3 +64,12 @@ private fun getProjectVersion(): String {
 	val versionFromWorkflow = runCatching { property("githubRefName").toString().removePrefix("v") }.getOrNull()
 	return versionFromWorkflow ?: versionFromGradleProperties ?: "untagged"
 }
+
+private fun isMavenLocalPublicationRequested(): Boolean =
+	gradle.startParameter.taskNames.any { taskName ->
+		taskName == "publishJvmToMavenLocal" ||
+			taskName == "publishToMavenLocal" ||
+			taskName.endsWith(":publishJvmToMavenLocal") ||
+			taskName.endsWith(":publishToMavenLocal") ||
+			taskName.endsWith("PublicationToMavenLocal")
+	}
