@@ -418,3 +418,42 @@ fun Value.Companion.fromJsonElement(json: JsonElement): Value = when (json) {
     is JsonArray -> Value.Array(json.map { fromJsonElement(it) })
     is JsonObject -> Value.Object(json.mapValues { (_, v) -> fromJsonElement(v) })
 }
+
+// Converts to/from plain Java-native types (Map, List, String, Number, Boolean, null) rather
+// than a Value or JsonElement tree. Intended for JVM/Java callers that want a generic object
+// graph to hand to something like Jackson, not another Kotlin-specific intermediate type.
+fun Value.toPlainObject(): Any? = when (this) {
+    is Value.Object -> this.v1.mapValues { (_, v) -> v.toPlainObject() }
+    is Value.Array -> this.v1.map { it.toPlainObject() }
+    is Value.Boolean -> this.v1
+    is Value.Bytes -> this.v1.toList()
+    Value.Null -> null
+    is Value.Number -> when (val inner = this.v1) {
+        is JsonNumber.Float -> inner.v1
+        is JsonNumber.Integer -> inner.v1
+    }
+    is Value.OrderedObject -> this.v1.entries.associate { it.key.toPlainObject() to it.value.toPlainObject() }
+    is Value.String -> this.v1
+    is Tag -> mapOf("tag" to this.tag, "value" to this.value)
+}
+
+fun Any?.toPlainValue(): Value = when (this) {
+    null -> Value.Null
+    is Value -> this
+    is Boolean -> Value.Boolean(this)
+    is String -> Value.String(this)
+    is ByteArray -> Value.Bytes(this)
+    is Double, is Float -> Value.Number(JsonNumber.Float((this as Number).toDouble()))
+    is Number -> Value.Number(JsonNumber.Integer(this.toLong()))
+    is Iterable<*> -> Value.Array(this.map { it.toPlainValue() })
+    is Array<*> -> Value.Array(this.map { it.toPlainValue() })
+    is Map<*, *> -> if (this.keys.all { it is String }) {
+        @Suppress("UNCHECKED_CAST")
+        Value.Object((this as Map<String, Any?>).mapValues { (_, v) -> v.toPlainValue() })
+    } else {
+        Value.OrderedObject(OrderedMap(this.entries.map { MapEntry(it.key.toPlainValue(), it.value.toPlainValue()) }))
+    }
+    else -> Value.Null
+}
+
+fun Map<String, Any?>.toPlainValueMap(): Map<String, Value> = this.mapValues { (_, v) -> v.toPlainValue() }
