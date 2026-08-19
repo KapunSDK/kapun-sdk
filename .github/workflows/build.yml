@@ -77,7 +77,7 @@ jobs:
           AR_aarch64_unknown_linux_gnu: aarch64-linux-gnu-ar
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUSTFLAGS: "-C link-args=-fstack-protector-all -lssp"
-          CARGO_TARGET_X86_64-PC-WINDOWS-GNU: x86_64-w64-mingw32-gcc
+          CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER: x86_64-w64-mingw32-gcc
         run: |
           echo "${{secrets.MAVEN_SIGNING_KEY_ARMOR_ASC}}" > ./signingkey.asc
           gpg --quiet --output $GITHUB_WORKSPACE/signingkey.gpg --dearmor ./signingkey.asc
