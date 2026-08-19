@@ -70,9 +70,6 @@ jobs:
           brew install mingw-w64
       - name: Build
         env:
-          UB_ARTIFACTORY_URL_ANDROID: ${{ secrets.ARTIFACTORY_URL_ANDROID }}
-          UB_ARTIFACTORY_USER: ${{ secrets.ARTIFACTORY_USER }}
-          UB_ARTIFACTORY_PASSWORD: ${{ secrets.ARTIFACTORY_PASSWORD }}
           IPHONEOS_DEPLOYMENT_TARGET: "16.4"
           CC_x86_64_unknown_linux_gnu: x86_64-linux-gnu-gcc
           CXX_x86_64_unknown_linux_gnu: x86_64-linux-gnu-g++
