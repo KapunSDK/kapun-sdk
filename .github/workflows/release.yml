@@ -19,6 +19,9 @@ jobs:
     name: "Publish to Artifactory"
     runs-on: ["self-hosted", "macOS"]
     timeout-minutes: 120
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-${{ matrix.platform }}
+      cancel-in-progress: false
 
     steps:
       - uses: actions/checkout@v5.1.0
