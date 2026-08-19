@@ -86,5 +86,19 @@ To build and run the iOS sample app:
   brew install mingw-w64
  ```
 
+### Publishing to Maven Local
+
+To build against a local SDK version, publish the JVM artifacts to `~/.m2`:
+
+```bash
+./gradlew publishJvmPublicationToMavenLocal -PARTIFACT_VERSION=1.0.0-LOCAL
+```
+
+Gradle runs the task in every module that has a JVM publication, so consumers can depend on the
+`-jvm` coordinates (e.g. `org.kapunsdk:kapun-trust-jvm:1.0.0-LOCAL`). Publishing every target
+locally, including Android and iOS, is done with `./gradlew publishToMavenLocal` and requires the
+Rust toolchains for all targets. Signing is disabled by default (see `RELEASE_SIGNING_ENABLED` in
+`gradle.properties`), so no signatory needs to be configured.
+
 ## License
 This project is licensed under the terms of the Apache License 2. See the [LICENSE](./LICENSE) file for details.
