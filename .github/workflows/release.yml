@@ -84,7 +84,10 @@ jobs:
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUSTFLAGS: "-C link-args=-fstack-protector-all -lssp"
           CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER: x86_64-w64-mingw32-gcc
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.MAVEN_SIGNING_KEY_ARMOR_ASC }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyId: ${{ secrets.MAVEN_SIGNING_KEY_ID }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.MAVEN_SIGNING_KEY_PASSPHRASE }}
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
         run: |
-          echo "${{secrets.MAVEN_SIGNING_KEY_ARMOR_ASC}}" > ./signingkey.asc
-          gpg --quiet --output $GITHUB_WORKSPACE/signingkey.gpg --dearmor ./signingkey.asc
-          ./gradlew buildBindings ${{ steps.gradle_tasks.outputs.tasks }} -PgithubRefName=${{ github.ref_name }} -PreleaseBuild=true -PRELEASE_SIGNING_ENABLED=true -Psigning.secretKeyRingFile=$GITHUB_WORKSPACE/signingkey.gpg -Psigning.password='${{secrets.MAVEN_SIGNING_KEY_PASSPHRASE}}' -Psigning.keyId=${{secrets.MAVEN_SIGNING_KEY_ID}} -PmavenCentralUsername=${{secrets.MAVEN_CENTRAL_USERNAME}} -PmavenCentralPassword=${{secrets.MAVEN_CENTRAL_PASSWORD}} 
+          ./gradlew buildBindings ${{ steps.gradle_tasks.outputs.tasks }} -PgithubRefName=${{ github.ref_name }} -PreleaseBuild=true -PRELEASE_SIGNING_ENABLED=true
