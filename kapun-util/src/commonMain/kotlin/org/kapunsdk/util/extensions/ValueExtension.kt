@@ -419,20 +419,26 @@ fun Value.Companion.fromJsonElement(json: JsonElement): Value = when (json) {
     is JsonObject -> Value.Object(json.mapValues { (_, v) -> fromJsonElement(v) })
 }
 
-// Converts to/from plain Java-native types (Map, List, String, Number, Boolean, null) rather
-// than a Value or JsonElement tree. Intended for JVM/Java callers that want a generic object
-// graph to hand to something like Jackson, not another Kotlin-specific intermediate type.
+// Converts to/from plain Java-native types (Map, List, ByteArray, String, Number, Boolean, null)
+// rather than a Value or JsonElement tree. Intended for JVM/Java callers that want a generic
+// object graph to hand to something like Jackson, not another Kotlin-specific intermediate type.
+//
+// Objects and ordered objects both become insertion-ordered maps, so a round trip back through
+// toPlainValue cannot tell them apart: an OrderedObject keyed entirely by strings returns as a
+// Value.Object. Everything else round trips unchanged.
 fun Value.toPlainObject(): Any? = when (this) {
     is Value.Object -> this.v1.mapValues { (_, v) -> v.toPlainObject() }
     is Value.Array -> this.v1.map { it.toPlainObject() }
     is Value.Boolean -> this.v1
-    is Value.Bytes -> this.v1.toList()
+    is Value.Bytes -> this.v1
     Value.Null -> null
     is Value.Number -> when (val inner = this.v1) {
         is JsonNumber.Float -> inner.v1
         is JsonNumber.Integer -> inner.v1
     }
-    is Value.OrderedObject -> this.v1.entries.associate { it.key.toPlainObject() to it.value.toPlainObject() }
+    is Value.OrderedObject -> this.v1.entries.associateTo(LinkedHashMap()) {
+        it.key.toPlainObject() to it.value.toPlainObject()
+    }
     is Value.String -> this.v1
     is Tag -> mapOf("tag" to this.tag, "value" to this.value)
 }
