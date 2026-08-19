@@ -18,6 +18,7 @@ jobs:
         platform: ["kmp", "android", "ios", "jvm"]
     name: "Publish to Artifactory"
     runs-on: ["self-hosted", "macOS"]
+    timeout-minutes: 120
 
     steps:
       - uses: actions/checkout@v5.1.0
