@@ -70,9 +70,12 @@ jobs:
           brew install aarch64-unknown-linux-gnu
           # install mingw-w64 targets
           brew install mingw-w64
+      - name: Export iOS deployment target
+        run: |
+          echo "IPHONEOS_DEPLOYMENT_TARGET=$(grep '^IPHONEOS_DEPLOYMENT_TARGET=' gradle.properties | cut -d '=' -f2)" >> "$GITHUB_ENV"
+
       - name: Publish artifact
         env:
-          IPHONEOS_DEPLOYMENT_TARGET: "16.4"
           CC_x86_64_unknown_linux_gnu: x86_64-linux-gnu-gcc
           CXX_x86_64_unknown_linux_gnu: x86_64-linux-gnu-g++
           AR_x86_64_unknown_linux_gnu: x86_64-linux-gnu-ar
