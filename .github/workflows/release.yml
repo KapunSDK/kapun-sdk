@@ -10,9 +10,6 @@ on:
 permissions:
   contents: read
 
-permissions:
-  contents: read
-
 jobs:
   release:
     strategy:
@@ -97,4 +94,4 @@ jobs:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
         run: |
-          ./gradlew buildBindings ${{ steps.gradle_tasks.outputs.tasks }} -PreleaseBuild=true -PgithubRefName=${{ github.ref_name }} -PRELEASE_SIGNING_ENABLED=true
+          ./gradlew buildBindings ${{ steps.gradle_tasks.outputs.tasks }} -PgithubRefName=${{ github.ref_name }} -PRELEASE_SIGNING_ENABLED=true
