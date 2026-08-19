@@ -94,5 +94,4 @@ cargo {
 mavenPublishing {
 	coordinates(artifactId= property("ARTIFACT_ID").toString(), version= project.version.toString())
 	publishToMavenCentral(true)
-	signAllPublications()
 }
