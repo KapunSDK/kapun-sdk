@@ -253,3 +253,18 @@ fun Mdoc.Companion.parseAndVerify(
 
 	return Result.success(mdoc)
 }
+
+/**
+ * Parses an OpenID4VP `vp_token` CBOR structure, extracting its "documents" array.
+ */
+@Throws(MDocVerificationException::class)
+fun parseVpToken(vpToken: ByteArray): List<Value>? =
+	decodeCbor(vpToken)["documents"].asArray()
+
+/**
+ * Verifies [document] against [steps] and returns its disclosed namespace map.
+ */
+fun Mdoc.Companion.verifyDocument(document: Value, steps: Set<VerificationStep>): Value {
+	val parsed = parseAndVerify(document, steps).getOrThrow()
+	return parsed.mdoc.namespaceMap
+}
