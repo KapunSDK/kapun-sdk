@@ -13,6 +13,7 @@ jobs:
       matrix:
         platform: ["kmp", "android", "ios", "jvm"]
     runs-on: ["self-hosted", "macOS"]
+    timeout-minutes: 120
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-${{ matrix.platform }}
       cancel-in-progress: true
