@@ -167,7 +167,11 @@ pub fn verify_chain_at<Provider: KapunCryptoProvider>(
                 return false;
             }
             if !are_x509_name_equal(&subject_cert.issuer, &issuer_cert.subject) {
-                tracing::error!("issuer name and subject name missmatch");
+                tracing::error!(
+                    "issuer name and subject name missmatch {}/{}",
+                    &subject_cert.issuer.to_string(),
+                    &issuer_cert.subject.to_string()
+                );
                 return false;
             }
 
