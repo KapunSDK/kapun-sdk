@@ -9,7 +9,9 @@ ureq = { workspace = true, optional = true }
 whitespace-sifter = "2.3.7"
 tracing = "^0.1"
 kapun-crypto-provider = { git = "https://github.com/heidiverse/kapun-sdk.git", branch = "feature/crypto-provider", default-features = false }
-
+simple_x509 = { version = "1.1.0"}
+rand.workspace = true
+p12 = { git = "https://github.com/ubamrein/p12.git", optional = true}
 
 
 
@@ -17,6 +19,8 @@ kapun-crypto-provider = { git = "https://github.com/heidiverse/kapun-sdk.git", b
 default = ["crl"]
 uniffi = []
 crl = ["dep:ureq"]
+builder = ["p12"]
+p12 = ["dep:p12"]
 
 [dev-dependencies]
 flate2 = "1.1.9"
@@ -26,5 +30,6 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 josekit = { git = "https://github.com/heidiverse/josekit-rs.git", default-features = false, features = [
     "rustcrypto",
     "pqc",
-    "legacy-crypto"
+    "legacy-crypto",
+    "kapun-provider"
 ], branch = "feature/digest-signing" }

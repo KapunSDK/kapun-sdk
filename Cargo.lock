@@ -2433,6 +2433,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "des"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ffdd80ce8ce993de27e9f063a444a4d53ce8e8db4c1f00cc03af5ad5a9867a1e"
+dependencies = [
+ "cipher 0.4.4",
+]
+
+[[package]]
 name = "devise"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3922,31 +3931,16 @@ checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 [[package]]
 name = "heidi-jwt"
 version = "0.1.2"
-source = "git+https://github.com/heidiverse/heidi-jwt?tag=v0.2.0#c774bd7c78f2c3dfc5518933daeed6532e1601b3"
+source = "git+https://github.com/heidiverse/heidi-jwt?branch=feeature%2Fkapun#d9d37fea4b4ec0a58a1a473de5e80af8b3fef1f9"
 dependencies = [
  "base64 0.22.1",
  "chrono",
- "heidi-x509",
  "itertools 0.14.0",
  "josekit 0.11.0 (git+https://github.com/heidiverse/josekit-rs.git)",
+ "kapun-x509 0.1.0 (git+https://github.com/heidiverse/kapun-sdk.git)",
  "serde",
  "serde_json",
  "tracing",
-]
-
-[[package]]
-name = "heidi-x509"
-version = "0.1.0"
-source = "git+https://github.com/heidiverse/heidi-x509.git#7ec0e8498596c0115e086e3137e58b906dea68e3"
-dependencies = [
- "josekit 0.11.0 (git+https://github.com/heidiverse/josekit-rs.git)",
- "oid-registry",
- "rsa 0.10.0-rc.18",
- "sha1",
- "tracing",
- "ureq 3.4.0",
- "whitespace-sifter",
- "x509-parser",
 ]
 
 [[package]]
@@ -4879,11 +4873,12 @@ dependencies = [
  "getrandom 0.3.4",
  "hmac 0.13.0",
  "k256",
+ "kapun-crypto-provider 0.1.0 (git+https://github.com/heidiverse/kapun-sdk.git?branch=feature%2Fcrypto-provider)",
  "ml-dsa",
  "p256 0.13.2",
  "p384",
  "p521",
- "pbkdf2",
+ "pbkdf2 0.13.0",
  "pem",
  "pkcs1 0.8.0-rc.4",
  "pkcs8 0.11.0",
@@ -4892,7 +4887,7 @@ dependencies = [
  "rsa 0.10.0-rc.18",
  "serde",
  "serde_json",
- "sha1",
+ "sha1 0.11.0",
  "sha2 0.11.0",
  "signature 3.0.0",
  "spki 0.8.0",
@@ -4927,7 +4922,7 @@ dependencies = [
  "p256 0.13.2",
  "p384",
  "p521",
- "pbkdf2",
+ "pbkdf2 0.13.0",
  "pem",
  "pkcs1 0.8.0-rc.4",
  "pkcs8 0.11.0",
@@ -4936,7 +4931,7 @@ dependencies = [
  "rsa 0.10.0-rc.18",
  "serde",
  "serde_json",
- "sha1",
+ "sha1 0.11.0",
  "sha2 0.11.0",
  "signature 3.0.0",
  "spki 0.8.0",
@@ -5296,7 +5291,7 @@ dependencies = [
  "hkdf 0.12.4",
  "josekit 0.11.0 (git+https://github.com/heidiverse/josekit-rs.git?branch=feature%2Fdigest-signing)",
  "kapun-util-rust",
- "kapun-x509",
+ "kapun-x509 0.1.0",
  "multibase",
  "oid-registry",
  "p256 0.13.2",
@@ -5427,7 +5422,7 @@ dependencies = [
  "kapun-credentials-rust",
  "kapun-crypto-rust",
  "kapun-util-rust",
- "kapun-x509",
+ "kapun-x509 0.1.0",
  "lazy_static",
  "libc",
  "lipsum",
@@ -5473,10 +5468,28 @@ dependencies = [
  "flate2",
  "josekit 0.11.0 (git+https://github.com/heidiverse/josekit-rs.git?branch=feature%2Fdigest-signing)",
  "kapun-crypto-provider 0.1.0 (git+https://github.com/heidiverse/kapun-sdk.git?branch=feature%2Fcrypto-provider)",
+ "p12",
  "pem",
+ "rand 0.8.8",
+ "simple_x509",
  "tar",
  "tracing",
  "tracing-subscriber 0.3.23",
+ "ureq 3.4.0",
+ "whitespace-sifter",
+ "x509-parser",
+]
+
+[[package]]
+name = "kapun-x509"
+version = "0.1.0"
+source = "git+https://github.com/heidiverse/kapun-sdk.git#476effa11e26edc44410c1414f67d20ee6e77239"
+dependencies = [
+ "josekit 0.11.0 (git+https://github.com/heidiverse/josekit-rs.git)",
+ "oid-registry",
+ "rsa 0.10.0-rc.18",
+ "sha1 0.11.0",
+ "tracing",
  "ureq 3.4.0",
  "whitespace-sifter",
  "x509-parser",
@@ -5489,12 +5502,12 @@ dependencies = [
  "base64 0.22.1",
  "clap",
  "josekit 0.11.0 (git+https://github.com/heidiverse/josekit-rs.git?branch=feature%2Fdigest-signing)",
- "kapun-x509",
+ "kapun-x509 0.1.0",
  "oid-registry",
  "pem",
  "rsa 0.10.0-rc.18",
  "serde_json",
- "sha1",
+ "sha1 0.11.0",
  "tracing-subscriber 0.3.23",
 ]
 
@@ -6559,7 +6572,7 @@ dependencies = [
 [[package]]
 name = "openidconnect-federation"
 version = "0.1.0"
-source = "git+https://github.com/UbiqueInnovation/openidconnect-federation.git?branch=main#89f0859c8473d9c1f5faf768dfbff5d35215d1d7"
+source = "git+https://github.com/UbiqueInnovation/openidconnect-federation.git?branch=feature%2Fkapun#4e6c36c81f844d5e0e74b8f1c798c5e03d43efee"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -6684,6 +6697,25 @@ dependencies = [
  "oxiri",
  "oxrdf",
  "thiserror 2.0.20",
+]
+
+[[package]]
+name = "p12"
+version = "0.6.3"
+source = "git+https://github.com/ubamrein/p12.git#081769dd57c8831d3ec4f8b3476ff9f2e792b131"
+dependencies = [
+ "aes 0.8.4",
+ "cbc 0.1.2",
+ "cipher 0.4.4",
+ "des",
+ "getrandom 0.2.17",
+ "hmac 0.12.1",
+ "lazy_static",
+ "pbkdf2 0.12.2",
+ "rc2",
+ "sha1 0.10.7",
+ "sha2 0.10.9",
+ "yasna",
 ]
 
 [[package]]
@@ -6839,6 +6871,17 @@ name = "paste"
 version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
+
+[[package]]
+name = "pbkdf2"
+version = "0.12.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f8ed6a7761f76e3b9f92dfb0a60a6a6477c61024b775147ff0973a02653abaf2"
+dependencies = [
+ "digest 0.10.7",
+ "hmac 0.12.1",
+ "sha2 0.10.9",
+]
 
 [[package]]
 name = "pbkdf2"
@@ -7076,7 +7119,7 @@ dependencies = [
  "aes-gcm 0.11.1",
  "cbc 0.2.1",
  "der 0.8.1",
- "pbkdf2",
+ "pbkdf2 0.13.0",
  "rand_core 0.10.1",
  "scrypt",
  "sha2 0.11.0",
@@ -7701,6 +7744,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "rc2"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "62c64daa8e9438b84aaae55010a93f396f8e60e3911590fcba770d04643fc1dd"
+dependencies = [
+ "cipher 0.4.4",
+]
+
+[[package]]
 name = "rdf-canon"
 version = "0.15.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8308,7 +8360,7 @@ dependencies = [
  "pkcs1 0.8.0-rc.4",
  "pkcs8 0.11.0",
  "rand_core 0.10.1",
- "sha1",
+ "sha1 0.11.0",
  "sha2 0.11.0",
  "signature 3.0.0",
  "spki 0.8.0",
@@ -8679,7 +8731,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d87af57419b594aa23fa95f09f0e06d80d84ba01c26148c43844cad6ff4485f0"
 dependencies = [
  "cfg-if",
- "pbkdf2",
+ "pbkdf2 0.13.0",
  "salsa20",
  "sha2 0.11.0",
 ]
@@ -9044,6 +9096,17 @@ checksum = "66cf8fedced2fcf12406bcb34223dffb92eaf34908ede12fed414c82b7f00b3e"
 dependencies = [
  "base16ct 1.0.0",
  "serde",
+]
+
+[[package]]
+name = "sha1"
+version = "0.10.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a978451301f4db1d02937a4ab3ccce137717b81826e79b7d49ffe3244a13c3b8"
+dependencies = [
+ "cfg-if",
+ "cpufeatures 0.2.17",
+ "digest 0.10.7",
 ]
 
 [[package]]
@@ -11934,6 +11997,12 @@ checksum = "cfe53a6657fd280eaa890a3bc59152892ffa3e30101319d168b781ed6529b049"
 dependencies = [
  "is-terminal",
 ]
+
+[[package]]
+name = "yasna"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e17bb3549cc1321ae1296b9cdc2698e2b6cb1992adfa19a8c72e5b7a738f44cd"
 
 [[package]]
 name = "yoke"
