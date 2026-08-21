@@ -1,7 +1,6 @@
 use kapun_crypto_provider::KapunCryptoProvider;
 use whitespace_sifter::WhitespaceSifter;
 use x509_parser::{
-    der_parser::oid,
     parse_x509_certificate,
     prelude::{
         ParsedExtension, TbsCertificateStructureValidator, Validator, VecLogger,
