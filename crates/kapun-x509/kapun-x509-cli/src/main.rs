@@ -49,6 +49,7 @@ enum What {
     San,
     PublicKey,
     BasicInfo,
+    KeyUsage,
 }
 
 fn main() {
@@ -133,6 +134,13 @@ fn main() {
             }
             What::PublicKey => {
                 print_public_key(&cert);
+            }
+            What::KeyUsage => {
+                let key_usage = cert
+                    .key_usage()
+                    .expect("Failed to find key usage")
+                    .expect("Key usage is absent");
+                println!("{}", key_usage.value.to_string());
             }
         },
         Commands::Validate { chain } => {
@@ -234,15 +242,25 @@ fn print_info(cert: &X509Certificate) {
             println!("No subject alternative name found");
         }
     }
+
+    if let Ok(Some(key_usage)) = cert.key_usage() {
+        println!();
+        println!("KeyUsage: {}", key_usage.value);
+    }
+
     println!();
     let uri = kapun_x509::x509::get_crl_uri(&cert).expect("Failed to parse extension");
     match uri {
         Some(uri) => println!("CRL: {uri}"),
         None => println!("No crl found"),
     }
-    let revocation_status =
-        kapun_x509::x509::check_revocation(&cert).expect("Failed to check revocation");
-    println!("[Revocation status] Certificate is revoked: {revocation_status}");
+    match kapun_x509::x509::check_revocation(&cert) {
+        Ok(revocation_status) => {
+            println!("[Revocation status] Certificate is revoked: {revocation_status}")
+        }
+        Err(_) => println!("!! Failed to check CRL !!"),
+    }
+
     println!();
     println!();
 }
