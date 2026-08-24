@@ -40,10 +40,10 @@ sealed interface VerificationStep {
 	data object IssuerSignature : VerificationStep
 	data object CertChain : VerificationStep
 	data class DeviceSignature(
-		val audience: String,
-		val responseUri: String,
-		val mdocGeneratedNonce: String,
+		val clientId: String,
 		val nonce: String,
+		val jwkThumbprint: ByteArray?,
+		val responseUri: String,
 	) : VerificationStep
 
 	data object IssuerSigned : VerificationStep
@@ -171,40 +171,11 @@ fun Mdoc.Companion.parseAndVerify(
 									Value.Array(
 										listOf(
 											Value.String("DeviceAuthentication"),
-											Value.Array(
-												listOf(
-													Value.Null,
-													Value.Null,
-													Value.Array(
-														listOf(
-															Value.Bytes(
-																digest(
-																	"SHA-256", encodeCbor(
-																		Value.Array(
-																			listOf(
-																				Value.String(step.audience),
-																				Value.String(step.mdocGeneratedNonce)
-																			)
-																		)
-																	)
-																)
-															),
-															Value.Bytes(
-																digest(
-																	"SHA-256", encodeCbor(
-																		Value.Array(
-																			listOf(
-																				Value.String(step.responseUri),
-																				Value.String(step.mdocGeneratedNonce)
-																			)
-																		)
-																	)
-																)
-															),
-															Value.String(step.nonce)
-														)
-													)
-												)
+											mdoc.getSessionTranscript(
+												step.clientId,
+												step.nonce,
+												step.jwkThumbprint,
+												step.responseUri,
 											),
 											Value.String(mdoc.doctype()!!),
 											deviceSigned["nameSpaces"]
