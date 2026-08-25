@@ -121,8 +121,12 @@ fun Mdoc.Companion.parseAndVerify(
 			VerificationStep.CertChain -> {
 				val unprotectedHeader = document["issuerSigned"]["issuerAuth"][1]
 				val x5Chain =
-					unprotectedHeader.asOrderedObject()!![Value.Number(JsonNumber.Integer(33))]!!.asBytes()!!
-				val certs = extractCerts(x5Chain)
+					unprotectedHeader.asOrderedObject()?.get(Value.Number(JsonNumber.Integer(33))) ?: return Result.failure(FailedToVerifyX509ChainException())
+				val certs = if(x5Chain.isArray()) {
+					x5Chain.asArray()?.map { extractCerts(it.asBytes()?: return Result.failure(FailedToVerifyX509ChainException())).firstOrNull() ?: return Result.failure(FailedToVerifyX509ChainException())}
+				} else {
+					extractCerts(x5Chain.asBytes()?: return Result.failure(FailedToVerifyX509ChainException()))
+				} ?: return Result.failure(FailedToVerifyX509ChainException())
 
 				if (!verifyChain(certs))
 					return Result.failure(FailedToVerifyX509ChainException())
