@@ -161,17 +161,11 @@ impl EncryptionParameters {
         log_warn!("PEX", &self.authorization_encrypted_response_enc);
         header.set_algorithm(self.authorization_encrytped_response_alg.clone());
         log_warn!("PEX", &self.authorization_encrytped_response_alg);
-        if self
-            .authorization_encrytped_response_alg
-            .starts_with("ECDH-ES")
-        {
-            let Some(apu) = apu else {
-                return Err(anyhow!("No apu!").into());
-            };
-            let Some(apv) = apv else {
-                return Err(anyhow!("No apv!").into());
-            };
+
+        if let Some(apu) = apu {
             header.set_agreement_partyuinfo(apu);
+        }
+        if let Some(apv) = apv {
             header.set_agreement_partyvinfo(apv);
         }
 
