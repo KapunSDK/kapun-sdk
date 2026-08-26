@@ -70,7 +70,6 @@ mod issuance {
         get_access_token, get_credential, get_credential_with_proofs, get_proof_body,
         try_get_deferred_credential,
     };
-    use crate::jwx::EncryptionParameters;
     use crate::{
         ApiError,
         error::CredentialError,
@@ -90,6 +89,7 @@ mod issuance {
         signing::{BatchSigner, KeyType, NativeSigner, SignerFactory},
         uniffi_reqwest::HsmSupportObject,
     };
+    use kapun_crypto_rust::jwx::EncryptionParameters;
 
     const RESPONSE_TYPE_CODE: &str = "code";
 
@@ -2885,6 +2885,7 @@ mod issuance {
                     None,
                     None,
                     is_for_pre_authorized_code,
+                    true,
                 )
                 .await
                 .unwrap();

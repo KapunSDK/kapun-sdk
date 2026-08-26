@@ -1,9 +1,8 @@
 use anyhow::Context;
 use josekit::jwk;
+use kapun_crypto_rust::jwx::EncryptionParameters;
 
-use crate::{
-    issuance::models::CredentialResponseEncryptionSpecification, jwx::EncryptionParameters,
-};
+use crate::issuance::models::CredentialResponseEncryptionSpecification;
 
 pub trait ContentEncryptor: Send + Sync {
     fn encrypt(&self, claims: serde_json::Map<String, serde_json::Value>)
@@ -54,17 +53,14 @@ impl CloneableDecryptor<EncryptionParameters> for EncryptionParameters {
 
 impl ContentDecryptor for EncryptionParameters {
     fn public_key(&self) -> jwk::Jwk {
-        self.jwk
-            .to_public_key()
+        self.public_jwk()
             .expect("somethings terribly wrong with the jwk")
-            .clone()
     }
 
     fn encryption_specification(&self) -> CredentialResponseEncryptionSpecification {
         CredentialResponseEncryptionSpecification {
             jwk: self
-                .jwk
-                .to_public_key()
+                .public_jwk()
                 .expect("somethings terribly wrong with the jwk"),
             enc: self.authorization_encrypted_response_enc.clone(),
         }
