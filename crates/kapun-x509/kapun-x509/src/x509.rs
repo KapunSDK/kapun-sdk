@@ -361,6 +361,7 @@ pub fn check_revocation(cert: &x509_parser::prelude::X509Certificate) -> Result<
 
     // we fetched something, but it fails to parse, error out
     let Ok((_, crl)) = x509_parser::parse_x509_crl(&list) else {
+        tracing::error!("Resolved CRL cannot be parsed");
         return Err(());
     };
 

@@ -40,10 +40,10 @@ sealed interface VerificationStep {
 	data object IssuerSignature : VerificationStep
 	data object CertChain : VerificationStep
 	data class DeviceSignature(
-		val audience: String,
-		val responseUri: String,
-		val mdocGeneratedNonce: String,
+		val clientId: String,
 		val nonce: String,
+		val jwkThumbprint: ByteArray?,
+		val responseUri: String,
 	) : VerificationStep
 
 	data object IssuerSigned : VerificationStep
@@ -121,8 +121,12 @@ fun Mdoc.Companion.parseAndVerify(
 			VerificationStep.CertChain -> {
 				val unprotectedHeader = document["issuerSigned"]["issuerAuth"][1]
 				val x5Chain =
-					unprotectedHeader.asOrderedObject()!![Value.Number(JsonNumber.Integer(33))]!!.asBytes()!!
-				val certs = extractCerts(x5Chain)
+					unprotectedHeader.asOrderedObject()?.get(Value.Number(JsonNumber.Integer(33))) ?: return Result.failure(FailedToVerifyX509ChainException())
+				val certs = if(x5Chain.isArray()) {
+					x5Chain.asArray()?.map { extractCerts(it.asBytes()?: return Result.failure(FailedToVerifyX509ChainException())).firstOrNull() ?: return Result.failure(FailedToVerifyX509ChainException())}
+				} else {
+					extractCerts(x5Chain.asBytes()?: return Result.failure(FailedToVerifyX509ChainException()))
+				} ?: return Result.failure(FailedToVerifyX509ChainException())
 
 				if (!verifyChain(certs))
 					return Result.failure(FailedToVerifyX509ChainException())
@@ -171,40 +175,11 @@ fun Mdoc.Companion.parseAndVerify(
 									Value.Array(
 										listOf(
 											Value.String("DeviceAuthentication"),
-											Value.Array(
-												listOf(
-													Value.Null,
-													Value.Null,
-													Value.Array(
-														listOf(
-															Value.Bytes(
-																digest(
-																	"SHA-256", encodeCbor(
-																		Value.Array(
-																			listOf(
-																				Value.String(step.audience),
-																				Value.String(step.mdocGeneratedNonce)
-																			)
-																		)
-																	)
-																)
-															),
-															Value.Bytes(
-																digest(
-																	"SHA-256", encodeCbor(
-																		Value.Array(
-																			listOf(
-																				Value.String(step.responseUri),
-																				Value.String(step.mdocGeneratedNonce)
-																			)
-																		)
-																	)
-																)
-															),
-															Value.String(step.nonce)
-														)
-													)
-												)
+											mdoc.getSessionTranscript(
+												step.clientId,
+												step.nonce,
+												step.jwkThumbprint,
+												step.responseUri,
 											),
 											Value.String(mdoc.doctype()!!),
 											deviceSigned["nameSpaces"]

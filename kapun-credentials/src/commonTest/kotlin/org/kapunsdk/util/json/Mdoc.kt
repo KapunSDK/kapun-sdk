@@ -40,6 +40,7 @@ import uniffi.kapun_util_rust.Value
 import uniffi.kapun_util_rust.decodeCbor
 import uniffi.kapun_util_rust.encodeCbor
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import org.kapunsdk.util.extensions.*
@@ -58,9 +59,30 @@ class Mdoc {
         val issuerAuth = decodedMdoc.mdoc.originalDecoded[listOf("issuerAuth").toClaimsPointer()!!]
         assertTrue(decodedMdoc.mdoc.originalDecoded.isSame(decodedcbor))
         val encodedMdoc = encodeCbor(decodedMdoc.mdoc.originalDecoded)
-        val certs = decodedMdoc.extracX5c().getOrThrow()
+        val certs = decodedMdoc.extractX5c().getOrThrow()
         assertTrue(decodedMdoc.verify().getOrThrow())
         assertEquals(mdoc, base64UrlEncode(encodedMdoc))
+    }
+
+    @Test
+    fun testOpenId4VpFinalSessionTranscript() {
+        val thumbprint = "4283ec927ae0f208daaa2d026a814f2b22dca52cf85ffa8f3f8626c6bd669047"
+            .chunked(2)
+            .map { it.toInt(16).toByte() }
+            .toByteArray()
+        val expected = "83f6f682714f70656e494434565048616e646f7665725820048bc053c00442af9b8eed494cefdd9d95240d254b046b11b68013722aad38ac"
+            .chunked(2)
+            .map { it.toInt(16).toByte() }
+            .toByteArray()
+
+        val transcript = decodedMdoc.getSessionTranscript(
+            "x509_san_dns:example.com",
+            "exc7gBkxjx1rdc9udRrveKvSsJIq80avlXeLHhGwqtA",
+            thumbprint,
+            "https://example.com/response",
+        )
+
+        assertContentEquals(expected, encodeCbor(transcript))
     }
 
     @Test
