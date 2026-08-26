@@ -177,6 +177,7 @@ data class PresentationRequest @OptIn(ExperimentalSerializationApi::class) const
 				transactionData = TransactionDataWrapper.fromValue(value),
 				clientMetadata = value["client_metadata"].transform(),
 				verifierAttestations = value["verifier_attestations"].transform(),
+				verifierInfo = value["verifier_info"].transform(),
 				expectedOrigins = value["expected_origins"].transform()
 			)
 

@@ -1,14 +1,16 @@
-use base64::{prelude::BASE64_URL_SAFE_NO_PAD, Engine};
+use std::println;
+
+use base64::{Engine, prelude::BASE64_URL_SAFE_NO_PAD};
 use clap::{Parser, Subcommand, ValueEnum};
-use josekit::{jwk::Jwk, Value};
+use josekit::{Value, jwk::Jwk};
 use kapun_x509::x509_parser::{
     self,
-    prelude::{oid_registry, X509Certificate},
+    prelude::{X509Certificate, oid_registry},
 };
 use oid_registry::{
     OID_KEY_TYPE_EC_PUBLIC_KEY, OID_PKCS1_RSASSAPSS, OID_PKCS1_SHA1WITHRSA,
     OID_PKCS1_SHA256WITHRSA, OID_PKCS1_SHA384WITHRSA, OID_PKCS1_SHA512WITHRSA,
-    OID_SIG_ECDSA_WITH_SHA384, OID_SIG_ECDSA_WITH_SHA512, OID_SIG_ED25519, OID_SIG_ED448,
+    OID_SIG_ECDSA_WITH_SHA384, OID_SIG_ECDSA_WITH_SHA512, OID_SIG_ED448, OID_SIG_ED25519,
 };
 use rsa::{pkcs8::DecodePublicKey, traits::PublicKeyParts};
 
@@ -49,10 +51,11 @@ enum What {
     San,
     PublicKey,
     BasicInfo,
+    KeyUsage,
 }
 
 fn main() {
-    use tracing_subscriber::{fmt, prelude::*, EnvFilter};
+    use tracing_subscriber::{EnvFilter, fmt, prelude::*};
     let _ = tracing_subscriber::registry()
         .with(fmt::layer())
         .with(EnvFilter::from_default_env())
@@ -133,6 +136,13 @@ fn main() {
             }
             What::PublicKey => {
                 print_public_key(&cert);
+            }
+            What::KeyUsage => {
+                let key_usage = cert
+                    .key_usage()
+                    .expect("Failed to find key usage")
+                    .expect("Key usage is absent");
+                println!("{}", key_usage.value.to_string());
             }
         },
         Commands::Validate { chain } => {
@@ -232,15 +242,25 @@ fn print_info(cert: &X509Certificate) {
             println!("No subject alternative name found");
         }
     }
+
+    if let Ok(Some(key_usage)) = cert.key_usage() {
+        println!();
+        println!("KeyUsage: {}", key_usage.value);
+    }
+
     println!();
     let uri = kapun_x509::x509::get_crl_uri(&cert).expect("Failed to parse extension");
     match uri {
         Some(uri) => println!("CRL: {uri}"),
         None => println!("No crl found"),
     }
-    let revocation_status =
-        kapun_x509::x509::check_revocation(&cert).expect("Failed to check revocation");
-    println!("[Revocation status] Certificate is revoked: {revocation_status}");
+    match kapun_x509::x509::check_revocation(&cert) {
+        Ok(revocation_status) => {
+            println!("[Revocation status] Certificate is revoked: {revocation_status}")
+        }
+        Err(_) => println!("!! Failed to check CRL !!"),
+    }
+
     println!();
     println!();
 }
