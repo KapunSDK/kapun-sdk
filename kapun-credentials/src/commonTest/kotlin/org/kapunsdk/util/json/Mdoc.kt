@@ -59,7 +59,7 @@ class Mdoc {
         val issuerAuth = decodedMdoc.mdoc.originalDecoded[listOf("issuerAuth").toClaimsPointer()!!]
         assertTrue(decodedMdoc.mdoc.originalDecoded.isSame(decodedcbor))
         val encodedMdoc = encodeCbor(decodedMdoc.mdoc.originalDecoded)
-        val certs = decodedMdoc.extracX5c().getOrThrow()
+        val certs = decodedMdoc.extractX5c().getOrThrow()
         assertTrue(decodedMdoc.verify().getOrThrow())
         assertEquals(mdoc, base64UrlEncode(encodedMdoc))
     }
