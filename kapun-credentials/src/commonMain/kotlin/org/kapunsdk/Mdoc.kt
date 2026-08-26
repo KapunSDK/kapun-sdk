@@ -20,7 +20,6 @@ under the License.
 
 package org.kapunsdk.credentials
 
-import org.kapunsdk.credentials.mdoc.MDocVerificationException
 import org.kapunsdk.credentials.mdoc.MDocVerificationException.FailedToVerifyX509ChainException
 import org.kapunsdk.proximity.documents.DocumentRequest
 import org.kapunsdk.util.extensions.*
@@ -357,7 +356,7 @@ class Mdoc(val mdoc: MdocRust) {
         return vpToken
     }
 
-    fun extracX5c(): Result<List<X509Certificate>> {
+    fun extractX5c(): Result<List<X509Certificate>> {
         val unprotectedHeader = this.mdoc.originalDecoded["issuerAuth"][1]
         val x5Chain =
             unprotectedHeader.asOrderedObject()?.get(Value.Number(JsonNumber.Integer(33))) ?: return Result.failure(
@@ -387,7 +386,7 @@ class Mdoc(val mdoc: MdocRust) {
     }
 
     fun verify(): Result<Boolean> {
-        val chain = this.extracX5c().getOrThrow()[0]
+        val chain = this.extractX5c().getOrThrow()[0]
         val pubKey = chain.publicKey
         if (pubKey is X509PublicKey.P256) {
             val verifyingKey = VerificationKey.fromCoords(pubKey.x, pubKey.y)
