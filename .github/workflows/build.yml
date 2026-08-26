@@ -86,4 +86,4 @@ jobs:
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUSTFLAGS: "-C link-args=-fstack-protector-all -lssp"
           CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER: x86_64-w64-mingw32-gcc
         run: |
-          ./gradlew clean buildBindings ${{ steps.gradle_tasks.outputs.tasks }} --console=plain
+          ./gradlew clean buildBindings ${{ steps.gradle_tasks.outputs.tasks }} -PreleaseBuild=true --console=plain
