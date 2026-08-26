@@ -9,7 +9,7 @@ oid-registry = "0.7.0"
 clap = { version = "4.6.1", features = ["derive"] }
 pem = "3.0.6"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-josekit = { git = "https://github.com/heidiverse/josekit-rs.git", branch = "feature/digest-signing", default-features = false, features = [
+josekit = { git = "https://github.com/heidiverse/josekit-rs.git", default-features = false, features = [
     "rustcrypto",
 ] }
 serde_json.workspace = true

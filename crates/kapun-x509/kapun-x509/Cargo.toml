@@ -9,7 +9,7 @@ oid-registry = "0.7.0"
 ureq = { workspace = true, optional = true }
 whitespace-sifter = "2.3.7"
 tracing = "^0.1"
-josekit = { git = "https://github.com/heidiverse/josekit-rs.git", branch = "feature/digest-signing", default-features = false, features = [
+josekit = { git = "https://github.com/heidiverse/josekit-rs.git", default-features = false, features = [
     "rustcrypto"
 ] }
 rsa = { version = "0.10.0-rc.9", features = [
