@@ -237,6 +237,11 @@ impl TryFrom<&KapunValue> for EncryptionParameters {
 
 #[uniffi::export]
 pub fn generate_jwe_key(algorithm: String) -> Result<JweKey, JweError> {
+    if algorithm == "RSA1_5" {
+        return Err(invalid(
+            "RSA1_5 is deprecated and cannot be used to generate new JWE keys",
+        ));
+    }
     let parameters = EncryptionParameters::new_decryptor(&algorithm, "A256GCM")
         .ok_or_else(|| invalid(format!("Unsupported JWE algorithm: {algorithm}")))?;
     let public_jwk = parameters.public_jwk()?;
@@ -470,6 +475,37 @@ mod tests {
         assert_eq!(
             decrypt_jwe(key.private_jwk, encrypted).unwrap(),
             r#"{"transaction_id":"123"}"#
+        );
+    }
+
+    #[test]
+    fn rsa1_5_key_generation_is_rejected() {
+        let error = generate_jwe_key("RSA1_5".to_string()).unwrap_err();
+        assert!(error.to_string().contains("deprecated"));
+    }
+
+    #[test]
+    fn decrypts_nimbus_rsa_oaep_256_vector() {
+        let private_jwk = r#"{"p":"wkYkI2kNn7ft2fE_rkD31ZyClvMV38grI81xyLpUS75hSSK5EII_TE0eZgRhTke7DopR60qzqv8NFrGSxWrCqW9nvPC7TaMGtUHcE1jxQaXS6LQ2Sa-KDxH4F3aop_60jzM4ZMlZG6FOHPIP5PpDjME7DZOO04KS-NHQCE-JpUU","kty":"RSA","q":"wNpDJUuKXUcGA7u4YtdSzqBJfgUwJ9hqxd4QeaPnldq9N_yAG9pSgqj6kUbOM8rTXinpMctRpARp3sySmp_PHViAAdhuHSGyFmdAHKC_lMmt7ZMasvA_ZIygIIEZ275zb7QGLnmJEyi-Og_1QoGWvqtvcSz5xIySu0iJ0FdU7ns","d":"AxRZBn4MA0sm8vUR0s2hjftTzex6z6IzaMZuhJbeqwvWY7bP6UfBXYmOGuaryzc-8oob3GEkAWJauD6dcYg9DRemhkf1-yiEDs0uQGzLXrRYuxXmjG1YYKp7tQ0KSGADcLfVvrVXhshn_oWOXW7uCKFAM2wDpFJX7KJJ6rqodi8KctxpHy5T78uggh6NzJLpDLaNOBoW527o0Ryn-PYwuJgBCj_Fms5VfX4C24hwV7oH2cs0Q_qFOh7NSX0gTmQ5bPJSnG-YNn9kNRiYh-q1YOwCqdf7NBG-jdwOFRn6AM7keyElzaOrhKnh2EzrKKaHgdEYrqv7jfI_oJqBnZLeOQ","e":"AQAB","use":"enc","kid":"nimbus-vector","qi":"O9SSC7fS86vP7f9ika0s7ORMMSRGZGzfKwAZyAWbqXpGfEVZWLRaYVYVCokiN2G2Zs9oFEL_VkP6LuJyUGkpZQwsGf5Y7Jf11xyC-Zh8WrTW68gy4-NvA7aaC4GpqIMrj6JvrWb2F3qC9d_QGT1hrXzHMBYalST7iIcgmojuD4Q","dp":"o5xgqPW7RIypIoe7IqySS_LQRAIapOk186P8tJi_jz6ZPfehNdcLKd40wKPlswBT963jya2S3GqKAlewDNSZdgpdqlBu3bZzWslJZ33bSHc3xUSoB6xvL7vpXRFQfpLSS1tOngq4Ib3aRCRT4Hon022Upx1jBpwL3MMOWUFq4aU","alg":"RSA-OAEP-256","dq":"uq6NcPy-46xs1hBRXNyy-_GNMsAy7V9BfGiJ6jYPZ7BmmluCZ3Pfizun0hmIYfpkwTIw2lLGpM7g7Rt6jtND2lRhFWg8r1Z-3dD07sFsssrH4sIThkOqGdtG5jASp_SkKe1KTpK3biRygCISeF6ZXdj198hhvzGUmFaPkW34eSE","n":"klo9yf3duC_wzDWcGeN6RBvOevKVpfdIZVS1AS-SdK1I37xbWlh8P6kNovOw5UZjdtI4hpcvEJbCqeyipkam9BBD7qPI4vJNeLYf22_nZvqC9SoSoADkV2lUAl3Pn-R9oTAqzGhf0HaVbaF8v9KavlXrtExPhFwfvZRuFsFJ2ygOtgEthqNVkeZe1dJdyeWVIW8QFC1XLdMJDCFes0m-19CnCjX9gGMU6n7DOrfuhJwVa3gzZZ8O5oKLXBCLk9txO1PkbR8kPd9asfwAi9XVz13cAaJ-Bp9tO_I-fov0kbJaPj3R9_jcPZd63uPS79In2HNEO13As5bdqMNU3GyOJw"}"#;
+        let compact_jwe = "eyJraWQiOiJuaW1idXMtdmVjdG9yIiwidHlwIjoiSldUIiwiZW5jIjoiQTI1NkdDTSIsImFsZyI6IlJTQS1PQUVQLTI1NiJ9.E11VVerQlN2STFaDhE60UMbnQl0L2fhec3pxaIaTcJpx4iOuItwtLkV4_pkONmNnBhct0RgLYHrM27VhHcvPAAkjgY_rr7UvWv9UBckqThuNVmHi0QD_3eOs6Uo3vfSDEUoknigAxonaHIJlFUsYPTo_QBnDoWl_96Gmb-HuXE7pEJX0etiLUgkC-Q0xWXqaPyzKaLsig9Ee4H4V5G2Fnq7G1F93mlqoCOY0hp2Cuw-KBq5ODc8Y7vJvuGS1IoW79VSBhi7BTIL1QtnZimLacezeu9NSFpSesYGu8980kCRrsr99VCaUHBVh200BipQdYU535R0T5YeHqtE96Jiu9A.yBZxAeIMxKOH18BU.GkWif-VvD6BxxdvqzG1vOYHI6gWL4UPypumSVbGUjFME7Xc9TeCMHVq52i62.Av5oopDEpJaH-kOD5LWAiQ";
+
+        assert_eq!(
+            decrypt_jwe(private_jwk.to_string(), compact_jwe.to_string()).unwrap(),
+            r#"{"iss":"nimbus","credential":"interoperable"}"#
+        );
+        let header = parse_jwe_header(compact_jwe.to_string()).unwrap();
+        assert_eq!(header.key_id.as_deref(), Some("nimbus-vector"));
+        assert_eq!(header.token_type.as_deref(), Some("JWT"));
+    }
+
+    #[test]
+    fn decrypts_nimbus_ecdh_es_vector() {
+        let private_jwk = r#"{"kty":"EC","d":"VgSvRcFbS5vtuJlzbeTgT_mwPRLPWtcfxY3E_crB9XI","use":"enc","crv":"P-256","kid":"nimbus-ec-vector","x":"-cICmfRWGffLkwFFNpuUPttzC9kQ_NfuX3UlsjGCz5w","y":"IFvIlSifTWcJkFEzlMsJQHn8w-F-LSz5Dv9_UcLznlQ","alg":"ECDH-ES"}"#;
+        let compact_jwe = "eyJlcGsiOnsia3R5IjoiRUMiLCJjcnYiOiJQLTI1NiIsIngiOiI0cXl4enlLVU1jREh3d1FBZENYUTBYSTZuVG5LYkhfQjZKQXU3V1dacFlVIiwieSI6IkVEaVBtYkJzdElJSk10Tm94dHZtTHBsLS1SV18zOTNjZzhmbHFHaTlZbUUifSwia2lkIjoibmltYnVzLWVjLXZlY3RvciIsImVuYyI6IkExMjhHQ00iLCJhbGciOiJFQ0RILUVTIn0..rer_AFuDut82r0tr.pSHE6anU1SeDXdYL7nGPZwNB9MvItYauQjUrPKTPCVb7.H1QRnkSmzalB_NMs15u5Hw";
+
+        assert_eq!(
+            decrypt_jwe(private_jwk.to_string(), compact_jwe.to_string()).unwrap(),
+            r#"{"source":"nimbus","kind":"ecdh"}"#
         );
     }
 }

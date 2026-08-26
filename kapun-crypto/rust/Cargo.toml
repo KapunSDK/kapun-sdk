@@ -29,7 +29,6 @@ blake3 = "1.8.1"
 kapun-util-rust = { path = "../../kapun-util/rust" }
 hkdf = "0.12.4"
 aes-gcm = "0.10.3"
-josekit.workspace = true
 
 ed25519-dalek = "2.2.0"
 multibase = { workspace = true }
