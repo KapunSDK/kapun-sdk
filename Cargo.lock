@@ -5364,6 +5364,7 @@ dependencies = [
  "jsonpath_lib",
  "jsonschema",
  "kapun-credentials-rust",
+ "kapun-crypto-rust",
  "kapun-util-rust",
  "kapun-x509",
  "lazy_static",
