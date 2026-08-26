@@ -49,6 +49,17 @@ import kotlin.test.assertFailsWith
 
 class SdJwtTests {
     @Test
+    fun generatedPublicJwkSerializesKeyIdWhenKeyHasKeyId() {
+        val keyPair = SoftwareKeyPair()
+        val keyPairWithKeyId = SoftwareKeyPair.newWithKeyId("issuer-key")
+        val bareJwk = Json.parseToJsonElement(keyPair.jwkString()).jsonObject
+        val jwkWithKeyId = Json.parseToJsonElement(keyPairWithKeyId.jwkString()).jsonObject
+
+        assertNull(bareJwk["kid"])
+        assertEquals("issuer-key", jwkWithKeyId["kid"]?.jsonPrimitive?.content)
+    }
+
+    @Test
     fun sdJwtVcHeaderUsesDcSdJwtTyp() {
         val claims: Value = Json.decodeFromString(
             """
