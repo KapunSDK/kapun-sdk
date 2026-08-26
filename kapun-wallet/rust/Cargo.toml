@@ -59,6 +59,7 @@ p384.workspace = true
 web-time = "1.1.0"
 http = "0.2.12"
 kapun-util-rust = { path = "../../kapun-util/rust", default-features = false }
+kapun-crypto-rust = { path = "../../kapun-crypto/rust", default-features = false }
 kapun-credentials-rust = { path = "../../kapun-credentials/rust", default-features = false }
 crunchy = "=0.2.2"
 rdf-util = { workspace = true, optional = true }

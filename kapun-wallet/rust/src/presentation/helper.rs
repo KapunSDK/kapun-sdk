@@ -35,7 +35,7 @@ use serde_json::{Value, json};
 use crate::agents::{AgentInfo, AgentType};
 #[cfg(all(feature = "reqwest", feature = "oid4vp"))]
 use crate::get_reqwest_client;
-use crate::jwx::EncryptionParameters;
+use kapun_crypto_rust::jwx::EncryptionParameters;
 use crate::presentation::presentation_exchange::{
     AuthorizationRequest, ClientIdScheme, ClientMetadataResource, PresentationDefinition,
 };
@@ -271,7 +271,7 @@ pub fn encrypt_submission(
     metadata: kapun_util_rust::value::Value,
 ) -> Result<String, ApiError> {
     log_warn!("PEX", "start encryption");
-    let encrypter = EncryptionParameters::try_from(&metadata)?;
+    let encrypter = EncryptionParameters::try_from(&metadata).map_err(|error| anyhow!(error))?;
     let object = if let Some(state) = state {
         if submission.is_null() {
             json!({
@@ -298,12 +298,14 @@ pub fn encrypt_submission(
     .as_object()
     .ok_or_else(|| anyhow!("Should not happen"))?
     .to_owned();
-    let response = encrypter.encrypt(
-        object,
-        Some(mdoc_generated_nonce.as_bytes().to_vec()),
-        Some(nonce),
-        None,
-    )?;
+    let response = encrypter
+        .encrypt(
+            object,
+            Some(mdoc_generated_nonce.as_bytes().to_vec()),
+            Some(nonce),
+            None,
+        )
+        .map_err(|error| anyhow!(error))?;
     Ok(response)
 }
 
