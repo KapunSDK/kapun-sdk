@@ -1267,7 +1267,7 @@ dependencies = [
  "semver",
  "serde",
  "serde_json",
- "thiserror 2.0.19",
+ "thiserror 2.0.20",
 ]
 
 [[package]]
@@ -5364,6 +5364,7 @@ dependencies = [
  "jsonpath_lib",
  "jsonschema",
  "kapun-credentials-rust",
+ "kapun-crypto-rust",
  "kapun-util-rust",
  "kapun-x509",
  "lazy_static",

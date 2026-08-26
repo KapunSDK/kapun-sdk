@@ -42,7 +42,7 @@ use crate::{
 };
 
 #[cfg(feature = "uniffi")]
-use crate::jwx::EncryptionParameters;
+use kapun_crypto_rust::jwx::EncryptionParameters;
 
 pub mod helper;
 
@@ -618,7 +618,8 @@ pub fn create_submission_encrypted(
     client_metadata: &kapun_util_rust::value::Value,
     state: Option<String>,
 ) -> Result<Oid4vpParams, ApiError> {
-    let encrypter = EncryptionParameters::try_from(client_metadata)?;
+    let encrypter =
+        EncryptionParameters::try_from(client_metadata).map_err(|error| anyhow!(error))?;
     let object = if let Some(state) = state {
         json!({
             "vp_token": vp_token,
@@ -634,12 +635,14 @@ pub fn create_submission_encrypted(
     .as_object()
     .ok_or_else(|| anyhow!("Should not happen"))?
     .to_owned();
-    let response = encrypter.encrypt(
-        object,
-        Some(mdoc_generated_nonce),
-        Some(nonce.as_bytes().to_vec()),
-        None,
-    )?;
+    let response = encrypter
+        .encrypt(
+            object,
+            Some(mdoc_generated_nonce),
+            Some(nonce.as_bytes().to_vec()),
+            None,
+        )
+        .map_err(|error| anyhow!(error))?;
     return Ok(Oid4vpParams::Jwt { response });
 }
 

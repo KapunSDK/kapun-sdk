@@ -63,8 +63,6 @@ pub mod frost;
 #[cfg(all(feature = "uniffi", feature = "reqwest", feature = "oid4vp"))]
 pub mod hsm;
 // #[cfg(all(feature = "uniffi", feature = "reqwest", feature = "oid4vp"))]
-#[cfg(feature = "oid4vp")]
-pub mod jwx;
 pub mod log;
 
 #[cfg(all(feature = "reqwest", feature = "uniffi"))]

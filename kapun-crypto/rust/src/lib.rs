@@ -25,6 +25,7 @@ use base64::{
 
 pub mod crypto;
 pub mod iso180135;
+pub mod jwx;
 pub mod jws;
 pub mod jwt;
 
