@@ -67,7 +67,7 @@ import org.kapunsdk.wallet.process.refresh.eaa.EaaRefreshProcessStep
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import org.kapunsdk.wallet.process.presentation.ErrorModel
-import uniffi.kapun_credentials_rust.DeviceBindingType
+import uniffi.kapun_dcql_bbs_rust.DeviceBindingType
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant

@@ -31,7 +31,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonNames
 import uniffi.kapun_dcql_rust.DcqlQuery
 import uniffi.kapun_util_rust.Value
-import uniffi.kapun_credentials_rust.generateNonce
+import uniffi.kapun_credential_core_rust.generateNonce
 
 /**
  * Data class to hold both the OID4VP draft version and the parsed PresentationRequest

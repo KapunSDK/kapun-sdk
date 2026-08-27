@@ -52,7 +52,7 @@ kotlin {
 	sourceSets {
 		commonMain.dependencies {
 			implementation(project(":kapun-util"))
-			implementation(project(":kapun-credentials"))
+			implementation(project(":kapun-credential-core"))
 			implementation(project(":kapun-crypto"))
 			implementation(libs.kotlin.coroutines)
 			implementation(libs.koin.core)
@@ -62,6 +62,11 @@ kotlin {
 		commonTest.dependencies {
 			implementation(libs.kotlin.test)
 			implementation(libs.kotlin.serialization)
+			implementation(project(":kapun-dcql-bbs"))
+			implementation(project(":kapun-dcql-mdoc"))
+			implementation(project(":kapun-dcql-sdjwt"))
+			implementation(project(":kapun-dcql-w3c"))
+			implementation(project(":kapun-dcql-openbadges"))
 		}
 
 		androidMain.dependencies {

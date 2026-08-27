@@ -20,7 +20,7 @@ under the License.
 
 package org.kapunsdk
 
-import uniffi.kapun_credentials_rust.PointerPart
+import uniffi.kapun_credential_core_rust.PointerPart
 import uniffi.kapun_dcql_rust.ClaimsQuery
 import uniffi.kapun_dcql_rust.CredentialQuery
 import uniffi.kapun_dcql_rust.DcqlQuery

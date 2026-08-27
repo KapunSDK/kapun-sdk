@@ -1,29 +1,16 @@
 use std::sync::{Arc, LazyLock, Mutex};
 
-#[cfg(feature = "builtin_parsers")]
-use crate::models::parser::builtin::AllPurposeParser;
-
 use crate::models::Credential;
 use kapun_util_rust::log_error;
 
-/// List of currently registered matchers
+/// Parsers registered with the DCQL runtime by credential-format libraries.
 pub(crate) static REGISTERED_PARSERS: LazyLock<Mutex<Vec<Arc<dyn CredentialParser>>>> =
-    LazyLock::new(|| {
-        #[allow(unused_mut)]
-        // Register default matchers
-        let mut parsers: Vec<Arc<dyn CredentialParser>> = vec![];
-        #[cfg(feature = "builtin_parsers")]
-        {
-            parsers.push(Arc::new(AllPurposeParser))
-        }
-        Mutex::new(parsers)
-    });
+    LazyLock::new(|| Mutex::new(Vec::new()));
 
 #[uniffi::export(with_foreign)]
-/// Trait to implement a credential parser
+/// Converts a serialized credential into the format-neutral DCQL representation.
 pub trait CredentialParser: Send + Sync {
-    /// A unique ID identifying this parser in this runtime. This ID is used
-    /// to check, if the parser is already registered.
+    /// A stable identifier used to avoid registering the same parser twice.
     fn id(&self) -> String;
     fn from_str(&self, credential: String) -> Option<Credential>;
 }
@@ -35,202 +22,86 @@ impl PartialEq for dyn CredentialParser {
 }
 
 #[uniffi::export]
-/// Registers this matcher with the DCQL Runtime.
-pub fn register_parser(matcher: Arc<dyn CredentialParser>) {
-    let Ok(mut matcher_lock) = REGISTERED_PARSERS.lock() else {
+/// Registers a credential-format parser with the DCQL runtime.
+pub fn register_parser(parser: Arc<dyn CredentialParser>) {
+    let Ok(mut parsers) = REGISTERED_PARSERS.lock() else {
         log_error!("DCQL", "Failed to register parser");
         return;
     };
-    if matcher_lock.contains(&matcher) {
-        return;
+    if !parsers.contains(&parser) {
+        parsers.push(parser);
     }
-    matcher_lock.push(matcher)
 }
-#[cfg(feature = "builtin_parsers")]
-mod builtin {
-    use std::sync::Arc;
 
-    #[cfg(feature = "bbs")]
-    use kapun_credentials_rust::bbs::{decode_bbs, BbsRust};
-    use kapun_credentials_rust::{
-        claims_pointer::Selector,
-        mdoc::{decode_mdoc, MdocRust},
-        sdjwt::{decode_sdjwt, SdJwtRust},
-        w3c::{parse_w3c_sd_jwt, W3CSdJwt, W3CVerifiableCredential},
-    };
+#[cfg(test)]
+mod tests {
+    use std::{str::FromStr, sync::Arc};
+
+    use kapun_credential_core_rust::claims_pointer::Selector;
     use kapun_util_rust::value::Value;
 
-    #[cfg(feature = "bbs")]
-    use crate::BBS_FORMATS;
     use crate::{
-        models::{parser::CredentialParser, Credential, CredentialLike, Meta},
-        MetaMismatch, MDOC_FORMATS, OPEN_BADGE_FORMATS, SDJWT_FORMATS, W3C_FORMATS,
+        models::{CredentialLike, Meta},
+        MetaMismatch,
     };
 
-    impl CredentialLike for SdJwtRust {
+    use super::*;
+
+    #[derive(Debug)]
+    struct TestCredential(String);
+
+    impl CredentialLike for TestCredential {
         fn get_body(&self) -> Value {
-            self.claims.clone()
+            Value::String(self.0.clone())
         }
 
         fn serialize(&self) -> String {
-            serde_json::to_string(&self).unwrap()
+            self.0.clone()
         }
 
         fn format_specifiers(&self) -> Vec<String> {
-            SDJWT_FORMATS.iter().map(|a| a.to_string()).collect()
+            vec!["test".to_string()]
         }
 
-        fn matches_meta(&self, meta: Option<Meta>) -> Option<MetaMismatch> {
-            Credential::matches_meta_sdjwt(&self, meta.as_ref())
-                .err()
-                .map(|a| MetaMismatch::SdJwtMetaMismatch(a))
+        fn matches_meta(&self, _meta: Option<Meta>) -> Option<MetaMismatch> {
+            None
         }
 
-        fn get(self: Arc<Self>, selector: Arc<dyn Selector>) -> Option<Vec<Value>> {
-            SdJwtRust::get(&self, selector)
+        fn get(self: Arc<Self>, _selector: Arc<dyn Selector>) -> Option<Vec<Value>> {
+            None
         }
     }
 
-    impl CredentialLike for W3CSdJwt {
-        fn get_body(&self) -> Value {
-            self.json.clone()
-        }
+    struct TestParser;
 
-        fn serialize(&self) -> String {
-            serde_json::to_string(&self).unwrap()
-        }
-
-        fn format_specifiers(&self) -> Vec<String> {
-            W3C_FORMATS.iter().map(|a| a.to_string()).collect()
-        }
-
-        fn matches_meta(&self, meta: Option<Meta>) -> Option<MetaMismatch> {
-            Credential::matches_meta_w3c(&self, meta.as_ref())
-                .err()
-                .map(|a| MetaMismatch::W3CMetaMismatch(a))
-        }
-
-        fn get(self: Arc<Self>, selector: Arc<dyn Selector>) -> Option<Vec<Value>> {
-            W3CSdJwt::get(&self, selector)
-        }
-    }
-    impl CredentialLike for MdocRust {
-        fn get_body(&self) -> Value {
-            self.namespace_map.clone()
-        }
-
-        fn serialize(&self) -> String {
-            serde_json::to_string(&self).unwrap()
-        }
-
-        fn format_specifiers(&self) -> Vec<String> {
-            MDOC_FORMATS.iter().map(|a| a.to_string()).collect()
-        }
-
-        fn matches_meta(&self, meta: Option<Meta>) -> Option<MetaMismatch> {
-            Credential::matches_meta_mdoc(&self, meta.as_ref())
-                .err()
-                .map(|a| MetaMismatch::MdocMetaMismatch(a))
-        }
-
-        fn get(self: Arc<Self>, selector: Arc<dyn Selector>) -> Option<Vec<Value>> {
-            MdocRust::get(&self, selector)
-        }
-    }
-    #[cfg(feature = "bbs")]
-    impl CredentialLike for BbsRust {
-        fn get_body(&self) -> Value {
-            self.body()
-        }
-
-        fn serialize(&self) -> String {
-            serde_json::to_string(&self).unwrap()
-        }
-
-        fn format_specifiers(&self) -> Vec<String> {
-            BBS_FORMATS.iter().map(|a| a.to_string()).collect()
-        }
-
-        fn matches_meta(&self, meta: Option<Meta>) -> Option<MetaMismatch> {
-            Credential::matches_meta_bbs(&self, meta.as_ref())
-                .err()
-                .map(|a| MetaMismatch::BbsMetaMismatch(a))
-        }
-
-        fn get(self: Arc<Self>, selector: Arc<dyn Selector>) -> Option<Vec<Value>> {
-            BbsRust::get(&self, selector)
-        }
-    }
-    impl CredentialLike for W3CVerifiableCredential {
-        fn get_body(&self) -> Value {
-            self.clone().into_value()
-        }
-
-        fn serialize(&self) -> String {
-            serde_json::to_string(&self).unwrap()
-        }
-
-        fn format_specifiers(&self) -> Vec<String> {
-            OPEN_BADGE_FORMATS.iter().map(|a| a.to_string()).collect()
-        }
-
-        fn matches_meta(&self, meta: Option<Meta>) -> Option<MetaMismatch> {
-            Credential::matches_meta_open_badges(&self, meta.as_ref())
-                .err()
-                .map(|a| MetaMismatch::LdpMetaMismatch(a))
-        }
-
-        fn get(self: Arc<Self>, selector: Arc<dyn Selector>) -> Option<Vec<Value>> {
-            W3CVerifiableCredential::get(&self, selector)
-        }
-    }
-
-    pub struct AllPurposeParser;
-    impl CredentialParser for AllPurposeParser {
-        #[doc = " A unique ID identifying this parser in this runtime. This ID is used"]
-        #[doc = " to check, if the parser is already registered."]
+    impl CredentialParser for TestParser {
         fn id(&self) -> String {
-            "all-purpose".to_string()
+            "dcql-test-parser".to_string()
         }
 
         fn from_str(&self, credential: String) -> Option<Credential> {
-            let s = credential.as_str();
-            let sdjwt = decode_sdjwt(s);
-            let w3c = parse_w3c_sd_jwt(s);
-
-            match (sdjwt, w3c) {
-                (Ok(sdjwt), Ok(w3c)) => {
-                    // NOTE: This is a hack, there should be a type hint somewhere
-
-                    // To distinguish between W3C and SD-JWT credentials,
-                    // we check if the W3C credential has a context.
-                    return if w3c.json.get("@context").is_some() {
-                        Some(Credential::W3CCredential(Arc::new(w3c)))
-                    } else {
-                        Some(Credential::SdJwtCredential(Arc::new(sdjwt)))
-                    };
-                }
-                (Ok(sdjwt), _) => return Some(Credential::SdJwtCredential(Arc::new(sdjwt))),
-                (_, Ok(w3c)) => return Some(Credential::W3CCredential(Arc::new(w3c))),
-
-                // Fallthrough to other formats
-                _ => (),
-            };
-
-            if let Ok(vc) = serde_json::from_str::<W3CVerifiableCredential>(s) {
-                if vc.types.contains(&"OpenBadgeCredential".to_string()) {
-                    return Some(Credential::OpenBadge303Credential(Arc::new(vc)));
-                }
-            }
-
-            if let Ok(mdoc) = decode_mdoc(s) {
-                return Some(Credential::MdocCredential(Arc::new(mdoc)));
-            }
-            #[cfg(feature = "bbs")]
-            if let Ok(bbs) = decode_bbs(s) {
-                return Some(Credential::BbsCredential(Arc::new(bbs)));
-            }
-            None
+            (credential == "test-credential")
+                .then(|| Credential::Other(Arc::new(TestCredential(credential))))
         }
+    }
+
+    #[test]
+    fn registration_is_idempotent_and_drives_parsing() {
+        register_parser(Arc::new(TestParser));
+        register_parser(Arc::new(TestParser));
+
+        let matching_parser_count = REGISTERED_PARSERS
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|parser| parser.id() == "dcql-test-parser")
+            .count();
+        assert_eq!(matching_parser_count, 1);
+
+        let credential = Credential::from_str("test-credential").unwrap();
+        let Credential::Other(credential) = credential else {
+            panic!("test parser returned the wrong credential variant");
+        };
+        assert_eq!(credential.serialize(), "test-credential");
     }
 }

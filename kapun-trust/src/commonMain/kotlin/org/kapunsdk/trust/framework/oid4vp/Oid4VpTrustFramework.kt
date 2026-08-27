@@ -33,7 +33,7 @@ import org.kapunsdk.trust.framework.ValidationInfo
 import org.kapunsdk.trust.model.AgentInformation
 import org.kapunsdk.trust.model.AgentType
 import io.ktor.http.Url
-import uniffi.kapun_credentials_rust.SignatureCreator
+import uniffi.kapun_credential_core_rust.SignatureCreator
 import uniffi.kapun_crypto_rust.SanType
 import uniffi.kapun_crypto_rust.base64UrlEncode
 import uniffi.kapun_crypto_rust.getKidFromJwt

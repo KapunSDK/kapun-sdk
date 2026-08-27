@@ -22,7 +22,7 @@ under the License.
 use std::{collections::HashMap, sync::Arc, time::SystemTime};
 
 use anyhow::Context;
-use kapun_credentials_rust::sdjwt::decode_sdjwt;
+use kapun_dcql_sdjwt_rust::sdjwt::decode_sdjwt;
 
 use serde_json::Value;
 

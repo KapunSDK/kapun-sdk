@@ -5188,38 +5188,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "kapun-credentials-rust"
+name = "kapun-credential-core-rust"
 version = "0.1.0"
 dependencies = [
- "anyhow",
- "ark-serialize",
- "base64 0.22.1",
  "chrono",
- "ciborium",
- "curve25519-dalek 4.1.2",
- "iref",
- "json-ld",
- "json-syntax",
- "kapun-crypto-rust",
  "kapun-util-rust",
- "mime",
- "multibase",
- "next-gen-signatures",
- "num-bigint 0.4.8",
- "openssl-sys",
- "p256 0.13.2",
- "png 0.18.1",
  "rand 0.8.8",
- "rand_core 0.6.4",
- "rdf-util 0.1.0",
- "reqwest 0.11.27",
  "serde",
  "serde_json",
- "sha2 0.10.9",
- "static-iref",
- "tokio",
  "uniffi",
- "zkp-util 0.1.0",
 ]
 
 [[package]]
@@ -5253,15 +5230,100 @@ dependencies = [
 ]
 
 [[package]]
+name = "kapun-dcql-bbs-rust"
+version = "0.1.0"
+dependencies = [
+ "ark-serialize",
+ "base64 0.22.1",
+ "kapun-credential-core-rust",
+ "kapun-util-rust",
+ "next-gen-signatures",
+ "num-bigint 0.4.8",
+ "rand_core 0.6.4",
+ "rdf-util 0.1.0",
+ "serde",
+ "serde_json",
+ "uniffi",
+ "zkp-util 0.1.0",
+]
+
+[[package]]
+name = "kapun-dcql-mdoc-rust"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "ciborium",
+ "kapun-credential-core-rust",
+ "kapun-util-rust",
+ "rand 0.8.8",
+ "serde",
+ "uniffi",
+]
+
+[[package]]
+name = "kapun-dcql-openbadges-rust"
+version = "0.1.0"
+dependencies = [
+ "kapun-crypto-rust",
+ "kapun-dcql-w3c-rust",
+ "kapun-util-rust",
+ "multibase",
+ "png 0.18.1",
+ "serde",
+ "serde_json",
+ "tokio",
+ "uniffi",
+]
+
+[[package]]
 name = "kapun-dcql-rust"
 version = "0.1.0"
 dependencies = [
  "chrono",
  "jlc",
- "kapun-credentials-rust",
+ "kapun-credential-core-rust",
  "kapun-util-rust",
  "serde",
  "serde_json",
+ "uniffi",
+]
+
+[[package]]
+name = "kapun-dcql-sdjwt-rust"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "chrono",
+ "curve25519-dalek 4.1.2",
+ "kapun-credential-core-rust",
+ "kapun-util-rust",
+ "p256 0.13.2",
+ "rand 0.8.8",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "uniffi",
+]
+
+[[package]]
+name = "kapun-dcql-w3c-rust"
+version = "0.1.0"
+dependencies = [
+ "iref",
+ "json-ld",
+ "json-syntax",
+ "kapun-credential-core-rust",
+ "kapun-crypto-rust",
+ "kapun-dcql-sdjwt-rust",
+ "kapun-util-rust",
+ "mime",
+ "multibase",
+ "rdf-util 0.1.0",
+ "reqwest 0.11.27",
+ "serde",
+ "serde_json",
+ "static-iref",
+ "tokio",
  "uniffi",
 ]
 
@@ -5363,8 +5425,13 @@ dependencies = [
  "josekit",
  "jsonpath_lib",
  "jsonschema",
- "kapun-credentials-rust",
+ "kapun-credential-core-rust",
  "kapun-crypto-rust",
+ "kapun-dcql-bbs-rust",
+ "kapun-dcql-mdoc-rust",
+ "kapun-dcql-openbadges-rust",
+ "kapun-dcql-sdjwt-rust",
+ "kapun-dcql-w3c-rust",
  "kapun-util-rust",
  "kapun-x509",
  "lazy_static",
