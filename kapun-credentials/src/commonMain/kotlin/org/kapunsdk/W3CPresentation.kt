@@ -22,6 +22,7 @@ package org.kapunsdk
 
 import org.kapunsdk.credentials.W3C.Companion.W3C_FORMATS
 import org.kapunsdk.credentials.*
+import uniffi.kapun_credential_core_rust.SignatureCreator
 import uniffi.kapun_credential_core_rust.*
 import uniffi.kapun_dcql_sdjwt_rust.*
 import uniffi.kapun_dcql_w3c_rust.*

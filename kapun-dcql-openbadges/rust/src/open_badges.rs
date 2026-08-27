@@ -4,9 +4,10 @@ use std::{
     sync::Arc,
 };
 
-use kapun_crypto_rust::crypto::SignatureCreator;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+
+use crate::{SignatureCreator, SigningError};
 
 use kapun_dcql_w3c_rust::{
     ldp::sign_unsecured_document,
@@ -15,6 +16,21 @@ use kapun_dcql_w3c_rust::{
         parse_canonicalized_w3c_json_ld,
     },
 };
+
+struct W3cSignatureCreator(Arc<dyn SignatureCreator>);
+
+impl kapun_dcql_w3c_rust::SignatureCreator for W3cSignatureCreator {
+    fn alg(&self) -> String {
+        self.0.alg()
+    }
+
+    fn sign(&self, bytes: Vec<u8>) -> Result<Vec<u8>, kapun_dcql_w3c_rust::SigningError> {
+        self.0.sign(bytes).map_err(|error| match error {
+            SigningError::FailedToSign => kapun_dcql_w3c_rust::SigningError::FailedToSign,
+            SigningError::InvalidSecret => kapun_dcql_w3c_rust::SigningError::InvalidSecret,
+        })
+    }
+}
 
 #[derive(Debug, Clone, uniffi::Error)]
 pub enum ParseError {
@@ -103,9 +119,13 @@ impl OpenBadges303Credential {
             "proofPurpose": "assertionMethod",
         });
 
-        let proof = sign_unsecured_document(unsecured_document, proof_options, signer)
-            .await
-            .unwrap();
+        let proof = sign_unsecured_document(
+            unsecured_document,
+            proof_options,
+            Arc::new(W3cSignatureCreator(signer)),
+        )
+        .await
+        .unwrap();
         vc.embedded_proof = Some(proof.into());
 
         Self {
@@ -154,6 +174,17 @@ mod tests {
     use kapun_util_rust::value::Value;
 
     use crate::open_badges::OpenBadges303Credential;
+
+    impl crate::SignatureCreator for SoftwareKeyPair {
+        fn alg(&self) -> String {
+            kapun_crypto_rust::crypto::SignatureCreator::alg(self)
+        }
+
+        fn sign(&self, bytes: Vec<u8>) -> Result<Vec<u8>, crate::SigningError> {
+            kapun_crypto_rust::crypto::SignatureCreator::sign(self, bytes)
+                .map_err(|_| crate::SigningError::FailedToSign)
+        }
+    }
 
     #[tokio::test]
     //TODO: fix signature stuff

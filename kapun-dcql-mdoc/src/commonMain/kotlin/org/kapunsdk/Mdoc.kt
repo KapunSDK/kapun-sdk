@@ -100,7 +100,7 @@ class MdocCredential(val mdoc: MdocRust) : CredentialLike {
     }
 
     override fun get(selector: Selector): List<Value>? {
-		return mdoc.namespaceMap[selector]
+		return runCatching { mdoc.namespaceMap[selector] }.getOrNull()
     }
     fun docType() : String? {
         val result = this.mdoc.issuerAuth[listOf("docType").toClaimsPointer()!!]

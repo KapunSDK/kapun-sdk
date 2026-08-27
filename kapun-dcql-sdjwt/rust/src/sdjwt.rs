@@ -77,11 +77,8 @@ mod tests {
     use crate::{sdjwt::SdJwtRust, sdjwt_util::SdJwtBuilder};
     #[cfg(feature = "experimental")]
     use base64::Engine;
-    use kapun_credential_core_rust::{
-        claims_pointer::Selector,
-        models::{PointerPart, SignatureCreator, SigningError},
-        pointer,
-    };
+    #[cfg(feature = "experimental")]
+    use kapun_credential_core_rust::{claims_pointer::Selector, models::PointerPart, pointer};
     #[cfg(feature = "experimental")]
     use next_gen_signatures::BASE64_URL_SAFE_NO_PAD;
     #[cfg(feature = "experimental")]
@@ -90,6 +87,8 @@ mod tests {
     use std::sync::Arc;
 
     use crate::sdjwt_util::SdJwtDecodeError;
+    #[cfg(feature = "experimental")]
+    use crate::{SignatureCreator, SigningError};
 
     use super::decode_sdjwt;
 
