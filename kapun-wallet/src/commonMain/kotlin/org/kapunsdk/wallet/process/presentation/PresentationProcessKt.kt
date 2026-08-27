@@ -79,7 +79,8 @@ import uniffi.kapun_dcql_rust.ClaimsQuery
 import uniffi.kapun_dcql_rust.CredentialSetOption
 import uniffi.kapun_dcql_rust.registerMatcher
 import uniffi.kapun_dcql_rust.registerParser
-import uniffi.kapun_dcql_rust.selectCredentialsWithInfo
+import uniffi.kapun_dcql_rust.parseCredential
+import uniffi.kapun_dcql_rust.selectParsedCredentialsWithInfo
 import uniffi.kapun_util_rust.encodeCbor
 import uniffi.kapun_wallet_rust.*
 import kotlin.collections.set
@@ -349,8 +350,14 @@ class PresentationProcessKt private constructor(
                 it.payload to Pair(it.identityId, meta?.credentialType ?: CredentialType.Unknown)
             }
 
-            // TODO: We need to improve this after refactoring
-            val tmpList = credentials.map {
+            // Credentials belonging to the same identity were issued as one batch. DCQL only
+            // needs one candidate from that batch, but each available format must be represented.
+            val batchCandidates = credentials.distinctBy {
+                val credentialType = CredentialMetadata.fromString(it.metadata)?.credentialType
+                    ?: CredentialType.Unknown
+                it.identityId to credentialType
+            }
+            val serializedCandidates = batchCandidates.map {
                 when (identityMap[it.payload]?.second) {
                     CredentialType.OpenBadge303 -> W3C.OpenBadge303.parseSerialized(it.payload).originalString
                     else -> it.payload
@@ -365,7 +372,8 @@ class PresentationProcessKt private constructor(
             registerMatcher(AkiAuthorityMatcher)
             registerMatcher(DidAuthorityMatcher)
 
-            val result = selectCredentialsWithInfo(dcqlQuery, tmpList)
+            val parsedCredentials = serializedCandidates.mapNotNull(::parseCredential)
+            val result = selectParsedCredentialsWithInfo(dcqlQuery, parsedCredentials)
 
             // Prioritize ZKP proofs for claim-based credentials
             val (setOptions, zkpOptions) = prioritizeBbsClaimBasedProofs(dcqlQuery, result.setOptions)
