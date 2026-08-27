@@ -60,7 +60,12 @@ web-time = "1.1.0"
 http = "0.2.12"
 kapun-util-rust = { path = "../../kapun-util/rust", default-features = false }
 kapun-crypto-rust = { path = "../../kapun-crypto/rust", default-features = false }
-kapun-credentials-rust = { path = "../../kapun-credentials/rust", default-features = false }
+kapun-credential-core-rust = { path = "../../kapun-credential-core/rust", default-features = false }
+kapun-dcql-bbs-rust = { path = "../../kapun-dcql-bbs/rust", default-features = false }
+kapun-dcql-mdoc-rust = { path = "../../kapun-dcql-mdoc/rust", default-features = false }
+kapun-dcql-sdjwt-rust = { path = "../../kapun-dcql-sdjwt/rust", default-features = false }
+kapun-dcql-w3c-rust = { path = "../../kapun-dcql-w3c/rust", default-features = false }
+kapun-dcql-openbadges-rust = { path = "../../kapun-dcql-openbadges/rust", default-features = false }
 crunchy = "=0.2.2"
 rdf-util = { workspace = true, optional = true }
 next-gen-signatures = { workspace = true, features = ["all"], optional = true }
@@ -95,16 +100,20 @@ default = [
     "oid4vp",
     "reqwest",
     "reqwest_cookies",
-    "kapun-credentials-rust/bbs",
-    "kapun-credentials-rust/sdjwt",
-    "kapun-credentials-rust/w3c",
-    "kapun-credentials-rust/mdoc",
-    "kapun-credentials-rust/openbadges",
     "rdf-util",
     "next-gen-signatures",
 
 ]
-uniffi = ["dep:uniffi", "dep:tokio", "kapun-credentials-rust/uniffi"]
+uniffi = [
+    "dep:uniffi",
+    "dep:tokio",
+    "kapun-credential-core-rust/uniffi",
+    "kapun-dcql-bbs-rust/uniffi",
+    "kapun-dcql-mdoc-rust/uniffi",
+    "kapun-dcql-sdjwt-rust/uniffi",
+    "kapun-dcql-w3c-rust/uniffi",
+    "kapun-dcql-openbadges-rust/uniffi",
+]
 oid4vp = ["dep:reqwest"]
 reqwest = ["dep:reqwest", "dep:reqwest-middleware", "dep:reqwest-retry"]
 reqwest_cookies = ["dep:reqwest_cookie_store"]

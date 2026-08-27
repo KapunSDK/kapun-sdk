@@ -20,8 +20,8 @@ under the License.
 pub mod parser;
 pub mod trusted_authority;
 
-use kapun_credentials_rust::claims_pointer::Selector;
-use kapun_credentials_rust::models::Pointer;
+use kapun_credential_core_rust::claims_pointer::Selector;
+use kapun_credential_core_rust::models::Pointer;
 use kapun_util_rust::value::Value;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;

@@ -1,3 +1,11 @@
 generate_serializable_records = true
 generate_immutable_records = true
-import_pointer_from = ["uniffi.kapun_credentials_rust", "uniffi.kapun_util_rust"]
+import_pointer_from = [
+    "uniffi.kapun_credential_core_rust",
+    "uniffi.kapun_dcql_bbs_rust",
+    "uniffi.kapun_dcql_mdoc_rust",
+    "uniffi.kapun_dcql_sdjwt_rust",
+    "uniffi.kapun_dcql_w3c_rust",
+    "uniffi.kapun_dcql_openbadges_rust",
+    "uniffi.kapun_util_rust",
+]

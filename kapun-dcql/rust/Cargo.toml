@@ -14,15 +14,9 @@ serde_json.workspace = true
 chrono.workspace = true
 jlc = { git = "https://github.com/UbiqueInnovation/possum.git", optional = true }
 kapun-util-rust = { path = "../../kapun-util/rust" }
-kapun-credentials-rust = { path = "../../kapun-credentials/rust", default-features = false }
+kapun-credential-core-rust = { path = "../../kapun-credential-core/rust", default-features = false }
 
 [features]
 default = ["uniffi"]
-bbs = ["kapun-credentials-rust/bbs"]
-mdoc = ["kapun-credentials-rust/mdoc"]
-sdjwt = ["kapun-credentials-rust/sdjwt"]
-w3c = ["kapun-credentials-rust/w3c"]
-openbadges = ["kapun-credentials-rust/openbadges"]
-uniffi = ["kapun-credentials-rust/uniffi"]
-builtin_parsers = ["bbs", "mdoc", "sdjwt", "w3c", "openbadges"]
+uniffi = ["kapun-credential-core-rust/uniffi"]
 jlc = ["dep:jlc"]

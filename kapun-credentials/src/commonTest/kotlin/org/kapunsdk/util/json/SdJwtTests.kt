@@ -35,9 +35,9 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import uniffi.kapun_crypto_rust.base64UrlDecode
 import uniffi.kapun_crypto_rust.SoftwareKeyPair
-import uniffi.kapun_credentials_rust.BuilderException
+import uniffi.kapun_dcql_sdjwt_rust.BuilderException
 
-import uniffi.kapun_credentials_rust.PointerPart
+import uniffi.kapun_credential_core_rust.PointerPart
 import uniffi.kapun_util_rust.Value
 import kotlin.test.Test
 import kotlin.test.assertEquals

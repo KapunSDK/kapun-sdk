@@ -20,7 +20,7 @@ under the License.
 
 package org.kapunsdk.json
 
-import uniffi.kapun_credentials_rust.SignatureCreator
+import uniffi.kapun_credential_core_rust.SignatureCreator
 import uniffi.kapun_crypto_rust.SoftwareKeyPair
 
 class TestSigner(private val kp : SoftwareKeyPair) : SignatureCreator {

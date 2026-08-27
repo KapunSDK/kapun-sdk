@@ -25,14 +25,14 @@ import org.kapunsdk.credentials.SdJwt
 import org.kapunsdk.util.extensions.*
 import org.kapunsdk.credentials.get
 import org.kapunsdk.credentials.toClaimsPointer
-import org.kapunsdk.SdJwtW3CParser
+import org.kapunsdk.SdJwtParser
 import org.kapunsdk.checkDcqlPresentation
 import org.kapunsdk.getVpToken
 import org.kapunsdk.trustedAuthority.AkiAuthorityMatcher
 import org.kapunsdk.trustedAuthority.DidAuthorityMatcher
 import kotlinx.serialization.json.Json
-import uniffi.kapun_credentials_rust.SignatureCreator
-import uniffi.kapun_credentials_rust.decodeSdjwt
+import uniffi.kapun_credential_core_rust.SignatureCreator
+import uniffi.kapun_dcql_sdjwt_rust.decodeSdjwt
 import uniffi.kapun_crypto_rust.SoftwareKeyPair
 import uniffi.kapun_dcql_rust.Credential
 import uniffi.kapun_dcql_rust.DcqlQuery
@@ -225,7 +225,7 @@ class TestDcql {
 
     @Test
     fun immatrikulationsBst() {
-        val p = SdJwtW3CParser
+        val p = SdJwtParser
         val claims1: Value = createMusterMatriculationConf("Universität Musterstadt", Json.decodeFromString(subjects1))
         val claims2: Value = createMusterMatriculationConf("Universität Musterwil", Json.decodeFromString(subjects1))
         val disclosures : List<ClaimsPointer> = listOf(
