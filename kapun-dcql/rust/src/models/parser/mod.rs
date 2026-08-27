@@ -35,7 +35,7 @@ pub fn register_parser(parser: Arc<dyn CredentialParser>) {
 
 #[cfg(test)]
 mod tests {
-    use std::{str::FromStr, sync::Arc};
+    use std::sync::Arc;
 
     use kapun_credential_core_rust::claims_pointer::Selector;
     use kapun_util_rust::value::Value;
@@ -98,7 +98,7 @@ mod tests {
             .count();
         assert_eq!(matching_parser_count, 1);
 
-        let credential = Credential::from_str("test-credential").unwrap();
+        let credential = crate::parse_credential("test-credential".to_string()).unwrap();
         let Credential::Other(credential) = credential else {
             panic!("test parser returned the wrong credential variant");
         };

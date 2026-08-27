@@ -26,10 +26,10 @@ use crate::models::trusted_authority::{TrustedAuthorityMatcher, REGISTERED_MATCH
 use crate::models::{SetOption, TrustedAuthority};
 use kapun_credential_core_rust::claims_pointer::Selector;
 use kapun_credential_core_rust::models::{Pointer, PointerPart};
-use kapun_util_rust::{value::Value, log_warn};
+use kapun_util_rust::{log_warn, value::Value};
 use models::{
-    ClaimsQuery, Credential, CredentialOptions, CredentialQuery, CredentialSetOption, DcqlQuery,
-    Disclosure,parser::REGISTERED_PARSERS
+    parser::REGISTERED_PARSERS, ClaimsQuery, Credential, CredentialOptions, CredentialQuery,
+    CredentialSetOption, DcqlQuery, Disclosure,
 };
 use serde::Serialize;
 use std::collections::{BTreeMap, HashMap};
@@ -138,6 +138,15 @@ impl<'a, T: AsRef<[&'a str]>> CredentialStore for T {
             .iter()
             .filter_map(|a| a.parse().ok())
             .collect()
+    }
+}
+
+/// Uses already parsed credential handles without serializing their payloads across UniFFI again.
+struct ParsedCredentialStore(Vec<Credential>);
+
+impl CredentialStore for ParsedCredentialStore {
+    fn get(&self) -> Vec<Credential> {
+        self.0.clone()
     }
 }
 
@@ -292,8 +301,11 @@ impl DcqlQuery {
         &self,
         credential_store: impl CredentialStore,
     ) -> DcqlMatchResponse {
-
-        for parser in  REGISTERED_PARSERS.lock() .map(|a| a.clone()).unwrap_or(vec![]) {
+        for parser in REGISTERED_PARSERS
+            .lock()
+            .map(|a| a.clone())
+            .unwrap_or(vec![])
+        {
             log_warn!("DCQL", &format!("Registered {}", parser.id()));
         }
         // does the actual parsing of the credentials
@@ -747,6 +759,33 @@ impl ClaimsQuery {
 
         Ok(())
     }
+}
+
+#[uniffi::export]
+/// Parses one credential with the dynamically registered Kotlin parsers.
+///
+/// The returned credential can be retained and passed to the handle-based selection functions,
+/// avoiding a `Vec<String>` containing every credential payload at the matching boundary.
+pub fn parse_credential(credential: String) -> Option<Credential> {
+    credential.parse().ok()
+}
+
+#[uniffi::export]
+/// Select all already parsed credential handles matching this DcqlQuery.
+pub fn select_parsed_credentials(
+    query: DcqlQuery,
+    credentials: Vec<Credential>,
+) -> Vec<CredentialSetOption> {
+    query.select_credentials(ParsedCredentialStore(credentials))
+}
+
+#[uniffi::export]
+/// Select all already parsed credential handles matching this DcqlQuery and return mismatches.
+pub fn select_parsed_credentials_with_info(
+    query: DcqlQuery,
+    credentials: Vec<Credential>,
+) -> DcqlMatchResponse {
+    query.select_credentials_with_info(ParsedCredentialStore(credentials))
 }
 
 #[uniffi::export]
