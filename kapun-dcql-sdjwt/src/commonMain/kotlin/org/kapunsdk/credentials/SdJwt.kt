@@ -24,6 +24,7 @@ import org.kapunsdk.credentials.sdjwt.SdJwtVcMetadata
 import org.kapunsdk.credentials.sdjwt.SdJwtVcSignatureResolver
 import uniffi.kapun_crypto_rust.base64UrlEncode
 import uniffi.kapun_credential_core_rust.*
+import uniffi.kapun_credential_core_rust.SignatureCreator
 import uniffi.kapun_dcql_sdjwt_rust.*
 import uniffi.kapun_util_rust.Value
 import kotlin.collections.set

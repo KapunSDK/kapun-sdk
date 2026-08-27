@@ -16,6 +16,9 @@ kapun-util-rust = { path = "../../kapun-util/rust" }
 kapun-crypto-rust = { path = "../../kapun-crypto/rust" }
 kapun-dcql-w3c-rust = { path = "../../kapun-dcql-w3c/rust" }
 
+[target.'cfg(any(target_os = "linux", target_os = "android"))'.dependencies]
+openssl-sys = { version = "0.9.117", features = ["vendored"] }
+
 [dev-dependencies]
 multibase.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

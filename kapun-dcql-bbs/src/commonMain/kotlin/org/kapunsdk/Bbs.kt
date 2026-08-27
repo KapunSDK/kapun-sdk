@@ -109,7 +109,7 @@ class BbsCredential(val bbs: BbsWrapper) : CredentialLike {
 	   }
     }
     override fun get(selector: Selector): List<Value>? {
-        return bbs.get(selector)
+        return runCatching { bbs.get(selector) }.getOrNull()
     }
 }
 

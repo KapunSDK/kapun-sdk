@@ -37,6 +37,7 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.encoding.decodeStructure
 import kotlinx.serialization.encoding.encodeStructure
+import uniffi.kapun_credential_core_rust.SignatureCreator
 import uniffi.kapun_credential_core_rust.*
 import uniffi.kapun_dcql_sdjwt_rust.*
 import uniffi.kapun_dcql_w3c_rust.*

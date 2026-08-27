@@ -18,7 +18,7 @@ kotlin {
 	jvmToolchain(17)
 
 	android {
-		namespace = "org.kapunsdk.credentials"
+		namespace = "org.kapunsdk.credentials.core"
 		compileSdk = libs.versions.android.compileSdk.get().toInt()
 		minSdk = libs.versions.android.minSdk.get().toInt()
 

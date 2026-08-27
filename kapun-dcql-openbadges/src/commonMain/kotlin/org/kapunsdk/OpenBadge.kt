@@ -62,5 +62,5 @@ class OpenBadgeCredential(
         else -> MetaMismatch.LdpMetaMismatch(CombinedLdpMetaMismatch.INVALID_META)
     }
 
-    override fun get(selector: Selector): List<Value>? = credentialBody[selector]
+    override fun get(selector: Selector): List<Value>? = runCatching { credentialBody[selector] }.getOrNull()
 }
