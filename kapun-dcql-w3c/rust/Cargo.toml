@@ -1,0 +1,30 @@
+[package]
+name = "kapun-dcql-w3c-rust"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib", "staticlib", "lib"]
+name = "kapun_dcql_w3c_rust"
+
+[dependencies]
+uniffi = { workspace = true, optional = true }
+serde.workspace = true
+serde_json.workspace = true
+tokio = { workspace = true, features = ["full"] }
+reqwest.workspace = true
+rdf-util.workspace = true
+multibase.workspace = true
+json-ld = { version = "0.21.4", features = ["reqwest"] }
+iref = "3.2.2"
+mime = "0.3.17"
+json-syntax = "0.12.5"
+static-iref = "3.0.0"
+kapun-util-rust = { path = "../../kapun-util/rust" }
+kapun-crypto-rust = { path = "../../kapun-crypto/rust" }
+kapun-credential-core-rust = { path = "../../kapun-credential-core/rust" }
+kapun-dcql-sdjwt-rust = { path = "../../kapun-dcql-sdjwt/rust" }
+
+[features]
+default = ["uniffi"]
+uniffi = ["dep:uniffi", "kapun-credential-core-rust/uniffi", "kapun-dcql-sdjwt-rust/uniffi"]

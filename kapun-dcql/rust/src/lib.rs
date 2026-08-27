@@ -23,19 +23,9 @@ pub mod models;
 pub mod verify;
 
 use crate::models::trusted_authority::{TrustedAuthorityMatcher, REGISTERED_MATCHERS};
-#[cfg(feature = "builtin_parsers")]
-use crate::models::Meta;
 use crate::models::{SetOption, TrustedAuthority};
-#[cfg(feature = "bbs")]
-use kapun_credentials_rust::bbs::BbsRust;
-use kapun_credentials_rust::claims_pointer::Selector;
-use kapun_credentials_rust::models::{Pointer, PointerPart};
-#[cfg(feature = "builtin_parsers")]
-use kapun_credentials_rust::sdjwt::SdJwtRust;
-#[cfg(feature = "builtin_parsers")]
-use kapun_credentials_rust::w3c::W3CSdJwt;
-#[cfg(feature = "builtin_parsers")]
-use kapun_credentials_rust::{mdoc::MdocRust, w3c::W3CVerifiableCredential};
+use kapun_credential_core_rust::claims_pointer::Selector;
+use kapun_credential_core_rust::models::{Pointer, PointerPart};
 use kapun_util_rust::value::Value;
 use models::{
     ClaimsQuery, Credential, CredentialOptions, CredentialQuery, CredentialSetOption, DcqlQuery,
@@ -44,18 +34,6 @@ use models::{
 use serde::Serialize;
 use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
-
-/// Supported SD-JWT formats. We have, for backwards compatibility included the vc+sd-jwt type used in some earlier drafts
-const SDJWT_FORMATS: [&str; 2] = ["dc+sd-jwt", "vc+sd-jwt"];
-/// The mdoc format type
-const MDOC_FORMATS: [&str; 1] = ["mso_mdoc"];
-/// W3C VCDM format type. Note: It overlaps with SD-JWT format type, so we need further heuristics (like @context or so)
-const W3C_FORMATS: [&str; 1] = ["vc+sd-jwt"];
-/// OpenBadges are just plain JSON-LD with linked data proofs
-const OPEN_BADGE_FORMATS: [&str; 1] = ["ldp_vc"];
-
-/// We use a bbs-termwise type format type
-const BBS_FORMATS: [&str; 1] = ["bbs-termwise"];
 
 #[derive(uniffi::Object)]
 /// Allow ClaimsPath pointer manipulation/selection via this helper class
@@ -611,102 +589,6 @@ pub fn get_requested_attributes(
 }
 
 impl Credential {
-    /// Check if the credential matches the meta information from the query
-    #[cfg(feature = "builtin_parsers")]
-    pub fn matches_meta_mdoc(
-        mdoc: &MdocRust,
-        meta: Option<&Meta>,
-    ) -> Result<(), CombinedMdocMetaMismatch> {
-        // Assume that if meta is set, we also have vct_values set
-        if let Some(Meta::IsoMdoc { doctype_value }) = meta {
-            let doc_type = mdoc.get_doc_type();
-            if &doc_type != doctype_value {
-                return Err(CombinedMdocMetaMismatch::WrongDocType);
-            }
-        } else if meta.is_some() {
-            return Err(CombinedMdocMetaMismatch::InvalidMeta);
-        }
-        Ok(())
-    }
-    #[cfg(feature = "builtin_parsers")]
-    /// Check if the credential matches the meta information from the query
-    pub fn matches_meta_sdjwt(
-        sd_jwt: &SdJwtRust,
-        meta: Option<&Meta>,
-    ) -> Result<(), CombinedSdJwtMetaMismatch> {
-        // Assume that if meta is set, we also have vct_values set
-        if let Some(Meta::SdjwtVc { vct_values: values }) = meta {
-            let vct = Self::get_vct(sd_jwt);
-            if !values.iter().any(|a| a == vct) {
-                return Err(CombinedSdJwtMetaMismatch::WrongVctValue);
-            }
-        } else if meta.is_some() {
-            return Err(CombinedSdJwtMetaMismatch::InvalidMeta);
-        }
-        Ok(())
-    }
-
-    #[cfg(feature = "bbs")]
-    /// Check if the credential matches the meta information from the query
-    pub fn matches_meta_bbs(
-        bbs: &BbsRust,
-        meta: Option<&Meta>,
-    ) -> Result<(), CombinedBbsMetaMismatch> {
-        // Assume that if meta is set, we also have vct_values set
-        match meta {
-            Some(Meta::W3C { credential_types }) => {
-                let types = bbs.types();
-
-                if !credential_types.iter().any(|a| types.contains(a)) {
-                    Err(CombinedBbsMetaMismatch::WrongCredentialType)
-                } else {
-                    Ok(())
-                }
-            }
-            None => Ok(()),
-            _ => Err(CombinedBbsMetaMismatch::InvalidMeta),
-        }
-    }
-    #[cfg(feature = "builtin_parsers")]
-    /// We don't match meta for W3C for now
-    pub fn matches_meta_w3c(
-        _w3c: &W3CSdJwt,
-        _meta: Option<&Meta>,
-    ) -> Result<(), CombinedW3CMetaMismatch> {
-        Ok(())
-    }
-    #[cfg(feature = "builtin_parsers")]
-    /// Check if the credential matches the meta information from the query
-    pub fn matches_meta_open_badges(
-        vc: &W3CVerifiableCredential,
-        meta: Option<&Meta>,
-    ) -> Result<(), CombinedLdpMetaMismatch> {
-        match meta {
-            Some(Meta::LdpVc { type_values }) => {
-                if type_values
-                    .iter()
-                    .any(|values| values.iter().all(|t| vc.types.contains(t)))
-                {
-                    return Ok(());
-                } else {
-                    return Err(CombinedLdpMetaMismatch::WrongCredentialTypes);
-                }
-            }
-            None => Ok(()),
-            _ => Err(CombinedLdpMetaMismatch::InvalidMeta),
-        }
-    }
-    #[cfg(feature = "builtin_parsers")]
-    /// Returns the VCT for a sd jwt
-    pub fn get_vct(sd_jwt: &SdJwtRust) -> &str {
-        sd_jwt
-            .claims
-            .get("vct")
-            .unwrap_or(&Value::Null)
-            .as_str()
-            .unwrap_or("")
-    }
-
     /// Checks if this credential does satisfy the given credential query
     pub fn is_satisfied(
         &self,
@@ -715,70 +597,22 @@ impl Credential {
         let expected_format_error =
             DcqlCredentialQueryMismatch::ExpectedFormat(credential_query.format.clone());
 
-        // check for the credential query format
-        match self {
-            Credential::SdJwtCredential(_)
-                if !SDJWT_FORMATS.contains(&credential_query.format.as_str()) =>
-            {
-                return Err(expected_format_error);
-            }
-            Credential::MdocCredential(_)
-                if !MDOC_FORMATS.contains(&credential_query.format.as_str()) =>
-            {
-                return Err(expected_format_error)
-            }
-            Credential::BbsCredential(_)
-                if !BBS_FORMATS.contains(&credential_query.format.as_str()) =>
-            {
-                return Err(expected_format_error)
-            }
-            Credential::W3CCredential(_)
-                if !W3C_FORMATS.contains(&credential_query.format.as_str()) =>
-            {
-                return Err(expected_format_error)
-            }
-            Credential::OpenBadge303Credential(_)
-                if !OPEN_BADGE_FORMATS.contains(&credential_query.format.as_str()) =>
-            {
-                return Err(expected_format_error)
-            }
-            Credential::Other(o) if !o.format_specifiers().contains(&credential_query.format) => {
-                return Err(expected_format_error)
-            }
-            _ => (),
+        let credential: &Arc<dyn crate::models::CredentialLike> = match self {
+            Credential::SdJwtCredential(value)
+            | Credential::MdocCredential(value)
+            | Credential::BbsCredential(value)
+            | Credential::W3CCredential(value)
+            | Credential::OpenBadge303Credential(value)
+            | Credential::Other(value) => value,
+        };
+        if !credential
+            .format_specifiers()
+            .contains(&credential_query.format)
+        {
+            return Err(expected_format_error);
         }
-        // check for the meta attribute
-        match self {
-            Credential::SdJwtCredential(sd_jwt) => {
-                if let Some(e) = sd_jwt.matches_meta(credential_query.meta.clone()) {
-                    return Err(e.into());
-                }
-            }
-            Credential::MdocCredential(mdoc) => {
-                if let Some(e) = mdoc.matches_meta(credential_query.meta.clone()) {
-                    return Err(e.into());
-                }
-            }
-            Credential::BbsCredential(bbs) => {
-                if let Some(e) = bbs.matches_meta(credential_query.meta.clone()) {
-                    return Err(e.into());
-                }
-            }
-            Credential::W3CCredential(w3c) => {
-                if let Some(e) = w3c.matches_meta(credential_query.meta.clone()) {
-                    return Err(e.into());
-                }
-            }
-            Credential::OpenBadge303Credential(vc) => {
-                if let Some(e) = vc.matches_meta(credential_query.meta.clone()) {
-                    return Err(e.into());
-                }
-            }
-            Credential::Other(credential_like) => {
-                if let Some(e) = credential_like.matches_meta(credential_query.meta.clone()) {
-                    return Err(e.into());
-                }
-            }
+        if let Some(error) = credential.matches_meta(credential_query.meta.clone()) {
+            return Err(error.into());
         }
 
         match (&credential_query.claim_sets, &credential_query.claims) {
@@ -930,10 +764,13 @@ pub fn select_credentials_with_info(
     query.select_credentials_with_info(credentials.iter().map(String::as_str).collect::<Vec<_>>())
 }
 
-#[cfg(all(test, feature = "builtin_parsers"))]
+// Credential-format integration tests require the former built-in parsers and are retained as
+// fixtures until they are moved into their respective format libraries.
+#[cfg(any())]
 mod tests {
+    use kapun_credential_core_rust::models::PointerPart;
+    use kapun_dcql_sdjwt_rust::sdjwt::decode_sdjwt;
     use std::sync::Arc;
-    use kapun_credentials_rust::{models::PointerPart, sdjwt::decode_sdjwt};
 
     use crate::{
         models::{Credential, DcqlQuery},

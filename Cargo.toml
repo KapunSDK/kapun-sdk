@@ -1,7 +1,12 @@
 [workspace]
 resolver = "3"
 members = [
-    "kapun-credentials/rust",
+    "kapun-credential-core/rust",
+    "kapun-dcql-bbs/rust",
+    "kapun-dcql-mdoc/rust",
+    "kapun-dcql-sdjwt/rust",
+    "kapun-dcql-w3c/rust",
+    "kapun-dcql-openbadges/rust",
     "kapun-crypto/rust",
     "kapun-dcql/rust",
     "kapun-issuance/rust",

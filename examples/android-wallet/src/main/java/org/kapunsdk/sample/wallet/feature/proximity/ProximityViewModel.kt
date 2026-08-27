@@ -38,7 +38,7 @@ import kotlinx.serialization.json.Json
 import org.koin.core.component.KoinComponent
 import org.koin.core.module.dsl.viewModelOf
 import org.koin.dsl.module
-import uniffi.kapun_credentials_rust.SignatureCreator
+import uniffi.kapun_credential_core_rust.SignatureCreator
 import uniffi.kapun_crypto_rust.SoftwareKeyPair
 import uniffi.kapun_crypto_rust.base64UrlDecode
 import uniffi.kapun_crypto_rust.parseEncodedJwtPayload

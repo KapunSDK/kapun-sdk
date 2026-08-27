@@ -22,7 +22,7 @@ package org.kapunsdk.wallet.process.presentation.remote
 
 import org.kapunsdk.wallet.credentials.presentation.CredentialSelectionUiModel
 import org.kapunsdk.wallet.process.ProcessEvent
-import uniffi.kapun_credentials_rust.DeviceBindingType
+import uniffi.kapun_dcql_bbs_rust.DeviceBindingType
 
 sealed interface RemotePresentationProcessEvent : ProcessEvent {
 
