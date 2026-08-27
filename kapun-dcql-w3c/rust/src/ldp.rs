@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fmt::Display, sync::Arc};
 
-use kapun_crypto_rust::crypto::SignatureCreator;
+use crate::SignatureCreator;
 use multibase::Base;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
@@ -11,7 +11,6 @@ pub enum OneOrMany<T> {
     One(T),
     Many(Vec<T>),
 }
-
 impl<T> OneOrMany<T> {
     pub fn into_vec(self) -> Vec<T> {
         match self {
@@ -456,7 +455,7 @@ mod eddsa_rdfc_2022 {
     use std::sync::Arc;
 
     use json_ld::{ChainLoader, ReqwestLoader};
-    use kapun_crypto_rust::crypto::{SignatureCreator, eddsa::EdDsaPublicKey, sha256};
+    use kapun_crypto_rust::crypto::{eddsa::EdDsaPublicKey, sha256};
     use serde_json::Value as JsonValue;
     use tokio::{
         runtime::Handle,
@@ -464,6 +463,7 @@ mod eddsa_rdfc_2022 {
     };
 
     use crate::{
+        SignatureCreator,
         json_ld::{JsonLdDocument, loader::StaticLoader},
         ldp::{LdpError, ProofCreationError, ProofVerificationError, retrieve_public_key},
         w3c::CONTEXT_W3C_VCDM2,

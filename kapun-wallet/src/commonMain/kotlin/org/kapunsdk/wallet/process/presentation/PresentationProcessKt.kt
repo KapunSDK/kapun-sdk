@@ -71,10 +71,14 @@ import uniffi.kapun_util_rust.Value
 import org.kapunsdk.wallet.process.presentation.models.TransactionDataWrapper
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonNames
+import org.kapunsdk.trustedAuthority.AkiAuthorityMatcher
+import org.kapunsdk.trustedAuthority.DidAuthorityMatcher
 import uniffi.kapun_dcql_bbs_rust.DeviceBindingType
 import uniffi.kapun_credential_core_rust.SignatureCreator
 import uniffi.kapun_dcql_rust.ClaimsQuery
 import uniffi.kapun_dcql_rust.CredentialSetOption
+import uniffi.kapun_dcql_rust.registerMatcher
+import uniffi.kapun_dcql_rust.registerParser
 import uniffi.kapun_dcql_rust.selectCredentialsWithInfo
 import uniffi.kapun_util_rust.encodeCbor
 import uniffi.kapun_wallet_rust.*
@@ -352,11 +356,15 @@ class PresentationProcessKt private constructor(
                     else -> it.payload
                 }
             }
-            BbsParser.register()
-            MdocParser.register()
-            OpenBadgeParser.register()
-            SdJwtParser.register()
-            W3CParser.register()
+
+            registerParser(BbsParser)
+            registerParser(MdocParser)
+            registerParser(OpenBadgeParser)
+            registerParser(SdJwtParser)
+            registerParser(W3CParser)
+            registerMatcher(AkiAuthorityMatcher)
+            registerMatcher(DidAuthorityMatcher)
+
             val result = selectCredentialsWithInfo(dcqlQuery, tmpList)
 
             // Prioritize ZKP proofs for claim-based credentials

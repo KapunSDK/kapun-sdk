@@ -24,6 +24,7 @@ import org.kapunsdk.credentials.*
 import org.kapunsdk.util.extensions.asString
 import org.kapunsdk.util.extensions.get
 import uniffi.kapun_credential_core_rust.*
+import uniffi.kapun_credential_core_rust.SignatureCreator
 import uniffi.kapun_dcql_sdjwt_rust.*
 import uniffi.kapun_dcql_rust.CombinedSdJwtMetaMismatch
 import uniffi.kapun_dcql_rust.Credential
@@ -84,7 +85,7 @@ class SdJwtCredential(val sdjwt: SdJwtRust): CredentialLike {
     }
 
     override fun get(selector: Selector): List<Value>? {
-        return sdjwt.claims[selector]
+        return runCatching { sdjwt.claims[selector] }.getOrNull()
     }
 }
 fun SdJwtBuilder.getVpToken(
@@ -107,14 +108,14 @@ fun SdJwtBuilder.getVpToken(
     // useful for tests
     overrideDisclosures?.let {
         it.forEach { ptr -> this.addDisclosure(ptr) }
-        return Result.success(this.build(signer))
+        return Result.success(this.build(signer.asNativeSdJwtSignatureCreator()))
     }
 
     // https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-selecting-claims
     // `If claims is absent, the Verifier requests all claims existing in the Credential`
     if(query.claims == null){
         this.addAll()
-        return Result.success(this.build(signer))
+        return Result.success(this.build(signer.asNativeSdJwtSignatureCreator()))
     }
 
     // If claims is present, but claim_sets is absent, the Verifier requests all claims listed in claims
@@ -166,12 +167,12 @@ fun SdJwtBuilder.getVpToken(
                     println(e)
                 }
             }
-            return Result.success(this.build(signer))
+            return Result.success(this.build(signer.asNativeSdJwtSignatureCreator()))
         }
         this.removeAll()
-        return Result.success(this.build(signer))
+        return Result.success(this.build(signer.asNativeSdJwtSignatureCreator()))
     }
-    return Result.success(this.build(signer))
+    return Result.success(this.build(signer.asNativeSdJwtSignatureCreator()))
 }
 
 private fun resolvePointer(claims: Value, ptr: List<PointerPart>) : List<List<PointerPart>> {

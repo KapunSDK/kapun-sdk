@@ -51,7 +51,7 @@ fun SdJwt.getVpToken(authRequestObject: Value,
     // useful for tests
     overrideDisclosures?.let {
         it.forEach { ptr -> builder.addDisclosure(ptr) }
-        return Result.success(builder.build(signer))
+        return Result.success(builder.build(signer.asNativeSdJwtSignatureCreator()))
     }
     val inputDescriptors = authRequestObject["presentation_definition"]["input_descriptors"].asArray() ?: return Result.failure(SdJwtErrors.InvalidFormat(""))
     val inputDescriptor = inputDescriptors.find { it["id"].asString() == inputDescriptorId } ?: return Result.failure(SdJwtErrors.InvalidFormat(""))
@@ -72,7 +72,7 @@ fun SdJwt.getVpToken(authRequestObject: Value,
             }
         }
     }
-    return Result.success(builder.build(signer))
+    return Result.success(builder.build(signer.asNativeSdJwtSignatureCreator()))
 }
 
 val ARRAY_INDICES = Regex("\\[(\\d+)]")

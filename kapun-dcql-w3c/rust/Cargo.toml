@@ -25,6 +25,9 @@ kapun-crypto-rust = { path = "../../kapun-crypto/rust" }
 kapun-credential-core-rust = { path = "../../kapun-credential-core/rust" }
 kapun-dcql-sdjwt-rust = { path = "../../kapun-dcql-sdjwt/rust" }
 
+[target.'cfg(any(target_os = "linux", target_os = "android"))'.dependencies]
+openssl-sys = { version = "0.9.117", features = ["vendored"] }
+
 [features]
 default = ["uniffi"]
 uniffi = ["dep:uniffi", "kapun-credential-core-rust/uniffi", "kapun-dcql-sdjwt-rust/uniffi"]

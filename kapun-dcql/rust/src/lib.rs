@@ -26,10 +26,10 @@ use crate::models::trusted_authority::{TrustedAuthorityMatcher, REGISTERED_MATCH
 use crate::models::{SetOption, TrustedAuthority};
 use kapun_credential_core_rust::claims_pointer::Selector;
 use kapun_credential_core_rust::models::{Pointer, PointerPart};
-use kapun_util_rust::value::Value;
+use kapun_util_rust::{value::Value, log_warn};
 use models::{
     ClaimsQuery, Credential, CredentialOptions, CredentialQuery, CredentialSetOption, DcqlQuery,
-    Disclosure,
+    Disclosure,parser::REGISTERED_PARSERS
 };
 use serde::Serialize;
 use std::collections::{BTreeMap, HashMap};
@@ -292,6 +292,10 @@ impl DcqlQuery {
         &self,
         credential_store: impl CredentialStore,
     ) -> DcqlMatchResponse {
+
+        for parser in  REGISTERED_PARSERS.lock() .map(|a| a.clone()).unwrap_or(vec![]) {
+            log_warn!("DCQL", &format!("Registered {}", parser.id()));
+        }
         // does the actual parsing of the credentials
         let credentials = credential_store.get();
         // lock the current trusted authorities

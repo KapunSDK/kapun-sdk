@@ -13,7 +13,7 @@ kotlin {
     }
     jvmToolchain(17)
     android {
-        namespace = "org.kapunsdk.credentials"
+        namespace = "org.kapunsdk.credentials.umbrella"
         compileSdk = libs.versions.android.compileSdk.get().toInt()
         minSdk = libs.versions.android.minSdk.get().toInt()
         withHostTest {}

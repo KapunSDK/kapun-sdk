@@ -47,5 +47,5 @@ class W3CCredential(private val w3c: W3cSdJwt) : CredentialLike {
 
     override fun matchesMeta(meta: Meta?): MetaMismatch? = null
 
-    override fun get(selector: Selector): List<Value>? = w3c.json[selector]
+    override fun get(selector: Selector): List<Value>? = runCatching { w3c.json[selector] }.getOrNull()
 }

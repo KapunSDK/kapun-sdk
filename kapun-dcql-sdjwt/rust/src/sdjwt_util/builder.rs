@@ -32,6 +32,7 @@ use sha2::{Digest, Sha256};
 #[cfg(feature = "experimental")]
 use super::zkp::ZkProof;
 use crate::{
+    SignatureCreator,
     sdjwt::SdJwtRust,
     sdjwt_util::{
         Disclosure, DisclosureIndex, DisclosureNode, DisclosureTree, Header, base64_hash,
@@ -41,7 +42,7 @@ use crate::{
 use kapun_credential_core_rust::{
     claims_pointer::Selector,
     generate_nonce,
-    models::{Pointer, PointerPart, SignatureCreator, SpecVersion},
+    models::{Pointer, PointerPart, SpecVersion},
 };
 
 const UNDISCLOSABLE_CLAIMS: [&str; 5] = ["iss", "iat", "exp", "nbf", "vct"];
