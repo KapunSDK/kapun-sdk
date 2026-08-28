@@ -89,6 +89,9 @@ class InvalidVctValueException(allowed: List<String>, actual: String) :
 class NotAllClaimsProvidedException() :
     DcqlVerificationException("A fully disclosed VC was expected, but a restricted was received")
 
+class UnexpectedClaimsProvidedException() :
+    DcqlVerificationException("No selectively disclosable claims were requested, but some were received")
+
 class NoCredentialSetQueryOptionSatisfiedException() :
     DcqlVerificationException("No credential set option was satisfied!")
 
@@ -133,18 +136,14 @@ private fun checkClaimQuery(
 private fun checkCredentialQuery(
     query: CredentialQuery,
     claims: Value,
-    originalNumClaims: Int,
     numClaimsDisclosed: Int,
 ): Result<Unit> {
     val claimQueries = query.claims
-    if (claimQueries == null) {
-        // If claims is absent, the Verifier requests all claims existing in the Credential
-
-        // NOTE: Currently for some formats (SdJwt, W3C, Mdoc?) counting the total number of
-        // claims does not work for nested disclosures (nested disclosures are not counted).
-        // Thus, for now, numClaimsDisclosed must be at least originalNumClaims
-        if (originalNumClaims > numClaimsDisclosed) return Result.failure(
-            NotAllClaimsProvidedException()
+    if (claimQueries.isNullOrEmpty()) {
+        // If claims is absent, no selectively disclosable claims are requested. Treat an empty
+        // legacy value the same way; mandatory claims are not included in numClaimsDisclosed.
+        if (numClaimsDisclosed > 0) return Result.failure(
+            UnexpectedClaimsProvidedException()
         )
         return Result.success(Unit)
     } else {
@@ -321,7 +320,7 @@ private fun checkCredentialQuery(
             }
 
             checkCredentialQuery(
-                query, sdJwt.innerJwt.claims, sdJwt.getOriginalNumClaims(), sdJwt.getNumDisclosed()
+                query, sdJwt.innerJwt.claims, sdJwt.getNumDisclosed()
             ).map { result }
         }
 
@@ -345,9 +344,6 @@ private fun checkCredentialQuery(
             checkCredentialQuery(
                 query,
                 mdoc.mdoc.namespaceMap,
-                mdoc.mdoc.issuerAuth["valueDigests"].asObject()!!
-                    .map { (_, value) -> value.asOrderedObject()!!.entries.size }
-                    .sum(),
                 mdoc.mdoc.namespaceMap.asOrderedObject()!!
                     .entries.sumOf { (_, value) -> value.asOrderedObject()!!.entries.size },
             ).map { result }
@@ -367,7 +363,6 @@ private fun checkCredentialQuery(
             checkCredentialQuery(
                 query,
                 bbs.claims(),
-                bbs.getOriginalNumClaims(),
                 bbs.getNumDisclosed()
             ).map { result }
         }
@@ -383,7 +378,7 @@ private fun checkCredentialQuery(
             }
 
             checkCredentialQuery(
-                query, w3c.asJson(), w3c.getOriginalNumClaims(), w3c.getNumDisclosed()
+                query, w3c.asJson(), w3c.getNumDisclosed()
             ).map { result }
         }
 
@@ -404,7 +399,7 @@ private fun checkCredentialQuery(
             }
 
             checkCredentialQuery(
-                query, vcJson, 0, 0
+                query, vcJson, 0
             ).map { result }
         }
 

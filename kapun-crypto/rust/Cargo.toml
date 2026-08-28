@@ -35,7 +35,7 @@ multibase = { workspace = true }
 unsigned-varint = "0.8.0"
 
 [features]
-default = ["uniffi"]
+default = ["uniffi", "cert-builder"]
 uniffi = []
 x448 = ["dep:x448"]
 cert-builder = ["simple_x509"]

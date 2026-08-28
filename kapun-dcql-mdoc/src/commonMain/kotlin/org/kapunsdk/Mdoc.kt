@@ -129,33 +129,22 @@ fun Mdoc.getVpToken(
         jwkThumbprint = jwkThumbprint,
         responseUri = responseUri,
     )
-    val coseSign1 = this.deviceSignature(signer, this.doctype()!!, sessionTranscript)
-    val deviceNameSpacesBytes = encodeCbor(mapOf<String, String>().toCbor()).toCbor()
     var issuerSigned = this.mdoc.originalDecoded
-    var originalIssuerAuth = issuerSigned.get("issuerAuth")
+    val originalIssuerAuth = issuerSigned.get("issuerAuth")
 
+    // If claims is absent, no selectively disclosable claims are requested. Treat an empty legacy
+    // value the same way so that invalid input fails closed instead of disclosing data.
     // https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-selecting-claims
-    // `If claims is absent, the Verifier requests all claims existing in the Credential`
-    if (query.claims == null) {
-        val vpToken = base64UrlEncode(
-            encodeCbor(
-                mapOf(
-                    "version" to this.version(), "status" to 0, "documents" to listOf(
-                        mapOf(
-                            "docType" to this.doctype(),
-                            "issuerSigned" to issuerSigned,
-                            "deviceSigned" to mapOf(
-                                "nameSpaces" to Pair(24, deviceNameSpacesBytes),
-                                "deviceAuth" to mapOf(
-                                    "deviceSignature" to coseSign1
-                                )
-                            ),
-                        )
-                    )
-                ).toCbor()
+    if (query.claims.isNullOrEmpty()) {
+        issuerSigned = mapOf(
+            "issuerAuth" to originalIssuerAuth,
+            "nameSpaces" to emptyMap<String, Value>()
+        ).toCbor()
+        return Result.success(
+            base64UrlEncode(
+                encodeCbor(this.buildToken(signer, issuerSigned, sessionTranscript))
             )
         )
-        return Result.success(vpToken)
     }
     val namespaces = mutableMapOf<String, MutableList<Value>>()
     val requestedClaims = query.claims.orEmpty()

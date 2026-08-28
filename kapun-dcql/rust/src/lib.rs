@@ -529,41 +529,9 @@ pub fn get_requested_attributes(
     let Ok(claims_queries) = credential.is_satisfied(credential_query) else {
         return Value::Null;
     };
-    // all queries match
-    // an empty claims query means a RP is requesting all claims
+    // No Claims Queries means no selectively disclosable claims were requested.
     if claims_queries.is_empty() {
-        let mut key_value_match = HashMap::new();
-        let Some(claims) = credential_query.claims.as_ref() else {
-            return Value::Null;
-        };
-        for claim in claims {
-            // generate a unified body payload type...
-            let body = match &credential {
-                Credential::SdJwtCredential(sdjwt) => sdjwt.get_body(),
-                Credential::MdocCredential(mdoc) => mdoc.get_body(),
-                Credential::BbsCredential(bbs) => bbs.get_body(),
-                Credential::W3CCredential(w3c) => w3c.get_body(),
-                Credential::OpenBadge303Credential(vc) => vc.get_body(),
-                Credential::Other(o) => o.get_body(),
-            };
-
-            // ... and try resolve the pointers (as there is also slicing)
-            let all_ptrs = claim.path.resolve_ptr(body.clone()).unwrap_or(vec![]);
-            for p in all_ptrs {
-                let key = p
-                    .iter()
-                    .map(|p| match p {
-                        PointerPart::String(s) => s.to_string(),
-                        PointerPart::Index(i) => i.to_string(),
-                        PointerPart::Null(_) => "null".to_string(),
-                    })
-                    .collect::<Vec<_>>()
-                    .join("/");
-                // insert every attribute into the object
-                key_value_match.insert(key, p.select(body.clone()).unwrap()[0].clone());
-            }
-        }
-        Value::Object(key_value_match)
+        Value::Object(HashMap::new())
     } else {
         let mut key_value_match = HashMap::new();
         let Some(claims) = credential_query.claims.as_ref() else {

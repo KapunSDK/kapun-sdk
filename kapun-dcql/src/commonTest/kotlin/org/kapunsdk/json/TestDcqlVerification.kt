@@ -33,7 +33,7 @@ import org.kapunsdk.InvalidDocTypeException
 import org.kapunsdk.InvalidVctValueException
 import org.kapunsdk.NoClaimSetQueryOptionSatisfiedException
 import org.kapunsdk.NoCredentialSetQueryOptionSatisfiedException
-import org.kapunsdk.NotAllClaimsProvidedException
+import org.kapunsdk.UnexpectedClaimsProvidedException
 import org.kapunsdk.checkDcqlPresentation
 import org.kapunsdk.getVpToken
 import org.kapunsdk.parseDcqlQuery
@@ -200,11 +200,12 @@ class TestDcqlVerification {
     ): DcqlPresentation = mapOf(
         query.id to credential
             .getVpToken(
-                query,
-                sha256Rs(encodeCbor(listOf(audience, mdocGeneratedNonce).toCbor())),
-                sha256Rs(encodeCbor(listOf(responseUri, mdocGeneratedNonce).toCbor())),
-                nonce,
-                keyBindingKey,
+                query = query,
+                clientId = audience,
+                responseUri = responseUri,
+                nonce = nonce,
+                jwkThumbprint = null,
+                signer = keyBindingKey,
             ).getOrNull()!!
     )
 
@@ -554,7 +555,7 @@ class TestDcqlVerification {
     }
 
     @Test
-    fun testVerifySdJwtQueryWithoutClaims_NotAllClaimsProvidedException() {
+    fun testVerifySdJwtQueryWithoutClaims_UnexpectedClaimsProvidedException() {
         val sdJwt = createSdJwk(
             """
             {
@@ -595,7 +596,7 @@ class TestDcqlVerification {
             )
         )
 
-        assertFailsWith<NotAllClaimsProvidedException> {
+        assertFailsWith<UnexpectedClaimsProvidedException> {
             verify(query, dcqlPresentation).getOrThrow()
         }
     }
@@ -1268,7 +1269,7 @@ class TestDcqlVerification {
     }
 
     @Test
-    fun testVerifyMDocQueryWithoutClaims_NotAllClaimsProvidedException() {
+    fun testVerifyMDocQueryWithoutClaims_UnexpectedClaimsProvidedException() {
         val mdoc = createMDoc(
             mapOf(
                 "org.iso.18013.5.1" to mapOf(
@@ -1315,7 +1316,7 @@ class TestDcqlVerification {
             """.trimIndent()
         )
 
-        assertFailsWith<NotAllClaimsProvidedException> {
+        assertFailsWith<UnexpectedClaimsProvidedException> {
             verify(query_without_claims, dcqlPresentation).getOrThrow()
         }
     }
@@ -1978,9 +1979,8 @@ class TestDcqlVerification {
         )
     }
 
-    // NOTE: Disabled as counting the original number of claims does not work properly.
-    // @Test
-    fun testVerifyW3CQueryWithoutClaims_NotAllClaimsProvidedException() {
+    @Test
+    fun testVerifyW3CQueryWithoutClaims_UnexpectedClaimsProvidedException() {
         val w3c = createW3C(
             """
                 {
@@ -2027,7 +2027,7 @@ class TestDcqlVerification {
             )
         )
 
-        assertFailsWith<NotAllClaimsProvidedException> {
+        assertFailsWith<UnexpectedClaimsProvidedException> {
             verify(query, dcqlPresentation).getOrThrow()
         }
     }
