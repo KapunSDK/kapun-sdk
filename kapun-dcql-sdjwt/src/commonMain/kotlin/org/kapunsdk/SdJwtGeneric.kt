@@ -111,10 +111,11 @@ fun SdJwtBuilder.getVpToken(
         return Result.success(this.build(signer.asNativeSdJwtSignatureCreator()))
     }
 
+    // If claims is absent, no selectively disclosable claims are requested. Treat an empty legacy
+    // value the same way so that invalid input fails closed instead of disclosing data.
     // https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-selecting-claims
-    // `If claims is absent, the Verifier requests all claims existing in the Credential`
-    if(query.claims == null){
-        this.addAll()
+    if(query.claims.isNullOrEmpty()){
+        this.removeAll()
         return Result.success(this.build(signer.asNativeSdJwtSignatureCreator()))
     }
 

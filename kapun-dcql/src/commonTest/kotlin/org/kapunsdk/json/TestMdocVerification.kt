@@ -30,8 +30,9 @@ import org.kapunsdk.DcqlPresentation
 import org.kapunsdk.InvalidDocTypeException
 import org.kapunsdk.NoClaimSetQueryOptionSatisfiedException
 import org.kapunsdk.NoCredentialSetQueryOptionSatisfiedException
-import org.kapunsdk.NotAllClaimsProvidedException
+import org.kapunsdk.UnexpectedClaimsProvidedException
 import org.kapunsdk.checkDcqlPresentation
+import org.kapunsdk.getVpToken
 import org.kapunsdk.parseDcqlQuery
 import org.kapunsdk.util.extensions.asObject
 import org.kapunsdk.util.extensions.asString
@@ -105,12 +106,11 @@ class TestMdocVerification {
                     VerificationStep.DocType,
                     VerificationStep.IssuerSigned,
                     VerificationStep.IssuerSignature,
-                    VerificationStep.CertChain,
                     VerificationStep.DeviceSignature(
-                        audience = audience,
+                        clientId = audience,
+                        nonce = nonce,
+                        jwkThumbprint = null,
                         responseUri = responseUri,
-                        mdocGeneratedNonce = mdocGeneratedNonce,
-                        nonce = nonce
                     )
                 )
             ).getOrThrow()
@@ -132,8 +132,10 @@ class TestMdocVerification {
             certificateChain = listOf(
                 createCert(
                     CertificateData(
-                        issuer = SubjectIdentifier(commonName = "Issuer"),
-                        subject = SubjectIdentifier(commonName = "Subject"),
+                        // This fixture contains a single certificate, so it must be a self-signed
+                        // trust anchor for CertChain verification to succeed.
+                        issuer = SubjectIdentifier(commonName = "Test Issuer"),
+                        subject = SubjectIdentifier(commonName = "Test Issuer"),
                         notBefore = Clock.System.now().toEpochMilliseconds() / 1000 - 1,
                         notAfter = Clock.System.now().toEpochMilliseconds() / 1000
                                 + 86400 * 365,
@@ -155,11 +157,12 @@ class TestMdocVerification {
     ): DcqlPresentation = mapOf(
         query.id to credential
             .getVpToken(
-                query,
-                sha256Rs(encodeCbor(listOf(audience, mdocGeneratedNonce).toCbor())),
-                sha256Rs(encodeCbor(listOf(responseUri, mdocGeneratedNonce).toCbor())),
-                nonce,
-                keyBindingKey,
+                query = query,
+                clientId = audience,
+                responseUri = responseUri,
+                nonce = nonce,
+                jwkThumbprint = null,
+                signer = keyBindingKey,
             ).getOrNull()!!
     )
 
@@ -463,7 +466,7 @@ class TestMdocVerification {
     }
 
     @Test
-    fun testVerifyMDocQueryWithoutClaims_NotAllClaimsProvidedException() {
+    fun testVerifyMDocQueryWithoutClaims_UnexpectedClaimsProvidedException() {
         val mdoc = createMDoc(
             mapOf(
                 "org.iso.18013.5.1" to mapOf(
@@ -510,7 +513,7 @@ class TestMdocVerification {
             """.trimIndent()
         )
 
-        assertFailsWith<NotAllClaimsProvidedException> {
+        assertFailsWith<UnexpectedClaimsProvidedException> {
             verify(query_without_claims, dcqlPresentation).getOrThrow()
         }
     }

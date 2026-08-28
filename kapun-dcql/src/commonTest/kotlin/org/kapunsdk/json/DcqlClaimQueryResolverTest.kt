@@ -11,6 +11,7 @@ import uniffi.kapun_util_rust.Value
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.fail
 
 class DcqlClaimQueryResolverTest {
 
@@ -32,6 +33,38 @@ class DcqlClaimQueryResolverTest {
             return claim.isNotEmpty()
 
         return values.any { v -> claim.any { c -> c == v  } }
+    }
+
+    @Test
+    fun testAbsentClaimsRequestsNoClaims() {
+        val query = CredentialQuery(
+            id = "test",
+            format = "test",
+            claims = null,
+            claimSets = null,
+        )
+
+        val neededClaims = DcqlClaimQueryResolver.neededClaims(query) { _, _ ->
+            fail("An absent claims property must not inspect or request credential claims")
+        }
+
+        assertEquals(emptyList(), neededClaims)
+    }
+
+    @Test
+    fun testEmptyClaimsRequestsNoClaims() {
+        val query = CredentialQuery(
+            id = "test",
+            format = "test",
+            claims = emptyList(),
+            claimSets = null,
+        )
+
+        val neededClaims = DcqlClaimQueryResolver.neededClaims(query) { _, _ ->
+            fail("An empty claims property must not inspect or request credential claims")
+        }
+
+        assertEquals(emptyList(), neededClaims)
     }
 
     @Test

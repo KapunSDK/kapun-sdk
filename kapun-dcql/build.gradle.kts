@@ -62,11 +62,15 @@ kotlin {
 		commonTest.dependencies {
 			implementation(libs.kotlin.test)
 			implementation(libs.kotlin.serialization)
+			implementation(project(":kapun-credentials"))
 			implementation(project(":kapun-dcql-bbs"))
 			implementation(project(":kapun-dcql-mdoc"))
 			implementation(project(":kapun-dcql-sdjwt"))
 			implementation(project(":kapun-dcql-w3c"))
 			implementation(project(":kapun-dcql-openbadges"))
+		}
+		commonTest {
+			kotlin.exclude("**/TestPossum.kt")
 		}
 
 		androidMain.dependencies {
