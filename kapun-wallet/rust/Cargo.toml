@@ -61,14 +61,17 @@ http = "0.2.12"
 kapun-util-rust = { path = "../../kapun-util/rust", default-features = false }
 kapun-crypto-rust = { path = "../../kapun-crypto/rust", default-features = false }
 kapun-credential-core-rust = { path = "../../kapun-credential-core/rust", default-features = false }
+kapun-dcql-rust = { path = "../../kapun-dcql/rust", default-features = false }
 kapun-dcql-bbs-rust = { path = "../../kapun-dcql-bbs/rust", default-features = false }
 kapun-dcql-mdoc-rust = { path = "../../kapun-dcql-mdoc/rust", default-features = false }
 kapun-dcql-sdjwt-rust = { path = "../../kapun-dcql-sdjwt/rust", default-features = false }
 kapun-dcql-w3c-rust = { path = "../../kapun-dcql-w3c/rust", default-features = false }
 kapun-dcql-openbadges-rust = { path = "../../kapun-dcql-openbadges/rust", default-features = false }
+kapun-issuance-rust = { path = "../../kapun-issuance/rust", default-features = false }
+kapun-presentation-rust = { path = "../../kapun-presentation/rust", default-features = false }
+kapun-trust-rust = { path = "../../kapun-trust/rust", default-features = false }
 crunchy = "=0.2.2"
 rdf-util = { workspace = true, optional = true }
-next-gen-signatures = { workspace = true, features = ["all"], optional = true }
 josekit.workspace = true
 heidi-jwt.workspace = true
 kapun-x509.workspace = true
@@ -101,20 +104,22 @@ default = [
     "reqwest",
     "reqwest_cookies",
     "rdf-util",
-    "next-gen-signatures",
 
 ]
 uniffi = [
     "dep:uniffi",
     "dep:tokio",
     "kapun-credential-core-rust/uniffi",
+    "kapun-dcql-rust/uniffi",
     "kapun-dcql-bbs-rust/uniffi",
     "kapun-dcql-mdoc-rust/uniffi",
     "kapun-dcql-sdjwt-rust/uniffi",
     "kapun-dcql-w3c-rust/uniffi",
     "kapun-dcql-openbadges-rust/uniffi",
+    "kapun-issuance-rust/uniffi",
+    "kapun-trust-rust/uniffi",
 ]
-oid4vp = ["dep:reqwest"]
+oid4vp = ["dep:reqwest", "kapun-issuance-rust/oid4vp"]
 reqwest = ["dep:reqwest", "dep:reqwest-middleware", "dep:reqwest-retry"]
 reqwest_cookies = ["dep:reqwest_cookie_store"]
 wasm = ["uuid/js"]

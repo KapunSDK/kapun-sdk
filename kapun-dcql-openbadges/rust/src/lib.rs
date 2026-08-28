@@ -1,5 +1,11 @@
 pub mod open_badges;
 
+#[doc(hidden)]
+#[inline(never)]
+pub fn uniffi_link_anchor() -> u8 {
+    2
+}
+
 #[derive(Debug, uniffi::Error)]
 pub enum SigningError {
     FailedToSign,
