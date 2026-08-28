@@ -23,6 +23,12 @@ pub fn hello_from_kapun_presentation_rust() {
     println!("Hello, world from Kapun Presentation Rust!");
 }
 
+#[doc(hidden)]
+#[inline(never)]
+pub fn uniffi_link_anchor() -> u8 {
+    4
+}
+
 #[cfg(target_arch = "arm")]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __deregister_frame() {}

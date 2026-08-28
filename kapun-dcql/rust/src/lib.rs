@@ -22,6 +22,12 @@ pub mod models;
 #[cfg(feature = "jlc")]
 pub mod verify;
 
+#[doc(hidden)]
+#[inline(never)]
+pub fn uniffi_link_anchor() -> u8 {
+    1
+}
+
 use crate::models::trusted_authority::{TrustedAuthorityMatcher, REGISTERED_MATCHERS};
 use crate::models::{SetOption, TrustedAuthority};
 use kapun_credential_core_rust::claims_pointer::Selector;

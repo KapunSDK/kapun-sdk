@@ -4,6 +4,12 @@ use oidcf::models::{EntityConfig, EntityStatement};
 use openidconnect_federation as oidcf;
 use std::fmt::Display;
 
+#[doc(hidden)]
+#[inline(never)]
+pub fn uniffi_link_anchor() -> u8 {
+    5
+}
+
 #[derive(Debug, uniffi::Error)]
 #[uniffi(flat_error)]
 pub enum FederationError {
