@@ -301,12 +301,11 @@ fn to_leaf_info(leaf: &EntityStatement) -> OidcfLeafInfo {
 }
 
 #[cfg(target_arch = "arm")]
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn __deregister_frame() {}
-
-#[cfg(target_arch = "arm")]
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn __register_frame() {}
+#[used]
+static _KEEP_EH_FRAME_STUBS: [unsafe extern "C" fn(); 2] = [
+    kapun_util_rust::__register_frame,
+    kapun_util_rust::__deregister_frame,
+];
 
 #[cfg(feature = "uniffi")]
 uniffi::setup_scaffolding!();
