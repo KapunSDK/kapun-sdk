@@ -18,8 +18,6 @@ specific language governing permissions and limitations
 under the License.
  */
 
-#[cfg(feature = "cert-builder")]
-use crate::crypto::SignatureCreator;
 use crate::crypto::base64_url_encode;
 use base64::Engine;
 use base64::prelude::BASE64_URL_SAFE_NO_PAD;
@@ -29,8 +27,6 @@ use kapun_x509::{der_parser::oid, x509_parser};
 use oid_registry::{OID_KEY_TYPE_EC_PUBLIC_KEY, OidEntry, OidRegistry};
 use p256::NistP256;
 use p256::pkcs8::DecodePublicKey;
-#[cfg(feature = "cert-builder")]
-use std::sync::Arc;
 
 #[derive(uniffi::Record, Clone, Debug)]
 pub struct X509Certificate {
@@ -98,66 +94,6 @@ pub fn create_cert(
     let cert =
         kapun_x509::builder::new_cert(v.as_ref(), s.as_ref(), &subject, Some(&issuer), None, false);
     Some(cert)
-}
-
-#[uniffi::export]
-#[cfg(feature = "cert-builder")]
-/// Create certificate signed by signing key
-/// currently we only support p256 keys
-pub fn create_cert(
-    certificate_data: CertificateData,
-    pubkey: X509PublicKey,
-    signer: Arc<dyn SignatureCreator>,
-) -> Option<Vec<u8>> {
-    use crate::crypto::base64_url_decode;
-    use p256::pkcs8::EncodePublicKey;
-    use p256::pkcs8::der::Encode;
-    use simple_x509::X509Builder;
-
-    let X509PublicKey::P256 { x, y } = pubkey else {
-        return None;
-    };
-    let mut public_key_bytes = vec![0x04];
-    public_key_bytes.extend(base64_url_decode(x));
-    public_key_bytes.extend(base64_url_decode(y));
-    let public_key = p256::PublicKey::from_sec1_bytes(&public_key_bytes).unwrap();
-    let der_bytes = public_key.to_public_key_der().unwrap().to_der().unwrap();
-    let serial: [u8; 32] = rand::random();
-    let mut builder = X509Builder::new(serial.to_vec()) /* SerialNumber */
-        .version(2);
-    let issuer = certificate_data.issuer;
-    let subject = certificate_data.subject;
-    builder = builder.issuer_utf8(vec![2, 5, 4, 3], &issuer.common_name);
-    if let Some(country) = &issuer.country {
-        builder = builder.issuer_prstr(vec![2, 5, 4, 6], &country); /* countryName */
-    }
-    if let Some(state) = &issuer.state {
-        builder = builder.issuer_utf8(vec![2, 5, 4, 8], state); /* stateOrProvinceName */
-    }
-    if let Some(organization) = &issuer.organization {
-        builder = builder.issuer_utf8(vec![2, 5, 4, 10], &organization); /* organizationName */
-    }
-    if let Some(country) = subject.country {
-        builder = builder.subject_prstr(vec![2, 5, 4, 6], &country); /* countryName */
-    }
-    if let Some(state) = &subject.state {
-        builder = builder.subject_utf8(vec![2, 5, 4, 8], state); /* stateOrProvinceName */
-    }
-    if let Some(organization) = &subject.organization {
-        builder = builder.subject_utf8(vec![2, 5, 4, 10], organization); /* organizationName */
-    }
-    if let Some(locality) = &subject.locality {
-        builder = builder.subject_utf8(vec![2, 5, 4, 7], locality);
-    }
-    builder = builder.subject_utf8(vec![2, 5, 4, 3], &subject.common_name); /* common name */
-    let cert = builder
-        .not_before_utc(certificate_data.not_before)
-        .not_after_utc(certificate_data.not_after)
-        .pub_key_der(&der_bytes)
-        .sign_oid(vec![1, 2, 840, 10045, 4, 3, 2]) /* sha256 with secp256r1  */
-        .build();
-    let cert = cert.sign(|d, _| signer.sign(d.to_vec()).ok(), &[]).unwrap();
-    cert.x509_enc().ok()
 }
 
 #[uniffi::export]
