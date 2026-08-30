@@ -12,14 +12,15 @@ kapun-crypto-provider = { git = "https://github.com/heidiverse/kapun-sdk.git", b
 simple_x509 = { version = "1.1.0"}
 rand.workspace = true
 p12 = { git = "https://github.com/ubamrein/p12.git", optional = true}
-
+x509-cert = { version = "0.3.0", features = ["builder"], optional = true }
+signature = "3.0.0"
 
 
 [features]
-default = ["crl"]
+default = ["crl", "builder"]
 uniffi = []
 crl = ["dep:ureq"]
-builder = ["p12"]
+builder = ["p12", "x509-cert"]
 p12 = ["dep:p12"]
 
 [dev-dependencies]
