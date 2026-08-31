@@ -1898,6 +1898,13 @@ mod issuance {
             signer_factory: Arc<dyn SignerFactory>,
             is_for_pre_authorized_code: bool,
         ) -> Result<IssuedCredentials, ApiError> {
+            // DPoP support in metadata is optional; honor the scheme of the token actually issued.
+            let client = if tokens.token_type.eq_ignore_ascii_case("Bearer") {
+                Arc::new(self.client.clone())
+            } else {
+                client
+            };
+
             // get from scope
             let cred_config_ids = {
                 let cred_config_ids = self.chosen_cred_config_ids.lock()?;
