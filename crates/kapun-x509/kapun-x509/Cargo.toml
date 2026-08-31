@@ -14,6 +14,7 @@ rand.workspace = true
 p12 = { git = "https://github.com/ubamrein/p12.git", optional = true}
 x509-cert = { version = "0.3.0", features = ["builder"], optional = true }
 signature = "3.0.0"
+sha2.workspace = true
 
 
 [features]
@@ -22,6 +23,7 @@ uniffi = []
 crl = ["dep:ureq"]
 builder = ["p12", "x509-cert"]
 p12 = ["dep:p12"]
+
 
 [dev-dependencies]
 flate2 = "1.1.9"
@@ -33,4 +35,5 @@ josekit = { git = "https://github.com/heidiverse/josekit-rs.git", default-featur
     "pqc",
     "legacy-crypto",
     "kapun-provider"
-], branch = "feature/digest-signing" }
+]}
+base64.workspace = true
