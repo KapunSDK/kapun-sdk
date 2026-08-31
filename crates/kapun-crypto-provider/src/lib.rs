@@ -1,6 +1,5 @@
 use std::{fmt, unimplemented};
 
-pub use kapun_util_rust::value::Value as KapunValue;
 pub use oid_registry;
 use oid_registry::Oid;
 
