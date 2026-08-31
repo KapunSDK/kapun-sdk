@@ -23,6 +23,7 @@ pub fn new_cert<V: KapunVerifier, S: KapunSigner + Clone>(
     signer: S,
     subject: &str,
     issuer: Option<&str>,
+    san_dns: Option<Vec<&str>>,
     is_root: bool,
 ) -> Vec<u8> {
     let serial_number = SerialNumber::from(42u32);
@@ -49,11 +50,16 @@ pub fn new_cert<V: KapunVerifier, S: KapunSigner + Clone>(
         let mut cert_builder =
             CertificateBuilder::new(profile, serial_number, validity, spki).unwrap();
 
-        cert_builder
-            .add_extension(&x509_cert::ext::pkix::SubjectAltName(vec![
-                GeneralName::DnsName(Ia5String::new("https://example.com").unwrap()),
-            ]))
-            .unwrap();
+        if let Some(san_dns) = san_dns {
+            let mut gn = vec![];
+            for s in san_dns {
+                gn.push(GeneralName::DnsName(Ia5String::new(s).unwrap()));
+            }
+            cert_builder
+                .add_extension(&x509_cert::ext::pkix::SubjectAltName(gn))
+                .unwrap();
+        }
+
         let cert = cert_builder.build(&X509Signer(signer)).unwrap();
         cert.to_der().expect("Failed to serialize")
     } else {
@@ -72,7 +78,8 @@ impl<S: KapunSigner + Clone> DynSignatureAlgorithmIdentifier for X509Signer<S> {
         signing_algorithm_from_spki(spki.algorithm)
     }
 }
-
+/// TODO: josekit should return the AlgorithmIdentifier actually used. Those here
+/// should be close to the IANA JWA algorithms
 fn signing_algorithm_from_spki(
     algorithm: x509_cert::AlgorithmIdentifier,
 ) -> x509_cert::spki::Result<x509_cert::AlgorithmIdentifier> {
@@ -180,6 +187,8 @@ fn is_ecdsa_signature_oid(oid: &[u8]) -> bool {
 }
 
 impl<S: KapunSigner + Clone> signature::Signer<KapunSignature> for X509Signer<S> {
+    // TODO: we should expose a way to get a der encoded signature from josekit
+    // or at least get the DER encoded ECDSA (all else should already be DER)
     fn try_sign(&self, msg: &[u8]) -> Result<KapunSignature, signature::Error> {
         let signature = kapun_crypto_provider::Signing::kapun_sign(&self.0, msg.to_vec())
             .map_err(|_| signature::Error::new())?;
@@ -255,6 +264,7 @@ mod tests {
             signer,
             "CN=World domination corporation,O=World domination Inc,C=US",
             None,
+            None,
             true,
         );
         let parsed_root = x509_cert::Certificate::from_der(&cert_root).unwrap();
@@ -279,6 +289,10 @@ mod tests {
             signer,
             "CN=Subordinate,O=World domination Inc,C=US",
             Some("CN=World domination corporation,O=World domination Inc,C=US"),
+            Some(vec![
+                "https://gdc.heidiverse.rocks",
+                "https://platform-dev.heidiverse.rocks",
+            ]),
             false,
         );
         let chain = vec![cert.clone(), cert_root];
