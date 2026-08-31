@@ -4937,6 +4937,7 @@ dependencies = [
  "getrandom 0.3.4",
  "hmac 0.13.0",
  "k256",
+ "kapun-crypto-provider 0.1.0 (git+https://github.com/heidiverse/kapun-sdk.git?branch=feature%2Fcrypto-provider)",
  "ml-dsa",
  "p256 0.13.2",
  "p384",
@@ -5284,7 +5285,6 @@ dependencies = [
 name = "kapun-crypto-provider"
 version = "0.1.0"
 dependencies = [
- "kapun-util-rust",
  "oid-registry",
  "uniffi",
 ]
@@ -5484,12 +5484,14 @@ dependencies = [
 name = "kapun-x509"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "flate2",
- "josekit 0.11.0 (git+https://github.com/heidiverse/josekit-rs.git?branch=feature%2Fdigest-signing)",
+ "josekit 0.11.0 (git+https://github.com/heidiverse/josekit-rs.git)",
  "kapun-crypto-provider 0.1.0 (git+https://github.com/heidiverse/kapun-sdk.git?branch=feature%2Fcrypto-provider)",
  "p12",
  "pem",
  "rand 0.8.8",
+ "sha2 0.10.9",
  "signature 3.0.0",
  "simple_x509",
  "tar",

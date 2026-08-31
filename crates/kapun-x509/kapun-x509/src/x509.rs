@@ -66,7 +66,10 @@ fn check_self_signed<T: AsRef<[u8]>, Provider: KapunCryptoProvider>(
     let x509_extensions_validity =
         X509ExtensionsValidator.validate(&issuer_cert.extensions(), &mut logger);
     if !(structure_validity && x509_extensions_validity) {
+        tracing::error!("structure_validity: {structure_validity}");
+        tracing::error!("x509_extensions_validity: {x509_extensions_validity}");
         tracing::error!("subject cert has invalid structure");
+        tracing::error!("{:?}", logger);
         return false;
     }
     if !is_key_usage_correct(&issuer_cert) {
