@@ -3955,7 +3955,7 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "itertools 0.14.0",
- "josekit 0.11.0 (git+https://github.com/heidiverse/josekit-rs.git)",
+ "josekit",
  "kapun-x509 0.1.0 (git+https://github.com/heidiverse/kapun-sdk.git)",
  "serde",
  "serde_json",
@@ -4873,51 +4873,6 @@ dependencies = [
 [[package]]
 name = "josekit"
 version = "0.11.0"
-source = "git+https://github.com/heidiverse/josekit-rs.git?branch=feature%2Fdigest-signing#0533de8da530ed93daf1e2c5630c4d854e4050ce"
-dependencies = [
- "aes 0.8.4",
- "aes-gcm 0.10.3",
- "aes-kw",
- "anyhow",
- "base64 0.22.1",
- "base64ct",
- "cbc 0.1.2",
- "crypto-bigint 0.7.5",
- "crypto-primes",
- "cx448",
- "der 0.8.1",
- "ed25519-dalek 3.0.0",
- "flate2",
- "getrandom 0.2.17",
- "getrandom 0.3.4",
- "hmac 0.13.0",
- "k256",
- "kapun-crypto-provider 0.1.0 (git+https://github.com/heidiverse/kapun-sdk.git?branch=feature%2Fcrypto-provider)",
- "ml-dsa",
- "p256 0.13.2",
- "p384",
- "p521",
- "pbkdf2 0.13.0",
- "pem",
- "pkcs1 0.8.0-rc.4",
- "pkcs8 0.11.0",
- "rand 0.10.2",
- "regex",
- "rsa 0.10.0-rc.18",
- "serde",
- "serde_json",
- "sha1 0.11.0",
- "sha2 0.11.0",
- "signature 3.0.0",
- "spki 0.8.0",
- "thiserror 2.0.20",
- "time",
- "x25519-dalek 2.0.1",
-]
-
-[[package]]
-name = "josekit"
-version = "0.11.0"
 source = "git+https://github.com/heidiverse/josekit-rs.git#e78d65b47195ad6a1be31e75b7d67b3fdf167d3a"
 dependencies = [
  "aes 0.8.4",
@@ -5308,7 +5263,7 @@ dependencies = [
  "ed25519-dalek 2.2.0",
  "heidi-jwt",
  "hkdf 0.12.4",
- "josekit 0.11.0 (git+https://github.com/heidiverse/josekit-rs.git?branch=feature%2Fdigest-signing)",
+ "josekit",
  "kapun-util-rust",
  "kapun-x509 0.1.0",
  "multibase",
@@ -5384,7 +5339,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "heidi-jwt",
- "josekit 0.11.0 (git+https://github.com/heidiverse/josekit-rs.git?branch=feature%2Fdigest-signing)",
+ "josekit",
  "openidconnect-federation",
  "reqwest 0.11.27",
  "serde_json",
@@ -5435,7 +5390,7 @@ dependencies = [
  "hkdf 0.12.4",
  "http 0.2.12",
  "is_empty",
- "josekit 0.11.0 (git+https://github.com/heidiverse/josekit-rs.git?branch=feature%2Fdigest-signing)",
+ "josekit",
  "jsonpath_lib",
  "jsonschema",
  "kapun-credentials-rust",
@@ -5486,7 +5441,7 @@ version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
  "flate2",
- "josekit 0.11.0 (git+https://github.com/heidiverse/josekit-rs.git)",
+ "josekit",
  "kapun-crypto-provider 0.1.0 (git+https://github.com/heidiverse/kapun-sdk.git?branch=feature%2Fcrypto-provider)",
  "p12",
  "pem",
@@ -5508,7 +5463,7 @@ name = "kapun-x509"
 version = "0.1.0"
 source = "git+https://github.com/heidiverse/kapun-sdk.git#476effa11e26edc44410c1414f67d20ee6e77239"
 dependencies = [
- "josekit 0.11.0 (git+https://github.com/heidiverse/josekit-rs.git)",
+ "josekit",
  "oid-registry",
  "rsa 0.10.0-rc.18",
  "sha1 0.11.0",
@@ -5524,7 +5479,7 @@ version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
  "clap",
- "josekit 0.11.0 (git+https://github.com/heidiverse/josekit-rs.git?branch=feature%2Fdigest-signing)",
+ "josekit",
  "kapun-x509 0.1.0",
  "oid-registry",
  "pem",
