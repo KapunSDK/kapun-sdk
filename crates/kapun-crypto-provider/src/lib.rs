@@ -69,9 +69,6 @@ pub trait Metadata: Send + Sync {
     fn kapun_oid(&self) -> Option<Vec<u8>> {
         None
     }
-    fn kapun_additional(&self) -> Option<KapunValue> {
-        None
-    }
 }
 #[cfg_attr(feature = "uniffi", uniffi::export(with_foreign))]
 pub trait KeyEncoding: Send + Sync {
