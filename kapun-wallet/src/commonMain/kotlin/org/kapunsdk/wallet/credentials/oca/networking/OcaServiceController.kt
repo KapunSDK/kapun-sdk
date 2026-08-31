@@ -62,7 +62,7 @@ class OcaServiceController(val client: HttpClient, val stringResourceProvider: S
 		return client.get(Url(url.trim('"'))).bodyAsText()
 	}
 
-	suspend fun getOcaFromMetadata(locale: String, metadata: CredentialIssuerMetadataClaims?, credential: Credential, credentialMetadata: CredentialMetadata) : String? {
+	suspend fun getOcaFromMetadata(locale: String, metadata: CredentialIssuerMetadataClaims?, credential: Credential, credentialMetadata: CredentialMetadata, selectedCredentialConfigurationId: List<String>) : String? {
 		val credentialType = credential.credential.asMetadataFormat()
 		val jsonContent = when (credentialType) {
 			CredentialType.SdJwt -> SdJwt.parse((credential.credential as CredentialFormat.SdJwt).v1).toJson() ?: return null
@@ -96,13 +96,7 @@ class OcaServiceController(val client: HttpClient, val stringResourceProvider: S
 			}
 		}
 
-		val credentialMetadata = metadata?.credentialConfigurationsSupported?.values?.firstOrNull {
-			when(it) {
-				is CredentialConfiguration.Mdoc -> it.doctype == docType
-				is CredentialConfiguration.SdJwt -> it.vct == docType
-				else -> false
-			}
-		}
+		val credentialMetadata = metadata?.credentialConfigurationsSupported?.get(selectedCredentialConfigurationId.first())
 		val display = credentialMetadata?.getDisplayMetadata()?.firstOrNull()
 		val backgroundImage = runCatching {
 			if (display?.backgroundImage?.uri?.startsWith("data:") == true) {
@@ -114,7 +108,7 @@ class OcaServiceController(val client: HttpClient, val stringResourceProvider: S
 			}
 		}.getOrNull()
 
-		val bundle = OcaBundleFactory.createOcaFromDisplayMetadata(locale, stringResourceProvider, backgroundImage, metadata, docType, jsonContent)
+		val bundle = OcaBundleFactory.createOcaFromDisplayMetadata(locale, stringResourceProvider, backgroundImage, metadata, credentialMetadata, docType, jsonContent)
 		return json.encodeToString(bundle)
 	}
 }

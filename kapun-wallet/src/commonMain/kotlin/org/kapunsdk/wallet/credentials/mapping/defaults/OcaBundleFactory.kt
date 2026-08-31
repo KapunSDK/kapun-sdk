@@ -76,7 +76,8 @@ object OcaBundleFactory {
         locale: String,
         stringResourceProvider: StringResourceProvider,
         backgroundImage: String?,
-        metadata: CredentialIssuerMetadataClaims?,
+		credentialIssuerMetadataClaims: CredentialIssuerMetadataClaims?,
+        metadata: CredentialConfiguration?,
         vct: String,
         jsonContent: String,
 	): OcaBundleJson? {
@@ -98,14 +99,8 @@ object OcaBundleFactory {
 		}
 
 		val captureBase = CaptureBase(attributes = propertyType)
-		val credentialMetadata = metadata?.credentialConfigurationsSupported?.values?.firstOrNull {
-			when (it) {
-				is CredentialConfiguration.Mdoc -> it.doctype == vct
-				is CredentialConfiguration.SdJwt -> it.vct == vct
-				else -> false
-			}
-		}
-		val display = credentialMetadata?.getDisplayMetadata()?.firstOrNull()
+
+		val display = metadata?.getDisplayMetadata()?.firstOrNull()
 		val cardTitle = display?.name ?: vct
 		var cardColor = display?.backgroundColor
 				?.replace("#", "")
@@ -133,7 +128,7 @@ object OcaBundleFactory {
 			)
 		)
 		val credentialMetadataClusterOrderingOverlay =
-			getCredentialMetadataClusterOrderingOverlay(metadata, vct, locale, captureBaseSaid)
+			getCredentialMetadataClusterOrderingOverlay(credentialIssuerMetadataClaims, vct, locale, captureBaseSaid)
 
 		val mainGroupOrdering = mapOf(
 			"/given_name" to 1,

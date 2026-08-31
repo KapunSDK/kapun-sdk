@@ -136,7 +136,7 @@ abstract class IssuanceProcess(
 		metadata: CredentialMetadata,
 	): CredentialInsertion? {
 		val ocaBundleUrl =
-			loadOcaBundleForCredential(credential) ?: loadOcaFromMetadata(credentialIssuerMetadata.claims, credential, metadata)
+			loadOcaBundleForCredential(credential) ?: loadOcaFromMetadata(credentialIssuerMetadata.claims, credential, metadata,credentialOffer.credentialConfigurationIds)
 
 		val credentialType = credential.credential.asMetadataFormat()
 		val credentialPayload = credential.credential.getPayload()
@@ -199,6 +199,7 @@ abstract class IssuanceProcess(
         credentialIssuerMetadata: CredentialIssuerMetadataClaims,
         credential: Credential,
         metadata: CredentialMetadata,
+		selectedCredentialConfigurationId: List<String>
 	): String? {
 		val credentialType = credential.credential.asMetadataFormat()
 		val credentialPayload = when (credential.credential) {
@@ -220,7 +221,7 @@ abstract class IssuanceProcess(
 				return null
 			}
 		}
-		val ocaBundle = ocaServiceController.getOcaFromMetadata("de", credentialIssuerMetadata, credential, metadata) ?: return null
+		val ocaBundle = ocaServiceController.getOcaFromMetadata("de", credentialIssuerMetadata, credential, metadata,selectedCredentialConfigurationId) ?: return null
 		val ocaUrl = "metadata://$docType"
 		ocaRepository.insertOrUpdateOca(ocaUrl, ocaBundle)
 		return ocaUrl
