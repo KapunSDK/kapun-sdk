@@ -24,7 +24,6 @@ use crate::crypto::base64_url_encode;
 use base64::Engine;
 use base64::prelude::BASE64_URL_SAFE_NO_PAD;
 use josekit::jws::alg::JosekitCryptoProvider;
-use josekit::jws::{JwsSigner, JwsVerifier};
 use josekit::kapun_crypto_provider::{KapunCryptoProvider, Signer, Verifier};
 use kapun_x509::{der_parser::oid, x509_parser};
 use oid_registry::{OID_KEY_TYPE_EC_PUBLIC_KEY, OidEntry, OidRegistry};
@@ -71,13 +70,16 @@ pub struct SubjectIdentifier {
     common_name: String,
 }
 
+#[uniffi::export]
 pub fn create_cert(
     certificate_data: CertificateData,
     pubkey: Vec<u8>,
     signing_key: Vec<u8>,
 ) -> Option<Vec<u8>> {
-    let v: Box<dyn Verifier> = KapunCryptoProvider::verifier(pubkey).ok()?;
-    let s: Box<dyn Signer> = KapunCryptoProvider::signer(signing_key).ok()?;
+    let v: Box<dyn Verifier> =
+        <JosekitCryptoProvider as KapunCryptoProvider>::verifier(pubkey).ok()?;
+    let s: Box<dyn Signer> =
+        <JosekitCryptoProvider as KapunCryptoProvider>::signer(signing_key).ok()?;
     let mut issuer = "".to_string();
     issuer.push_str("CN=");
     issuer.push_str(&certificate_data.issuer.common_name);
@@ -93,7 +95,8 @@ pub fn create_cert(
         subject.push_str(&o);
     }
 
-    let cert = kapun_x509::builder::new_cert(v, s, &subject, Some(&issuer), None, false);
+    let cert =
+        kapun_x509::builder::new_cert(v.as_ref(), s.as_ref(), &subject, Some(&issuer), None, false);
     Some(cert)
 }
 
