@@ -18,9 +18,9 @@ use x509_cert::{
     time::Validity,
 };
 
-pub fn new_cert<V: KapunVerifier, S: KapunSigner + Clone>(
-    pub_key: V,
-    signer: S,
+pub fn new_cert<V: KapunVerifier + ?Sized, S: KapunSigner + ?Sized>(
+    pub_key: &V,
+    signer: &S,
     subject: &str,
     issuer: Option<&str>,
     san_dns: Option<Vec<&str>>,
@@ -67,9 +67,17 @@ pub fn new_cert<V: KapunVerifier, S: KapunSigner + Clone>(
     }
 }
 
-#[derive(Clone)]
-pub struct X509Signer<S: KapunSigner + Clone>(S);
-impl<S: KapunSigner + Clone> DynSignatureAlgorithmIdentifier for X509Signer<S> {
+pub struct X509Signer<'a, S: KapunSigner + ?Sized>(&'a S);
+
+// `KeypairRef::VerifyingKey` must be `Clone`. Cloning this adapter only copies
+// the reference; the underlying signer itself does not need to be cloneable.
+impl<S: KapunSigner + ?Sized> Clone for X509Signer<'_, S> {
+    fn clone(&self) -> Self {
+        Self(self.0)
+    }
+}
+
+impl<S: KapunSigner + ?Sized> DynSignatureAlgorithmIdentifier for X509Signer<'_, S> {
     fn signature_algorithm_identifier(
         &self,
     ) -> x509_cert::spki::Result<x509_cert::AlgorithmIdentifier> {
@@ -186,11 +194,11 @@ fn is_ecdsa_signature_oid(oid: &[u8]) -> bool {
     )
 }
 
-impl<S: KapunSigner + Clone> signature::Signer<KapunSignature> for X509Signer<S> {
+impl<S: KapunSigner + ?Sized> signature::Signer<KapunSignature> for X509Signer<'_, S> {
     // TODO: we should expose a way to get a der encoded signature from josekit
     // or at least get the DER encoded ECDSA (all else should already be DER)
     fn try_sign(&self, msg: &[u8]) -> Result<KapunSignature, signature::Error> {
-        let signature = kapun_crypto_provider::Signing::kapun_sign(&self.0, msg.to_vec())
+        let signature = kapun_crypto_provider::Signing::kapun_sign(self.0, msg.to_vec())
             .map_err(|_| signature::Error::new())?;
         let algorithm = self
             .signature_algorithm_identifier()
@@ -205,15 +213,15 @@ impl<S: KapunSigner + Clone> signature::Signer<KapunSignature> for X509Signer<S>
         Ok(KapunSignature(signature))
     }
 }
-impl<S: KapunSigner + Clone> AsRef<X509Signer<S>> for X509Signer<S> {
-    fn as_ref(&self) -> &X509Signer<S> {
-        &self
+impl<'a, S: KapunSigner + ?Sized> AsRef<X509Signer<'a, S>> for X509Signer<'a, S> {
+    fn as_ref(&self) -> &X509Signer<'a, S> {
+        self
     }
 }
-impl<S: KapunSigner + Clone> signature::KeypairRef for X509Signer<S> {
-    type VerifyingKey = X509Signer<S>;
+impl<'a, S: KapunSigner + ?Sized> signature::KeypairRef for X509Signer<'a, S> {
+    type VerifyingKey = X509Signer<'a, S>;
 }
-impl<S: KapunSigner + Clone> EncodePublicKey for X509Signer<S> {
+impl<S: KapunSigner + ?Sized> EncodePublicKey for X509Signer<'_, S> {
     fn to_public_key_der(&self) -> x509_cert::spki::Result<x509_cert::der::Document> {
         Ok(x509_cert::der::Document::from_der(&self.0.kapun_public_spki_der().unwrap()).unwrap())
     }
@@ -260,8 +268,8 @@ mod tests {
             .unwrap();
 
         let cert_root = new_cert::<EcdsaJwsVerifier, EcdsaJwsSigner>(
-            verifier,
-            signer,
+            &verifier,
+            &signer,
             "CN=World domination corporation,O=World domination Inc,C=US",
             None,
             None,
@@ -284,9 +292,12 @@ mod tests {
             .signer_from_der(signer_kp.to_der_private_key())
             .unwrap();
 
-        let cert = new_cert::<EcdsaJwsVerifier, EcdsaJwsSigner>(
-            verifier,
-            signer,
+        let verifier: Box<dyn kapun_crypto_provider::Verifier> = Box::new(verifier);
+        let signer: Box<dyn kapun_crypto_provider::Signer> = Box::new(signer);
+
+        let cert = new_cert(
+            verifier.as_ref(),
+            signer.as_ref(),
             "CN=Subordinate,O=World domination Inc,C=US",
             Some("CN=World domination corporation,O=World domination Inc,C=US"),
             Some(vec![
