@@ -1,3 +1,5 @@
+use std::println;
+
 use base64::{Engine, prelude::BASE64_URL_SAFE_NO_PAD};
 use clap::{Parser, Subcommand, ValueEnum};
 use josekit::{Value, jwk::Jwk, jws::alg::JosekitCryptoProvider};

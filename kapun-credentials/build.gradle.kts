@@ -17,6 +17,10 @@ kotlin {
         compileSdk = libs.versions.android.compileSdk.get().toInt()
         minSdk = libs.versions.android.minSdk.get().toInt()
         withHostTest {}
+        optimization {
+            consumerKeepRules.publish = true
+            consumerKeepRules.file(rootProject.file("consumer-jna-rules.pro"))
+        }
     }
     jvm()
     listOf(iosArm64(), iosSimulatorArm64()).forEach { target ->
