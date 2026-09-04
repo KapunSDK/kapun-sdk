@@ -6147,7 +6147,7 @@ dependencies = [
 [[package]]
 name = "next-gen-signatures"
 version = "0.1.2"
-source = "git+https://github.com/heidiverse/zk-bridge-services.git?rev=8a1be153250ad29fdabd8d8f5a2b4f334fd72994#8a1be153250ad29fdabd8d8f5a2b4f334fd72994"
+source = "git+https://github.com/heidiverse/zk-bridge-services.git?rev=aadc591bd3f1319f9cf341bcf3e7f0dfcee8989e#aadc591bd3f1319f9cf341bcf3e7f0dfcee8989e"
 dependencies = [
  "anyhow",
  "ark-ec",
