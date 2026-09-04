@@ -163,6 +163,7 @@ internal class GattClient(
     }
 
     override fun disconnect() {
+        if (inhibitCallbacks) return
         inhibitCallbacks = true
         if (gatt != null) {
             // used to convey we want to shutdown once all writes are done.
