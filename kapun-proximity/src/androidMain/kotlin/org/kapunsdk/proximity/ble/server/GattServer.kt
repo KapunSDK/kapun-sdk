@@ -398,18 +398,6 @@ internal class GattServer(
 		drainWritingQueues()
 	}
 
-	private fun reportPeerConnected() {
-		if (!inhibitCallbacks) {
-			listener?.onPeerConnected()
-		}
-	}
-
-	private fun reportPeerDisconnected() {
-		if (!inhibitCallbacks) {
-			listener?.onPeerDisconnected()
-		}
-	}
-
 	private fun reportError(error: ProximityError) {
 		if (!inhibitCallbacks) {
 			listener?.onError(error)
