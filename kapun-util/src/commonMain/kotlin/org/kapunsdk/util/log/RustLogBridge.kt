@@ -47,11 +47,11 @@ private object RustToKotlinLogSink : RustLogSink {
  * Bridges Rust-originated SDK logs into [Logger.sink]. Called once from `KapunSdk.initialize`,
  * after `Logger.sink` has been assigned, so both language sides funnel into the same sink.
  */
-internal fun bridgeRustLogsToKotlin() {
+public fun bridgeRustLogsToKotlin() {
 	registerRustLogSink(RustToKotlinLogSink)
 }
 
 /** Stops forwarding Rust-originated logs. */
-internal fun unbridgeRustLogs() {
+public fun unbridgeRustLogs() {
 	clearRustLogSink()
 }

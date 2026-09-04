@@ -28,6 +28,7 @@ actual class KapunSdk {
 	actual fun initialize(logSink: LogSink?) {
 		Logger.sink = logSink
 		bridgeRustLogsToKotlin()
+		Logger("KapunSdk").info("KapunSdk initialized")
 	}
 
 }
