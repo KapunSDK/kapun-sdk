@@ -65,6 +65,8 @@ class ProximityVerifier<T> private constructor(
 	private var isDcApi : Boolean = true,
 	private val readerKey: Value? = null
 ) {
+	private val operationJob = SupervisorJob(scope.coroutineContext[Job])
+	private val operationScope = CoroutineScope(scope.coroutineContext + operationJob)
 
 	companion object {
 		fun <T> createReverse(protocol: ProximityProtocol,
@@ -162,12 +164,14 @@ class ProximityVerifier<T> private constructor(
 	init {
 		transportProtocol.setListener(
 			object : TransportProtocol.Listener {
-				override fun onConnecting() {
-					verifierStateMutable.update { ProximityVerifierState.Connecting }
+					override fun onConnecting() {
+					publishState(ProximityVerifierState.Connecting)
 				}
 
-				override fun onConnected() {
-					verifierStateMutable.update { ProximityVerifierState.Connected }
+				 override fun onConnected() {
+					if (!publishState(ProximityVerifierState.Connected)) {
+						return
+					}
 
 					if(protocol == ProximityProtocol.MDL) {
 						// We don't have a device engagement yet so wait for the first package
@@ -182,10 +186,9 @@ class ProximityVerifier<T> private constructor(
 					}
 				}
 
-				override fun onDisconnected() {
-					verifierStateMutable.update { current ->
-						if (current is ProximityVerifierState.Terminated) current else ProximityVerifierState.Disconnected
-					}
+					override fun onDisconnected() {
+					cancelPendingOperations()
+					publishState(ProximityVerifierState.Disconnected)
 				}
 
 				override fun onMessageReceived() {
@@ -193,9 +196,8 @@ class ProximityVerifier<T> private constructor(
 					if (message != null) {
 						processMessageReceived(message)
 					} else {
-						verifierStateMutable.update {
-							ProximityVerifierState.Error(ProximityError.InvalidData("Received message is null"))
-						}
+						cancelPendingOperations()
+						publishState(ProximityVerifierState.Error(ProximityError.InvalidData("Received message is null")))
 					}
 				}
 
@@ -204,19 +206,21 @@ class ProximityVerifier<T> private constructor(
 				}
 
 				override fun onError(error: ProximityError) {
-					verifierStateMutable.update { ProximityVerifierState.Error(error) }
+					cancelPendingOperations()
+					publishState(ProximityVerifierState.Error(error))
 				}
 			}
 		)
 	}
 
 	 fun requestDocument() {
-		scope.launch {
+		if (verifierStateMutable.value.isTerminal()) {
+			return
+		}
+		operationScope.launch {
 			// The session transcript is needed to derive origin
 			val sessionTranscript = (transportProtocol as MdlTransportProtocolExtensions).sessionTranscript ?: run {
-				verifierStateMutable.update {
-					ProximityVerifierState.Error(ProximityError.InvalidData("failed to get session transcript"))
-				}
+				publishState(ProximityVerifierState.Error(ProximityError.InvalidData("failed to get session transcript")))
 				return@launch
 			}
 			val origin = ProximityMdlUtils.buildIsoOriginFromSessionTranscript(sessionTranscript)
@@ -231,30 +235,22 @@ class ProximityVerifier<T> private constructor(
 					val dcRequest = documentRequest.asDcRequest()
 					val serializedDcRequest = json.encodeToString(dcRequest)
 					val currentCipher = sessionCipher ?: run {
-						verifierStateMutable.update {
-							ProximityVerifierState.Error(ProximityError.InvalidData("no session cipher"))
-						}
+						publishState(ProximityVerifierState.Error(ProximityError.InvalidData("no session cipher")))
 						return@launch
 					}
 					readerKey ?: run {
-						verifierStateMutable.update {
-							ProximityVerifierState.Error(ProximityError.InvalidData("reader key is null"))
-						}
+						publishState(ProximityVerifierState.Error(ProximityError.InvalidData("reader key is null")))
 						return@launch
 					}
 					val encryptedData = currentCipher.encrypt(serializedDcRequest.encodeToByteArray()) ?: run {
-						verifierStateMutable.update {
-							ProximityVerifierState.Error(ProximityError.InvalidData("failed to encrypt data"))
-						}
+						publishState(ProximityVerifierState.Error(ProximityError.InvalidData("failed to encrypt data")))
 						return@launch
 					}
 					var readerKeyTagged = (24 to encodeCbor(readerKey.toCbor())).toCbor()
 					// In the session establishment data package, we need to transmit the other part of the key (ours)
 					var sessionEstablishment = MdlSessionEstablishment(readerKeyTagged, encryptedData, true)
 					transportProtocol.sendMessage(sessionEstablishment.asCbor())
-					verifierStateMutable.update {
-						ProximityVerifierState.AwaitingDocuments
-					}
+					publishState(ProximityVerifierState.AwaitingDocuments)
 				}
 			}
 
@@ -263,26 +259,26 @@ class ProximityVerifier<T> private constructor(
 
 	@Throws(Exception::class)
 	fun startEngagement()  {
-		verifierStateMutable.update { ProximityVerifierState.PreparingEngagement }
-
-		if (transportProtocol.isConnected) {
-			verifierStateMutable.update {
-				ProximityVerifierState.Error(ProximityError.InvalidState("Verifier is already connected"))
-			}
+		if (!publishState(ProximityVerifierState.PreparingEngagement)) {
 			return
 		}
 
-		scope.launch(Dispatchers.IO) {
+		if (transportProtocol.isConnected) {
+			publishState(ProximityVerifierState.Error(ProximityError.InvalidState("Verifier is already connected")))
+			return
+		}
+
+		operationScope.launch(Dispatchers.IO) {
 			when (protocol) {
 				ProximityProtocol.MDL -> {
 					transportProtocol.connect()
 					val qrCodeData = engagementBuilder!!.createQrCodeForEngagement()
-					verifierStateMutable.update { ProximityVerifierState.ReadyForEngagement(qrCodeData) }
+					publishState(ProximityVerifierState.ReadyForEngagement(qrCodeData))
 				}
 				ProximityProtocol.OPENID4VP -> {
 					transportProtocol.connect()
 					val qrCodeData = engagementBuilder!!.createQrCodeForEngagement()
-					verifierStateMutable.update { ProximityVerifierState.ReadyForEngagement(qrCodeData) }
+					publishState(ProximityVerifierState.ReadyForEngagement(qrCodeData))
 				}
 			}
 		}
@@ -290,10 +286,9 @@ class ProximityVerifier<T> private constructor(
 
 	fun disconnect() {
 		Logger.debug("disconnect() was called")
+		cancelPendingOperations()
 		transportProtocol.disconnect()
-		if (verifierStateMutable.value !is ProximityVerifierState.Terminated) {
-			verifierStateMutable.update { ProximityVerifierState.Disconnected }
-		}
+		publishState(ProximityVerifierState.Disconnected)
 	}
 
 	fun reset() {
@@ -303,17 +298,20 @@ class ProximityVerifier<T> private constructor(
 	}
 
 	fun connect() {
-		verifierStateMutable.update {
-			ProximityVerifierState.Connecting
+		if (!publishState(ProximityVerifierState.Connecting)) {
+			return
 		}
-		scope.launch(Dispatchers.IO) {
+		operationScope.launch(Dispatchers.IO) {
 			transportProtocol.connect()
 		}
 
 	}
 
 	private fun processMessageReceived(message: ByteArray) {
-		scope.launch(Dispatchers.IO) {
+		if (verifierStateMutable.value.isTerminal()) {
+			return
+		}
+		operationScope.launch(Dispatchers.IO) {
 			when (protocol) {
 				ProximityProtocol.MDL -> {
 					Logger.debug("Processing message of size ${message.size}")
@@ -338,15 +336,13 @@ class ProximityVerifier<T> private constructor(
 					if (sessionData.status != null) {
 						val reason = TerminationReason.fromCode(sessionData.status)
 						Logger.debug("processMessageReceived status=${sessionData.status} reson: $reason, disconnecting, sessionData=$sessionData")
-						verifierStateMutable.update { ProximityVerifierState.Terminated(reason) }
+						publishState(ProximityVerifierState.Terminated(reason))
 						disconnect()
 						return@launch
 					}
 					val encryptedPayload = sessionData.data ?: run {
 						Logger.debug("processMessageReceived data is null, disconnecting")
-						verifierStateMutable.update {
-							ProximityVerifierState.Error(ProximityError.InvalidData("Received empty session data"))
-						}
+						publishState(ProximityVerifierState.Error(ProximityError.InvalidData("Received empty session data")))
 						disconnect()
 						return@launch
 					}
@@ -360,14 +356,10 @@ class ProximityVerifier<T> private constructor(
 							if(isDcApi){
 								// data should be the dcql response
 								val response = documentRequester.verifySubmittedDocuments(data)
-								verifierStateMutable.update {
-									ProximityVerifierState.VerificationResult(response)
-								}
+								publishState(ProximityVerifierState.VerificationResult(response))
 							} else {
 								// handle mdl device response
-								verifierStateMutable.update {
-									ProximityVerifierState.Error(ProximityError.InvalidState("mdl not yet implemented"))
-								}
+								publishState(ProximityVerifierState.Error(ProximityError.InvalidState("mdl not yet implemented")))
 							}
 						}
 						is ProximityMdlUtils.PayloadDecryptResult.Failure -> {
@@ -377,28 +369,50 @@ class ProximityVerifier<T> private constructor(
 								ProximityMdlUtils.PayloadDecryptFailureType.MISSING_CIPHER -> "Missing session cipher"
 								ProximityMdlUtils.PayloadDecryptFailureType.DECRYPT_FAILED -> "Failed to decrypt session data"
 							}
-							verifierStateMutable.update { ProximityVerifierState.Error(ProximityError.InvalidData(errorMessage)) }
+							publishState(ProximityVerifierState.Error(ProximityError.InvalidData(errorMessage)))
 							disconnect()
 							return@launch
 						}
 					}
 				}
 				ProximityProtocol.OPENID4VP -> {
-					verifierStateMutable.update { current ->
-						when (current) {
-							is ProximityVerifierState.Connected -> ProximityVerifierState.AwaitingDocuments
-							is ProximityVerifierState.AwaitingDocuments -> {
-								val verificationResult = documentRequester.verifySubmittedDocuments(message)
-								ProximityVerifierState.VerificationResult(verificationResult)
-							}
-							else -> ProximityVerifierState.Error(
+					when (val current = verifierStateMutable.value) {
+						is ProximityVerifierState.Connected -> publishState(ProximityVerifierState.AwaitingDocuments)
+						is ProximityVerifierState.AwaitingDocuments -> {
+							val verificationResult = documentRequester.verifySubmittedDocuments(message)
+							publishState(ProximityVerifierState.VerificationResult(verificationResult))
+						}
+						else -> publishState(
+							ProximityVerifierState.Error(
 								ProximityError.InvalidState("Received message in unexpected state: $current")
 							)
-						}
+						)
 					}
 				}
 			}
 		}
 	}
+
+	private fun cancelPendingOperations() {
+		operationJob.cancelChildren()
+	}
+
+	private fun publishState(nextState: ProximityVerifierState): Boolean {
+		while (true) {
+			val currentState = verifierStateMutable.value
+			if (currentState.isTerminal()) {
+				return false
+			}
+			if (verifierStateMutable.compareAndSet(currentState, nextState)) {
+				return true
+			}
+		}
+	}
+
+	private fun ProximityVerifierState.isTerminal(): Boolean =
+		this is ProximityVerifierState.Terminated ||
+			this is ProximityVerifierState.Disconnected ||
+			this is ProximityVerifierState.Error ||
+			this is ProximityVerifierState.VerificationResult<*>
 
 }

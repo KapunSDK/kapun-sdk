@@ -163,6 +163,7 @@ internal class GattClient(
     }
 
     override fun disconnect() {
+        if (inhibitCallbacks) return
         inhibitCallbacks = true
         if (gatt != null) {
             // used to convey we want to shutdown once all writes are done.
@@ -255,6 +256,8 @@ internal class GattClient(
     }
 
     override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
+        if (inhibitCallbacks) return
+
         when (newState) {
             BluetoothProfile.STATE_CONNECTED -> {
                 try {
@@ -327,7 +330,9 @@ internal class GattClient(
         val service = gatt.services.any { it.uuid == serviceUuid }
         if (!service) { reportError(ProximityError.Unknown("Service $serviceUuid not discovered")); return }
 
-        characteristics = requireListener().onServicesDiscovered(gatt.services.map { BleGattService(it) })
+        val callbackListener = listener ?: return
+        if (inhibitCallbacks) return
+        characteristics = callbackListener.onServicesDiscovered(gatt.services.map { BleGattService(it) })
 
         coordinator.reset()
 
@@ -371,7 +376,8 @@ internal class GattClient(
         }
         Logger(TAG).debug("Successfully changed MTU, reporting to listeners")
         negotiatedMtu = mtu
-        requireListener().onMtuChanged(mtu)
+        if (inhibitCallbacks) return
+        listener?.onMtuChanged(mtu)
 
         // Once the MTU is changed, consider the connection as established
         reportPeerConnected()
@@ -392,9 +398,11 @@ internal class GattClient(
         value: ByteArray,
         status: Int
     ) {
+        if (inhibitCallbacks) return
+        val callbackListener = listener ?: return
         when (val result = chunkAccumulator.consume(characteristic.uuid, value)) {
             is ChunkProcessingResult.Complete -> {
-                requireListener().onCharacteristicRead(
+                callbackListener.onCharacteristicRead(
                     BleGattCharacteristic(characteristic, result.payload)
                 )
             }
@@ -402,7 +410,7 @@ internal class GattClient(
                 gatt.readCharacteristic(characteristic)
             }
             is ChunkProcessingResult.Single -> {
-                requireListener().onCharacteristicRead(
+                callbackListener.onCharacteristicRead(
                     BleGattCharacteristic(characteristic, result.payload)
                 )
             }
@@ -417,7 +425,9 @@ internal class GattClient(
         // If the characteristic write was completed, check if this characteristic has more chunks in the writing queue or else notify the listener about a successful write
         val charUuid = characteristic.uuid
         if (writeQueues.isEmpty(charUuid)) {
-            requireListener().onCharacteristicWrite(BleGattCharacteristic(characteristic))
+            if (!inhibitCallbacks) {
+                listener?.onCharacteristicWrite(BleGattCharacteristic(characteristic))
+            }
         } else {
             drainWritingQueue(characteristic.uuid)
         }
@@ -437,15 +447,17 @@ internal class GattClient(
         characteristic: BluetoothGattCharacteristic,
         value: ByteArray
     ) {
+        if (inhibitCallbacks) return
+        val callbackListener = listener ?: return
         when (val result = chunkAccumulator.consume(characteristic.uuid, value)) {
             is ChunkProcessingResult.Complete -> {
-                requireListener().onCharacteristicChanged(
+                callbackListener.onCharacteristicChanged(
                     BleGattCharacteristic(characteristic, result.payload)
                 )
             }
             ChunkProcessingResult.Waiting -> Unit
             is ChunkProcessingResult.Single -> {
-                requireListener().onCharacteristicChanged(
+                callbackListener.onCharacteristicChanged(
                     BleGattCharacteristic(characteristic, result.payload)
                 )
             }
@@ -458,32 +470,36 @@ internal class GattClient(
         status: Int,
         value: ByteArray,
     ) {
-        requireListener().onDescriptorRead(descriptor)
+        if (!inhibitCallbacks) {
+            listener?.onDescriptorRead(descriptor)
+        }
     }
 
     override fun onDescriptorWrite(gatt: BluetoothGatt, descriptor: BluetoothGattDescriptor, status: Int) {
-        requireListener().onDescriptorWrite(descriptor)
+        if (!inhibitCallbacks) {
+            listener?.onDescriptorWrite(descriptor)
+        }
         coordinator.onDescriptorWriteComplete(gatt)
     }
 
     private fun reportPeerConnecting() {
         if (inhibitCallbacks) return
-        requireListener().onPeerConnecting()
+        listener?.onPeerConnecting()
     }
 
     private fun reportPeerConnected() {
         if (inhibitCallbacks) return
-        requireListener().onPeerConnected()
+        listener?.onPeerConnected()
     }
 
     private fun reportPeerDisconnected() {
         if (inhibitCallbacks) return
-        requireListener().onPeerDisconnected()
+        listener?.onPeerDisconnected()
     }
 
     private fun reportError(error: ProximityError) {
         if (inhibitCallbacks) return
-        requireListener().onError(error)
+        listener?.onError(error)
     }
 
     private fun reportError(error: Throwable) {
@@ -493,10 +509,6 @@ internal class GattClient(
 
     private fun requireGatt(): BluetoothGatt {
         return gatt ?: throw IllegalStateException("Gatt not set")
-    }
-
-    private fun requireListener(): BleGattClientListener {
-        return listener ?: throw IllegalStateException("Listener not set")
     }
 
     private fun connectToDevice(device: BluetoothDevice) {
