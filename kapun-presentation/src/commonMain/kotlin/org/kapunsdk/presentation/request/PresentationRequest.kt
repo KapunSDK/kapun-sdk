@@ -41,6 +41,31 @@ data class VersionedPresentationRequest(
 	val request: PresentationRequest,
 )
 
+@OptIn(ExperimentalSerializationApi::class)
+@Serializable
+data class ZkpInfo(
+	val definition: String,
+	@JsonNames("proving_key") val provingKey: String,
+	@JsonNames("issuer_pk") val issuerPk: String,
+	@JsonNames("issuer_id") val issuerId: String,
+	@JsonNames("issuer_key_id") val issuerKeyId: String,
+) {
+	companion object {
+		fun fromValue(value: Value): ZkpInfo? {
+			fun stringValue(camelCaseName: String, snakeCaseName: String): String? =
+				value[camelCaseName].asString() ?: value[snakeCaseName].asString()
+
+			return ZkpInfo(
+				definition = value["definition"].asString() ?: return null,
+				provingKey = stringValue("provingKey", "proving_key") ?: return null,
+				issuerPk = stringValue("issuerPk", "issuer_pk") ?: return null,
+				issuerId = stringValue("issuerId", "issuer_id") ?: return null,
+				issuerKeyId = stringValue("issuerKeyId", "issuer_key_id") ?: return null,
+			)
+		}
+	}
+}
+
 @Serializable
 data class PresentationRequest @OptIn(ExperimentalSerializationApi::class) constructor(
 	@SerialName("client_id")
@@ -72,6 +97,7 @@ data class PresentationRequest @OptIn(ExperimentalSerializationApi::class) const
 	val verifierInfo: List<Value>? = null,
 	@SerialName("expected_origins")
 	val expectedOrigins: List<String>? = null,
+	val zkp: ZkpInfo? = null,
 ) {
 	@Serializable
 	data class ClientMetadata(
@@ -178,7 +204,8 @@ data class PresentationRequest @OptIn(ExperimentalSerializationApi::class) const
 				clientMetadata = value["client_metadata"].transform(),
 				verifierAttestations = value["verifier_attestations"].transform(),
 				verifierInfo = value["verifier_info"].transform(),
-				expectedOrigins = value["expected_origins"].transform()
+				expectedOrigins = value["expected_origins"].transform(),
+				zkp = value["zkp"].takeIf { it != Value.Null }?.let(ZkpInfo::fromValue),
 			)
 
 			return VersionedPresentationRequest(version, request)

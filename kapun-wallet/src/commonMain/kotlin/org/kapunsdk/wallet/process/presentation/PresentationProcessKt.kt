@@ -695,6 +695,8 @@ class PresentationProcessKt private constructor(
             }
 
             if (bbsPresentTwo && this.authRequest?.dcqlQuery != null) {
+                val zkpInfo = authRequest.zkp
+                    ?: return PresentationWorkflow.Error("Missing or incomplete ZKP metadata in authorization request")
                 val (rep1, rep2) = Pair(this.stateData.entries.elementAt(0), this.stateData.entries.elementAt(1))
                 val (c1, c2) = Pair<VerifiableCredential, VerifiableCredential>(
                     rep1.value["credential"].transform()
@@ -753,9 +755,9 @@ class PresentationProcessKt private constructor(
                     vc2 = Bbs.parse(other.first.payload),
                     q2 = other.second,
 
-                    issuerPk = "zUC711y7V85xqmn7UidKFf5kwC3RWjB9CTsqEWjk81Yqs1TQW73oSawsQxCU3mdziXmbyrEPs2GFkXqvojqYiWz9JyXHaMjh7bR3XYPJTXgU9FZHDEWMarUAWiRBYu5ZenGmvyn",
-                    issuerId = "did:example:issuer0",
-                    issuerKeyId = "did:example:issuer0#bls12_381-g2-pub001",
+                    issuerPk = zkpInfo.issuerPk,
+                    issuerId = zkpInfo.issuerId,
+                    issuerKeyId = zkpInfo.issuerKeyId,
                 )
 
                 val theToken = vpToken.getOrElse {
@@ -833,19 +835,20 @@ class PresentationProcessKt private constructor(
                                 )
                             }
                             CredentialType.BbsTermwise -> {
+                                val zkpInfo = authRequest.zkp
+                                    ?: return PresentationWorkflow.Error("Missing or incomplete ZKP metadata in authorization request")
                                 val signer = nativeSigner?.let { Signer(nativeSigner) }
 
                                 val publicKey = nativeSigner?.publicKey()
                                 val message = nonce.encodeToByteArray()
                                 val signature = signer?.sign(message)
 
-                                // TODO: Get issuer stuff from credential metadata
                                 Logger("ZKP").warn("----> before proof")
                                 Bbs.parse(c.payload).getVpToken(
                                     credentialQuery,
-                                    issuerPk = "zUC711y7V85xqmn7UidKFf5kwC3RWjB9CTsqEWjk81Yqs1TQW73oSawsQxCU3mdziXmbyrEPs2GFkXqvojqYiWz9JyXHaMjh7bR3XYPJTXgU9FZHDEWMarUAWiRBYu5ZenGmvyn",
-                                    issuerId = "did:example:issuer0",
-                                    issuerKeyId = "did:example:issuer0#bls12_381-g2-pub001",
+                                    issuerPk = zkpInfo.issuerPk,
+                                    issuerId = zkpInfo.issuerId,
+                                    issuerKeyId = zkpInfo.issuerKeyId,
                                     deviceBindingPk = publicKey,
                                     message = sha256Rs(message),
                                     messageSignature = signature,
