@@ -53,7 +53,7 @@ josekit = { git = "https://github.com/heidiverse/josekit-rs.git", default-featur
 
 zkp-util = { path = "crates/zkp-util" }
 rdf-util = { path = "crates/rdf-util" }
-next-gen-signatures = { git = "https://github.com/heidiverse/zk-bridge-services.git", rev = "cc4740c8dd8f30d8ee8bb8e32715a1af295e7941", default-features = false, features = [
+next-gen-signatures = { git = "https://github.com/heidiverse/zk-bridge-services.git", rev = "8a1be153250ad29fdabd8d8f5a2b4f334fd72994", default-features = false, features = [
     "zkp",
 ] }
 
