@@ -4,7 +4,7 @@ import org.kapunsdk.credentials.models.credential.CredentialModel
 import org.kapunsdk.issuance.metadata.data.CredentialIssuerMetadata
 import org.kapunsdk.presentation.request.PresentationRequest
 import org.kapunsdk.trust.framework.DocumentProvider
-import org.kapunsdk.trust.framework.JWKTrustAnchorProvider
+import org.kapunsdk.trust.framework.OidfTrustAnchorProvider
 import org.kapunsdk.trust.framework.TrustFramework
 import org.kapunsdk.trust.framework.ValidationInfo
 import org.kapunsdk.trust.model.AgentInformation
@@ -18,7 +18,7 @@ const val OIDC_FEDERATION_TRUST_FRAMEWORK_ID: String = "oidc_federation_framewor
 
 class OidcFederationTrustFramerwork(
 	val documentProvider: DocumentProvider? = null,
-	val jwkTrustAnchorProvider: JWKTrustAnchorProvider = StaticJWKTrustAnchorProvider(),
+	val oidfTrustAnchorProvider: OidfTrustAnchorProvider = StaticOidfTrustAnchorProvider(),
 ) : TrustFramework {
 	override val frameworkId: String
 		get() = OIDC_FEDERATION_TRUST_FRAMEWORK_ID
@@ -38,7 +38,7 @@ class OidcFederationTrustFramerwork(
 		}
 
 		val isTrusted = trustInfo.trustAnchorKeys.any {
-			jwkTrustAnchorProvider.isTrusted(it)
+			oidfTrustAnchorProvider.isTrusted(it)
 		};
 		val isVerified = credentialConfigurationIds.all {
 			trustInfo.leaf.credentialConfigurationsSupported?.contains(it) ?: false
@@ -71,7 +71,7 @@ class OidcFederationTrustFramerwork(
 		}
 
 		val isTrusted = trustInfo.trustAnchorKeys.any {
-			jwkTrustAnchorProvider.isTrusted(it)
+			oidfTrustAnchorProvider.isTrusted(it)
 		};
 		val isVerified = true;
 
