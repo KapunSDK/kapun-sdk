@@ -23,8 +23,8 @@ use std::time::Instant;
 
 use anyhow::{anyhow, Context};
 use ark_bls12_381::G1Affine as BlsG1Affine;
-use ark_ec::AffineRepr;
-use ark_ff::{BigInteger, PrimeField as ArkPrimeField};
+use ark_ec::{AffineRepr, CurveGroup};
+use ark_ff::{BigInteger, Field as ArkField, PrimeField as ArkPrimeField};
 use ark_secp256r1::Fq;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::UniformRand;
@@ -70,12 +70,14 @@ const ABORT_PARAM: usize = 8;
 const RESPONSE_BYTE_SIZE: usize = 32;
 const NUM_REPS: usize = 1;
 const NUM_CHUNKS: usize = 4;
+const CHUNKS_PER_LIMB: usize = 2;
+const NUM_LIMBS: usize = NUM_CHUNKS / CHUNKS_PER_LIMB;
 
 pub const DEVICE_BINDING_KEY: &str = "https://zkp-ld.org/deviceBinding";
-pub const DEVICE_BINDING_KEY_X: &str = "https://zkp-ld.org/deviceBinding#x";
-pub const DEVICE_BINDING_KEY_Y: &str = "https://zkp-ld.org/deviceBinding#y";
 pub const DEVICE_BINDING_KEY_X_1: &str = "https://zkp-ld.org/deviceBinding#x1";
 pub const DEVICE_BINDING_KEY_X_2: &str = "https://zkp-ld.org/deviceBinding#x2";
+pub const DEVICE_BINDING_KEY_Y_1: &str = "https://zkp-ld.org/deviceBinding#y1";
+pub const DEVICE_BINDING_KEY_Y_2: &str = "https://zkp-ld.org/deviceBinding#y2";
 
 pub type SecpFr = ark_secp256r1::Fr;
 pub type SecpFq = ark_secp256r1::Fq;
@@ -108,8 +110,8 @@ pub struct DeviceBindingSigma {
     pub bls_comm_pk_x: BlsG1Affine,
     pub bls_comm_pk_y: BlsG1Affine,
 
-    pub bls_scalars_x: Vec<BlsFr>,
-    pub bls_scalars_y: Vec<BlsFr>,
+    pub bls_scalars_x: Vec<Vec<BlsFr>>,
+    pub bls_scalars_y: Vec<Vec<BlsFr>>,
 }
 
 #[allow(nonstandard_style)]
@@ -240,8 +242,7 @@ impl DeviceBindingPresentationNative {
         let h = nizk.ck_bls_blinding();
         let pp = RelECDSAParams::<G1Affine, 2>::new(gs, *h, ecdsa);
         let r_verifier = RelECDSA::new(pp, x, None);
-        let _ = self
-            .params
+        self.params
             .verify(&mut transcript_verifier, &r_verifier, &self.proof)
             .unwrap();
         Ok(())
@@ -259,13 +260,13 @@ pub fn from_g1_to_arkg1(g: &ecdsa_pops::G1Affine) -> BlsG1Affine {
     let y_rep = g.y.to_repr();
     let x = x_rep.as_ref();
     let y = y_rep.as_ref();
-    let x = <BlsFq as ArkPrimeField>::from_le_bytes_mod_order(&x);
-    let y = <BlsFq as ArkPrimeField>::from_le_bytes_mod_order(&y);
+    let x = <BlsFq as ArkPrimeField>::from_le_bytes_mod_order(x);
+    let y = <BlsFq as ArkPrimeField>::from_le_bytes_mod_order(y);
     BlsG1Affine::new(x, y)
 }
 pub fn from_arkg1_to_g1(g: &BlsG1Affine) -> ecdsa_pops::G1Affine {
-    let x: BigUint = g.x.clone().into();
-    let y: BigUint = g.y.clone().into();
+    let x: BigUint = g.x.into();
+    let y: BigUint = g.y.into();
     let xbs = x.to_bytes_le();
     let ybs = y.to_bytes_le();
     let mut xbytes = [0u8; 48];
@@ -358,7 +359,7 @@ impl DeviceBindingNative {
         println!("elapsed [actual proof]: {}", (end - start).as_millis());
         println!("proof finished");
         Ok(Self {
-            proof: proof,
+            proof,
             params: nizk,
             bls_comm_pk_x1: coms[0],
             bls_comm_pk_x2: coms[1],
@@ -375,7 +376,7 @@ impl DeviceBindingNative {
             params: self.params.clone(),
             bls_comm_pk_x1: from_g1_to_arkg1(&self.bls_comm_pk_x1),
             bls_comm_pk_x2: from_g1_to_arkg1(&self.bls_comm_pk_x2),
-            K: self.K.clone(),
+            K: self.K,
         }
     }
 }
@@ -431,8 +432,8 @@ impl DeviceBindingSigma {
         let bls_comm_pk_ry = BlsFr::rand(rng);
         let bls_comm_pk_x = comm_key_bls.commit(&pk_x, &bls_comm_pk_rx);
         let bls_comm_pk_y = comm_key_bls.commit(&pk_y, &bls_comm_pk_ry);
-        let bls_scalars_x = vec![pk_x, bls_comm_pk_rx];
-        let bls_scalars_y = vec![pk_y, bls_comm_pk_ry];
+        let bls_scalars_x = aggregate_witnesses(&limb_witnesses(&comm_pk.x, &bls_comm_pk_rx));
+        let bls_scalars_y = aggregate_witnesses(&limb_witnesses(&comm_pk.y, &bls_comm_pk_ry));
 
         let transformed_sig =
             TransformedEcdsaSig::new(&message_signature, message, public_key).unwrap();
@@ -601,24 +602,77 @@ impl DeviceBindingPresentationSigma {
     }
 }
 
-pub fn change_field(p: &SecpFq) -> BlsFr {
-    from_base_field_to_scalar_field::<Fq, BlsFr>(p)
-}
-pub fn limbs_from_public_key(x: &str) -> (String, String) {
+pub fn limbs_from_coordinate(coordinate: &str) -> anyhow::Result<(String, String)> {
     use base64::prelude::BASE64_STANDARD;
-    let x = BASE64_STANDARD.decode(x).unwrap();
-    let x = SecpFq::from(BigUint::from_bytes_be(&x));
-    let limbs = fp_to_scalars::<ecdsa_pops::G1Affine, 2>(&arkfp_to_fp(&x).unwrap()).unwrap();
-    let x: BlsFr = from_blsfr_to_arkblsfr(&limbs[0]);
-    let y: BlsFr = from_blsfr_to_arkblsfr(&limbs[1]);
+    let bytes = BASE64_STANDARD.decode(coordinate)?;
+    anyhow::ensure!(bytes.len() == 32, "P-256 coordinate must be 32 bytes");
+
+    let coordinate = BigUint::from_bytes_be(&bytes);
+    anyhow::ensure!(
+        coordinate < BigUint::from(SecpFq::MODULUS),
+        "P-256 coordinate is outside the field"
+    );
+    let coordinate = SecpFq::from(coordinate);
+    let coordinate = arkfp_to_fp(&coordinate).context("invalid P-256 coordinate")?;
+    let limbs = fp_to_scalars::<ecdsa_pops::G1Affine, 2>(&coordinate)?;
+    let x = from_blsfr_to_arkblsfr(&limbs[0]);
+    let y = from_blsfr_to_arkblsfr(&limbs[1]);
 
     let x_bytes = x.into_bigint().to_bytes_be();
     let y_bytes = y.into_bigint().to_bytes_be();
 
-    (
+    Ok((
         BASE64_STANDARD.encode(x_bytes),
         BASE64_STANDARD.encode(y_bytes),
-    )
+    ))
+}
+
+fn limb_witnesses<F: ArkPrimeField>(value: &F, randomness: &BlsFr) -> Vec<Vec<BlsFr>> {
+    let values = bls_limbs(value);
+    let randomness = bls_limbs(randomness);
+
+    values
+        .into_iter()
+        .zip(randomness)
+        .map(|(value, randomness)| vec![value, randomness])
+        .collect()
+}
+
+fn aggregate_witnesses(witnesses: &[Vec<BlsFr>]) -> Vec<Vec<BlsFr>> {
+    debug_assert_eq!(witnesses.len(), NUM_CHUNKS);
+
+    // The VC stores 128-bit limbs; combine the equality proof's 64-bit chunks first.
+    let base = BlsFr::from(2u64).pow([WITNESS_BIT_SIZE as u64]);
+    witnesses
+        .chunks_exact(CHUNKS_PER_LIMB)
+        .map(|pair| {
+            debug_assert_eq!(pair[0].len(), 2);
+            debug_assert_eq!(pair[1].len(), 2);
+
+            vec![
+                pair[0][0] + pair[1][0] * base,
+                pair[0][1] + pair[1][1] * base,
+            ]
+        })
+        .collect()
+}
+
+pub(crate) fn aggregate_commitments(commitments: &[BlsG1Affine]) -> [BlsG1Affine; NUM_LIMBS] {
+    debug_assert_eq!(commitments.len(), NUM_CHUNKS);
+
+    // Use the same 128-bit grouping for public commitments and witnesses.
+    let base = BlsFr::from(2u64).pow([WITNESS_BIT_SIZE as u64]);
+    std::array::from_fn(|i| {
+        let start = CHUNKS_PER_LIMB * i;
+        (commitments[start].into_group() + commitments[start + 1].into_group() * base).into_affine()
+    })
+}
+
+fn bls_limbs<F: ArkPrimeField>(value: &F) -> [BlsFr; NUM_CHUNKS] {
+    let mut bytes = value.into_bigint().to_bytes_le();
+    bytes.resize(NUM_CHUNKS * 8, 0);
+
+    std::array::from_fn(|i| BlsFr::from_le_bytes_mod_order(&bytes[i * 8..(i + 1) * 8]))
 }
 
 #[cfg(test)]
@@ -626,6 +680,22 @@ mod tests {
     use std::io::Cursor;
 
     use super::*;
+
+    #[test]
+    fn split_coordinate_above_bls_order() {
+        use base64::{prelude::BASE64_STANDARD, Engine};
+
+        // P-256 values above BLS order must survive as limbs, not be reduced.
+        let expected = BigUint::from(BlsFr::MODULUS) + BigUint::from(1u64);
+        let mut coordinate = vec![0; 32 - expected.to_bytes_be().len()];
+        coordinate.extend(expected.to_bytes_be());
+
+        let (low, high) = limbs_from_coordinate(&BASE64_STANDARD.encode(coordinate)).unwrap();
+        let low = BigUint::from_bytes_be(&BASE64_STANDARD.decode(low).unwrap());
+        let high = BigUint::from_bytes_be(&BASE64_STANDARD.decode(high).unwrap());
+
+        assert_eq!(low + (high << 128), expected);
+    }
 
     #[test]
     pub fn test_device_binding() {
@@ -732,8 +802,7 @@ mod tests {
         let h = nizk.ck_bls_blinding();
         let pp = RelECDSAParams::<G1Affine, 2>::new(gs, *h, ecdsa);
         let r_verifier = RelECDSA::new(pp, x, None);
-        let _ = nizk
-            .verify(&mut transcript_verifier, &r_verifier, &proof.proof)
+        nizk.verify(&mut transcript_verifier, &r_verifier, &proof.proof)
             .unwrap();
     }
 }

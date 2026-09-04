@@ -27,7 +27,7 @@ multibase = { workspace = true }
 num-bigint = { version = "0.4.6" }
 proof_system = "0.32.0"
 rand_core = { workspace = true }
-rdf-proofs = { git = "https://github.com/UbiqueInnovation/rdf-proofs", branch = "main" }
+rdf-proofs = { git = "https://github.com/UbiqueInnovation/rdf-proofs", rev = "279786a5ae2b32e058f7ccda014d8703b4c31f4f" }
 rdf-util = { path = "../rdf-util" }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }

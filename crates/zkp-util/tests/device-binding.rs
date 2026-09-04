@@ -18,24 +18,21 @@ specific language governing permissions and limitations
 under the License.
  */
 
-use ark_ec::{AffineRepr, CurveGroup};
+use ark_ec::CurveGroup;
 use ark_ff::{biginteger::BigInteger, PrimeField};
-use ark_secp256r1::Fq;
 use ark_std::UniformRand;
 use base64::{prelude::BASE64_STANDARD, Engine};
 use chrono::DateTime;
-use ecdsa_pops::utils::{arkfp_to_fp, fp_to_scalars};
-use equality_across_groups::ec::commitments::from_base_field_to_scalar_field;
 use kvac::bbs_sharp::ecdsa;
 use rdf_util::oxrdf::vocab::xsd;
 use rdf_util::{ObjectId, Value as RdfValue};
 use std::{collections::BTreeMap, str::FromStr, time::Instant};
-use zkp_util::device_binding::{from_blsfr_to_arkblsfr, limbs_from_public_key};
+use zkp_util::device_binding::limbs_from_coordinate;
 use zkp_util::vc::presentation::present_native;
 use zkp_util::vc::verification::verify_native;
 use zkp_util::{
     circuits,
-    device_binding::{BlsFr, SecpFr},
+    device_binding::SecpFr,
     vc::{
         issuance::issue,
         presentation::present,
@@ -92,9 +89,10 @@ fn device_binding_with_both_and_special() {
 
             let x_encoded = BASE64_STANDARD.encode(x_bytes);
             let y_encoded = BASE64_STANDARD.encode(public_key.y.into_bigint().to_bytes_be());
-            let (x_1, x_2) = limbs_from_public_key(&x_encoded);
+            let (x_1, x_2) = limbs_from_coordinate(&x_encoded).unwrap();
+            let (y_1, y_2) = limbs_from_coordinate(&y_encoded).unwrap();
 
-            (x_encoded, y_encoded, x_1, x_2)
+            (x_1, x_2, y_1, y_2)
         };
 
         let message = SecpFr::rand(&mut rng);
@@ -240,31 +238,12 @@ fn device_binding_native_with_special() {
         let public_key = (SECP_GEN * secret_key).into_affine();
 
         let db = {
-            println!("before");
-            let limbs =
-                fp_to_scalars::<ecdsa_pops::G1Affine, 2>(&arkfp_to_fp(&public_key.x).unwrap())
-                    .unwrap();
-            println!("after");
-            let x1: BlsFr = from_blsfr_to_arkblsfr(&limbs[0]);
-            println!("after2");
-            let x1_bytes = x1.into_bigint().to_bytes_be();
-            println!("after3");
-            let x2: BlsFr = from_blsfr_to_arkblsfr(&limbs[1]);
-            println!("after4");
-            let x2_bytes = x2.into_bigint().to_bytes_be();
-            println!("after5");
-
             let x_encoded = BASE64_STANDARD.encode(public_key.x.into_bigint().to_bytes_be());
-            println!("after6");
             let y_encoded = BASE64_STANDARD.encode(public_key.y.into_bigint().to_bytes_be());
-            println!("after7");
+            let (x_1, x_2) = limbs_from_coordinate(&x_encoded).unwrap();
+            let (y_1, y_2) = limbs_from_coordinate(&y_encoded).unwrap();
 
-            (
-                x_encoded,
-                y_encoded,
-                BASE64_STANDARD.encode(x1_bytes),
-                BASE64_STANDARD.encode(x2_bytes),
-            )
+            (x_1, x_2, y_1, y_2)
         };
 
         let message = SecpFr::rand(&mut rng);

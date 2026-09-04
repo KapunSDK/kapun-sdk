@@ -18,13 +18,12 @@ specific language governing permissions and limitations
 under the License.
  */
 
-use ark_ec::{AffineRepr, CurveGroup};
+use ark_bls12_381::Fr as BlsFr;
+use ark_ec::CurveGroup;
 use ark_ff::{biginteger::BigInteger, PrimeField};
-use ark_secp256r1::Fq;
 use ark_std::UniformRand;
 use base64::{prelude::BASE64_STANDARD, Engine};
 use chrono::DateTime;
-use equality_across_groups::ec::commitments::from_base_field_to_scalar_field;
 use kvac::bbs_sharp::ecdsa;
 use rdf_util::oxrdf::vocab::xsd;
 use rdf_util::{ObjectId, Value as RdfValue};
@@ -32,9 +31,9 @@ use std::{
     collections::{BTreeMap, HashMap},
     str::FromStr,
 };
-use zkp_util::device_binding::limbs_from_public_key;
+use zkp_util::device_binding::limbs_from_coordinate;
 use zkp_util::{
-    device_binding::{BlsFr, SecpFr},
+    device_binding::SecpFr,
     vc::{
         issuance::issue,
         presentation::present_two,
@@ -68,8 +67,16 @@ const ISSUER_PK: &str = "zUC77roR12AzeB1bjwU6eK86NBBpJf5Rxvyqh8QcaEK6BxRTDoQucp2
 fn claim_based() {
     let mut rng = rand_core::OsRng;
 
-    let secret_key = SecpFr::rand(&mut rng);
-    let public_key = (SECP_GEN * secret_key).into_affine();
+    let (secret_key, public_key) = loop {
+        let secret_key = SecpFr::rand(&mut rng);
+        let public_key = (SECP_GEN * secret_key).into_affine();
+
+        if public_key.x.into_bigint() >= BlsFr::MODULUS
+            || public_key.y.into_bigint() >= BlsFr::MODULUS
+        {
+            break (secret_key, public_key);
+        }
+    };
 
     let db = {
         let x_bytes = public_key.x.into_bigint().to_bytes_be();
@@ -77,9 +84,10 @@ fn claim_based() {
 
         let x_encoded = BASE64_STANDARD.encode(x_bytes);
         let y_encoded = BASE64_STANDARD.encode(y_bytes);
-        let (x_1, x_2) = limbs_from_public_key(&x_encoded);
+        let (x_1, x_2) = limbs_from_coordinate(&x_encoded).unwrap();
+        let (y_1, y_2) = limbs_from_coordinate(&y_encoded).unwrap();
 
-        (x_encoded, y_encoded, x_1, x_2)
+        (x_1, x_2, y_1, y_2)
     };
 
     // This is done on the issuer side
@@ -109,7 +117,7 @@ fn claim_based() {
             ObjectId::None,
         );
 
-        let vc = issue(
+        issue(
             &mut rng,
             claims,
             ISSUER_PK,
@@ -122,10 +130,9 @@ fn claim_based() {
             Some(db),
             None,
         )
-        .unwrap();
+        .unwrap()
 
         // println!("issuance done! {vc}");
-        vc
     };
 
     // This is done on the issuer side
@@ -155,7 +162,7 @@ fn claim_based() {
             ObjectId::None,
         );
 
-        let vc = issue(
+        issue(
             &mut rng,
             claims,
             ISSUER_PK,
@@ -168,10 +175,9 @@ fn claim_based() {
             None,
             None,
         )
-        .unwrap();
+        .unwrap()
 
         // println!("issuance done! {vc}");
-        vc
     };
 
     // The verifier generates the requirements and the circuits

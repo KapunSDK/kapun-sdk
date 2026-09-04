@@ -36,8 +36,8 @@ use std::collections::{BTreeSet, HashMap};
 use crate::{
     constants::{CHALLENGE_LABEL, MERLIN_TRANSCRIPT_LABEL},
     device_binding::{
-        from_g1_to_arkg1, DEVICE_BINDING_KEY_X, DEVICE_BINDING_KEY_X_1, DEVICE_BINDING_KEY_X_2,
-        DEVICE_BINDING_KEY_Y,
+        aggregate_commitments, from_g1_to_arkg1, DEVICE_BINDING_KEY_X_1, DEVICE_BINDING_KEY_X_2,
+        DEVICE_BINDING_KEY_Y_1, DEVICE_BINDING_KEY_Y_2,
     },
     vc::{index::index_of_vp, presentation::VerifiablePresentationNative},
 };
@@ -86,22 +86,21 @@ pub fn verify<R: RngCore>(
             anyhow::bail!("Device binding verification params expected!")
         };
 
-        // add the statements about the public key commitment
-        statements.add(PedersenCommitment::new_statement_from_params(
-            db.bls_comm_key.clone(),
-            db.bls_comm_pk_x,
-        ));
-        // add the statements about the public key commitment
-        statements.add(PedersenCommitment::new_statement_from_params(
-            db.bls_comm_key.clone(),
-            db.bls_comm_pk_y,
-        ));
+        for commitment in aggregate_commitments(&db.eq_x.comms_g2)
+            .into_iter()
+            .chain(aggregate_commitments(&db.eq_y.comms_g2))
+        {
+            statements.add(PedersenCommitment::new_statement_from_params(
+                db.bls_comm_key.clone(),
+                commitment,
+            ));
+        }
 
         // TODO: This is a biiiiig hack
-        let (x_index, graph_idx) = {
+        let (limb_index, graph_idx) = {
             if let Some(idx) = index_of_vp(
                 &presentation.proof.dataset(),
-                &NamedNode::new_unchecked(DEVICE_BINDING_KEY_X),
+                &NamedNode::new_unchecked(DEVICE_BINDING_KEY_X_1),
                 0,
             ) {
                 (idx + 1, 0)
@@ -109,7 +108,7 @@ pub fn verify<R: RngCore>(
                 (
                     index_of_vp(
                         &presentation.proof.dataset(),
-                        &NamedNode::new_unchecked(DEVICE_BINDING_KEY_X),
+                        &NamedNode::new_unchecked(DEVICE_BINDING_KEY_X_1),
                         1,
                     )
                     .unwrap()
@@ -118,22 +117,32 @@ pub fn verify<R: RngCore>(
                 )
             }
         };
-        let y_index = index_of_vp(
-            &presentation.proof.dataset(),
-            &NamedNode::new_unchecked(DEVICE_BINDING_KEY_Y),
-            graph_idx,
-        )
-        .unwrap()
-            + 1;
+        for (i, predicate) in [
+            DEVICE_BINDING_KEY_X_1,
+            DEVICE_BINDING_KEY_X_2,
+            DEVICE_BINDING_KEY_Y_1,
+            DEVICE_BINDING_KEY_Y_2,
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let index = if i == 0 {
+                limb_index
+            } else {
+                index_of_vp(
+                    &presentation.proof.dataset(),
+                    &NamedNode::new_unchecked(predicate),
+                    graph_idx,
+                )
+                .ok_or_else(|| anyhow::anyhow!("Missing device binding limb: {predicate}"))?
+                    + 1
+            };
 
-        meta_statements.add_witness_equality(EqualWitnesses(BTreeSet::from([
-            (graph_idx, x_index),
-            (num_vcs + 0, 0),
-        ])));
-        meta_statements.add_witness_equality(EqualWitnesses(BTreeSet::from([
-            (graph_idx, y_index),
-            (num_vcs + 1, 0),
-        ])));
+            meta_statements.add_witness_equality(EqualWitnesses(BTreeSet::from([
+                (graph_idx, index),
+                (num_vcs + i, 0),
+            ])));
+        }
 
         db.verify(
             rng,
@@ -200,7 +209,7 @@ pub fn verify<R: RngCore>(
     for requirement in requirements {
         match requirement {
             ProofRequirement::Required(req) => {
-                anyhow::ensure!(bodies.iter().find(|b| b.get(&req.key).is_some()).is_some())
+                anyhow::ensure!(bodies.iter().any(|b| b.get(&req.key).is_some()))
             }
             ProofRequirement::Circuit {
                 id,
@@ -355,7 +364,7 @@ pub fn verify_native<R: RngCore>(
 
         meta_statements.add_witness_equality(EqualWitnesses(BTreeSet::from([
             (graph_idx, x_index),
-            (num_vcs + 0, 0),
+            (num_vcs, 0),
         ])));
         meta_statements.add_witness_equality(EqualWitnesses(BTreeSet::from([
             (graph_idx, y_index),
@@ -418,7 +427,7 @@ pub fn verify_native<R: RngCore>(
     for requirement in requirements {
         match requirement {
             ProofRequirement::Required(req) => {
-                anyhow::ensure!(bodies.iter().find(|b| b.get(&req.key).is_some()).is_some())
+                anyhow::ensure!(bodies.iter().any(|b| b.get(&req.key).is_some()))
             }
             ProofRequirement::Circuit {
                 id,

@@ -32,6 +32,16 @@ pub mod device_binding;
 pub mod keypair;
 pub mod vc;
 
+#[cfg(target_arch = "x86_64")]
+#[unsafe(no_mangle)]
+/// Provides the stack-probe symbol required by x86_64 builds.
+///
+/// # Safety
+///
+/// This symbol is called by compiler-generated stack probes and has no
+/// Rust-level preconditions.
+pub unsafe extern "C" fn __rust_probestack() {}
+
 pub use ecdsa_pops;
 pub use rok;
 
