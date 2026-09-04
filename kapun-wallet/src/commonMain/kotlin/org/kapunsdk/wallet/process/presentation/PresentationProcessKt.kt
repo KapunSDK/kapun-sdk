@@ -32,6 +32,11 @@ import org.kapunsdk.credentials.models.credential.CredentialModel
 import org.kapunsdk.credentials.models.metadata.KeyMaterial
 import org.kapunsdk.bbsCombinedClaimBasedProof
 import org.kapunsdk.getVpToken
+import org.kapunsdk.BbsParser
+import org.kapunsdk.MdocParser
+import org.kapunsdk.OpenBadgeParser
+import org.kapunsdk.SdJwtParser
+import org.kapunsdk.W3CParser
 import org.kapunsdk.presentation.request.model.DocumentDigest
 import org.kapunsdk.presentation.request.model.OID4VPVersion
 import org.kapunsdk.presentation.request.model.TransactionData
@@ -58,7 +63,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import uniffi.kapun_credentials_rust.generateNonce
+import uniffi.kapun_credential_core_rust.generateNonce
 import uniffi.kapun_crypto_rust.sha256Rs
 import uniffi.kapun_dcql_rust.Credential
 import uniffi.kapun_dcql_rust.DcqlQuery
@@ -66,11 +71,16 @@ import uniffi.kapun_util_rust.Value
 import org.kapunsdk.wallet.process.presentation.models.TransactionDataWrapper
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonNames
-import uniffi.kapun_credentials_rust.DeviceBindingType
-import uniffi.kapun_credentials_rust.SignatureCreator
+import org.kapunsdk.trustedAuthority.AkiAuthorityMatcher
+import org.kapunsdk.trustedAuthority.DidAuthorityMatcher
+import uniffi.kapun_dcql_bbs_rust.DeviceBindingType
+import uniffi.kapun_credential_core_rust.SignatureCreator
 import uniffi.kapun_dcql_rust.ClaimsQuery
 import uniffi.kapun_dcql_rust.CredentialSetOption
-import uniffi.kapun_dcql_rust.selectCredentialsWithInfo
+import uniffi.kapun_dcql_rust.registerMatcher
+import uniffi.kapun_dcql_rust.registerParser
+import uniffi.kapun_dcql_rust.parseCredential
+import uniffi.kapun_dcql_rust.selectParsedCredentialsWithInfo
 import uniffi.kapun_util_rust.encodeCbor
 import uniffi.kapun_wallet_rust.*
 import kotlin.collections.set
@@ -340,14 +350,30 @@ class PresentationProcessKt private constructor(
                 it.payload to Pair(it.identityId, meta?.credentialType ?: CredentialType.Unknown)
             }
 
-            // TODO: We need to improve this after refactoring
-            val tmpList = credentials.map {
+            // Credentials belonging to the same identity were issued as one batch. DCQL only
+            // needs one candidate from that batch, but each available format must be represented.
+            val batchCandidates = credentials.distinctBy {
+                val credentialType = CredentialMetadata.fromString(it.metadata)?.credentialType
+                    ?: CredentialType.Unknown
+                it.identityId to credentialType
+            }
+            val serializedCandidates = batchCandidates.map {
                 when (identityMap[it.payload]?.second) {
                     CredentialType.OpenBadge303 -> W3C.OpenBadge303.parseSerialized(it.payload).originalString
                     else -> it.payload
                 }
             }
-            val result = selectCredentialsWithInfo(dcqlQuery, tmpList)
+
+            registerParser(BbsParser)
+            registerParser(MdocParser)
+            registerParser(OpenBadgeParser)
+            registerParser(SdJwtParser)
+            registerParser(W3CParser)
+            registerMatcher(AkiAuthorityMatcher)
+            registerMatcher(DidAuthorityMatcher)
+
+            val parsedCredentials = serializedCandidates.mapNotNull(::parseCredential)
+            val result = selectParsedCredentialsWithInfo(dcqlQuery, parsedCredentials)
 
             // Prioritize ZKP proofs for claim-based credentials
             val (setOptions, zkpOptions) = prioritizeBbsClaimBasedProofs(dcqlQuery, result.setOptions)
@@ -374,17 +400,16 @@ class PresentationProcessKt private constructor(
                                     credentialOptions = setOption.options.map {
                                         val c = credentials.firstOrNull { c ->
                                             when (it.credential) {
-                                                is Credential.MdocCredential -> (it.credential as Credential.MdocCredential).v1.originalMdoc == c.payload
-                                                is Credential.SdJwtCredential -> (it.credential as Credential.SdJwtCredential).v1.originalSdjwt == c.payload
-                                                is Credential.BbsCredential -> (it.credential as Credential.BbsCredential).v1.originalBbs == c.payload
-                                                is Credential.W3cCredential -> (it.credential as Credential.W3cCredential).v1.originalSdjwt == c.payload
+                                                is Credential.MdocCredential -> (it.credential as Credential.MdocCredential).v1.serialize() == c.payload
+                                                is Credential.SdJwtCredential -> (it.credential as Credential.SdJwtCredential).v1.serialize() == c.payload
+                                                is Credential.BbsCredential -> (it.credential as Credential.BbsCredential).v1.serialize() == c.payload
+                                                is Credential.W3cCredential -> (it.credential as Credential.W3cCredential).v1.serialize() == c.payload
                                                 is Credential.OpenBadge303Credential -> {
                                                     val vc = runCatching { W3C.OpenBadge303.parseSerialized(c.payload) }
                                                         .getOrNull() ?: return@firstOrNull false
-                                                    val a = (it.credential as Credential.OpenBadge303Credential).v1
-                                                    val b = vc.asW3CCredential()
-                                                    (it.credential as Credential.OpenBadge303Credential).v1 == vc.asW3CCredential()
+                                                    (it.credential as Credential.OpenBadge303Credential).v1.serialize() == vc.originalString
                                                 }
+                                                is Credential.Other -> (it.credential as Credential.Other).v1.serialize() == c.payload
                                             }
                                         }
                                         if (c == null) {

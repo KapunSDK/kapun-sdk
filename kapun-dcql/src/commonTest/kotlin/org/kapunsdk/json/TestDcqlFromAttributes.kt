@@ -20,7 +20,6 @@ under the License.
 
 package org.kapunsdk.json
 
-import org.kapunsdk.dcql.*
 import org.kapunsdk.Attribute
 import org.kapunsdk.AttributeType
 import org.kapunsdk.mDocDcqlClaimsFromAttributes

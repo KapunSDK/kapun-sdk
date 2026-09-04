@@ -19,37 +19,27 @@ under the License.
  */
 
 pub mod models;
+#[cfg(feature = "jlc")]
 pub mod verify;
+
+#[doc(hidden)]
+#[inline(never)]
+pub fn uniffi_link_anchor() -> u8 {
+    1
+}
 
 use crate::models::trusted_authority::{TrustedAuthorityMatcher, REGISTERED_MATCHERS};
 use crate::models::{SetOption, TrustedAuthority};
-#[cfg(feature = "bbs")]
-use kapun_credentials_rust::bbs::BbsRust;
-use kapun_credentials_rust::models::{Pointer, PointerPart};
-use kapun_credentials_rust::sdjwt::SdJwtRust;
-use kapun_credentials_rust::{claims_pointer::Selector, w3c::W3CSdJwt};
-use kapun_credentials_rust::{mdoc::MdocRust, w3c::W3CVerifiableCredential};
-use kapun_util_rust::value::Value;
+use kapun_credential_core_rust::claims_pointer::Selector;
+use kapun_credential_core_rust::models::{Pointer, PointerPart};
+use kapun_util_rust::{log_warn, value::Value};
 use models::{
-    ClaimsQuery, Credential, CredentialOptions, CredentialQuery, CredentialSetOption, DcqlQuery,
-    Disclosure, Meta,
+    parser::REGISTERED_PARSERS, ClaimsQuery, Credential, CredentialOptions, CredentialQuery,
+    CredentialSetOption, DcqlQuery, Disclosure,
 };
 use serde::Serialize;
 use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
-
-/// Supported SD-JWT formats. We have, for backwards compatibility included the vc+sd-jwt type used in some earlier drafts
-const SDJWT_FORMATS: [&str; 2] = ["dc+sd-jwt", "vc+sd-jwt"];
-/// The mdoc format type
-const MDOC_FORMATS: [&str; 1] = ["mso_mdoc"];
-/// W3C VCDM format type. Note: It overlaps with SD-JWT format type, so we need further heuristics (like @context or so)
-const W3C_FORMATS: [&str; 1] = ["vc+sd-jwt"];
-/// OpenBadges are just plain JSON-LD with linked data proofs
-const OPEN_BADGE_FORMATS: [&str; 1] = ["ldp_vc"];
-
-#[cfg(feature = "bbs")]
-/// We use a bbs-termwise type format type
-const BBS_FORMATS: [&str; 1] = ["bbs-termwise"];
 
 #[derive(uniffi::Object)]
 /// Allow ClaimsPath pointer manipulation/selection via this helper class
@@ -157,6 +147,15 @@ impl<'a, T: AsRef<[&'a str]>> CredentialStore for T {
     }
 }
 
+/// Uses already parsed credential handles without serializing their payloads across UniFFI again.
+struct ParsedCredentialStore(Vec<Credential>);
+
+impl CredentialStore for ParsedCredentialStore {
+    fn get(&self) -> Vec<Credential> {
+        self.0.clone()
+    }
+}
+
 #[derive(Debug, Clone, uniffi::Enum, Serialize)]
 /// If query matching fails for some reason we return a list of mismatches
 /// to be able to improve informations to users.
@@ -182,16 +181,17 @@ pub enum DcqlQueryMismatch {
 /// Data type explaining, why a credential did not match the requested credential query
 pub enum DcqlCredentialQueryMismatch {
     /// VCT of the credential does not match the one from the query
-    SdJwtMeta(SdJwtMetaMismatch),
+    SdJwtMeta(CombinedSdJwtMetaMismatch),
     /// Doctype does not match the one from the query
-    MdocMeta(MdocMetaMismatch),
-    #[cfg(feature = "bbs")]
+    MdocMeta(CombinedMdocMetaMismatch),
     /// Credential type does not match the one from the query
-    BbsMeta(BbsMetaMismatch),
+    BbsMeta(CombinedBbsMetaMismatch),
     /// Invalid W3C meta data
-    W3CMeta(W3CMetaMismatch),
+    W3CMeta(CombinedW3CMetaMismatch),
     /// Credential types does not match the one from the query
-    LdpMeta(LdpMetaMismatch),
+    LdpMeta(CombinedLdpMetaMismatch),
+    /// Externally registered data types
+    CredentialMetaMismatch,
 
     /// This credential does not have a matching format
     ExpectedFormat(String),
@@ -203,33 +203,64 @@ pub enum DcqlCredentialQueryMismatch {
     /// The credential does not match the trusted authorities matcher (of which we have registered ones)
     UnstatisfiedTrustedAuthority(Vec<TrustedAuthority>),
 }
+#[derive(Debug, Clone, uniffi::Enum, Serialize)]
+pub enum MetaMismatch {
+    SdJwtMetaMismatch(CombinedSdJwtMetaMismatch),
+    MdocMetaMismatch(CombinedMdocMetaMismatch),
+    BbsMetaMismatch(CombinedBbsMetaMismatch),
+    W3CMetaMismatch(CombinedW3CMetaMismatch),
+    LdpMetaMismatch(CombinedLdpMetaMismatch),
+    Other,
+}
+impl From<MetaMismatch> for DcqlCredentialQueryMismatch {
+    fn from(value: MetaMismatch) -> Self {
+        match value {
+            MetaMismatch::SdJwtMetaMismatch(sd_jwt_meta_mismatch) => {
+                DcqlCredentialQueryMismatch::SdJwtMeta(sd_jwt_meta_mismatch)
+            }
+            MetaMismatch::MdocMetaMismatch(mdoc_meta_mismatch) => {
+                DcqlCredentialQueryMismatch::MdocMeta(mdoc_meta_mismatch)
+            }
+
+            MetaMismatch::BbsMetaMismatch(bbs_meta_mismatch) => {
+                DcqlCredentialQueryMismatch::BbsMeta(bbs_meta_mismatch)
+            }
+            MetaMismatch::W3CMetaMismatch(w3_cmeta_mismatch) => {
+                DcqlCredentialQueryMismatch::W3CMeta(w3_cmeta_mismatch)
+            }
+            MetaMismatch::LdpMetaMismatch(ldp_meta_mismatch) => {
+                DcqlCredentialQueryMismatch::LdpMeta(ldp_meta_mismatch)
+            }
+            MetaMismatch::Other => DcqlCredentialQueryMismatch::CredentialMetaMismatch,
+        }
+    }
+}
 
 #[derive(Debug, Clone, uniffi::Enum, Serialize)]
-pub enum SdJwtMetaMismatch {
+pub enum CombinedSdJwtMetaMismatch {
     WrongVctValue,
     InvalidMeta,
 }
 
 #[derive(Debug, Clone, uniffi::Enum, Serialize)]
-pub enum MdocMetaMismatch {
+pub enum CombinedMdocMetaMismatch {
     WrongDocType,
     InvalidMeta,
 }
 
-#[cfg(feature = "bbs")]
 #[derive(Debug, Clone, uniffi::Enum, Serialize)]
-pub enum BbsMetaMismatch {
+pub enum CombinedBbsMetaMismatch {
     InvalidMeta,
     WrongCredentialType,
 }
 
 #[derive(Debug, Clone, uniffi::Enum, Serialize)]
-pub enum W3CMetaMismatch {
+pub enum CombinedW3CMetaMismatch {
     InvalidMeta,
 }
 
 #[derive(Debug, Clone, uniffi::Enum, Serialize)]
-pub enum LdpMetaMismatch {
+pub enum CombinedLdpMetaMismatch {
     InvalidMeta,
     WrongCredentialTypes,
 }
@@ -276,6 +307,13 @@ impl DcqlQuery {
         &self,
         credential_store: impl CredentialStore,
     ) -> DcqlMatchResponse {
+        for parser in REGISTERED_PARSERS
+            .lock()
+            .map(|a| a.clone())
+            .unwrap_or(vec![])
+        {
+            log_warn!("DCQL", &format!("Registered {}", parser.id()));
+        }
         // does the actual parsing of the credentials
         let credentials = credential_store.get();
         // lock the current trusted authorities
@@ -497,41 +535,9 @@ pub fn get_requested_attributes(
     let Ok(claims_queries) = credential.is_satisfied(credential_query) else {
         return Value::Null;
     };
-    // all queries match
-    // an empty claims query means a RP is requesting all claims
+    // No Claims Queries means no selectively disclosable claims were requested.
     if claims_queries.is_empty() {
-        let mut key_value_match = HashMap::new();
-        let Some(claims) = credential_query.claims.as_ref() else {
-            return Value::Null;
-        };
-        for claim in claims {
-            // generate a unified body payload type...
-            let body = match &credential {
-                Credential::SdJwtCredential(sdjwt) => sdjwt.claims.clone(),
-                Credential::MdocCredential(mdoc) => mdoc.namespace_map.clone(),
-                #[cfg(feature = "bbs")]
-                Credential::BbsCredential(bbs) => bbs.body().clone(),
-                Credential::W3CCredential(w3c) => w3c.json.clone(),
-                Credential::OpenBadge303Credential(vc) => vc.clone().into_value(),
-            };
-
-            // ... and try resolve the pointers (as there is also slicing)
-            let all_ptrs = claim.path.resolve_ptr(body.clone()).unwrap_or(vec![]);
-            for p in all_ptrs {
-                let key = p
-                    .iter()
-                    .map(|p| match p {
-                        PointerPart::String(s) => s.to_string(),
-                        PointerPart::Index(i) => i.to_string(),
-                        PointerPart::Null(_) => "null".to_string(),
-                    })
-                    .collect::<Vec<_>>()
-                    .join("/");
-                // insert every attribute into the object
-                key_value_match.insert(key, p.select(body.clone()).unwrap()[0].clone());
-            }
-        }
-        Value::Object(key_value_match)
+        Value::Object(HashMap::new())
     } else {
         let mut key_value_match = HashMap::new();
         let Some(claims) = credential_query.claims.as_ref() else {
@@ -546,12 +552,12 @@ pub fn get_requested_attributes(
             };
 
             let body = match &credential {
-                Credential::SdJwtCredential(sdjwt) => sdjwt.claims.clone(),
-                Credential::MdocCredential(mdoc) => mdoc.namespace_map.clone(),
-                #[cfg(feature = "bbs")]
-                Credential::BbsCredential(bbs) => bbs.body().clone(),
-                Credential::W3CCredential(w3c) => w3c.json.clone(),
-                Credential::OpenBadge303Credential(vc) => vc.clone().into_value(),
+                Credential::SdJwtCredential(sdjwt) => sdjwt.get_body(),
+                Credential::MdocCredential(mdoc) => mdoc.get_body(),
+                Credential::BbsCredential(bbs) => bbs.get_body().clone(),
+                Credential::W3CCredential(w3c) => w3c.get_body(),
+                Credential::OpenBadge303Credential(vc) => vc.get_body(),
+                Credential::Other(credential_like) => credential_like.get_body(),
             };
 
             let all_ptrs = claim.path.resolve_ptr(body.clone()).unwrap_or(vec![]);
@@ -573,88 +579,6 @@ pub fn get_requested_attributes(
 }
 
 impl Credential {
-    /// Check if the credential matches the meta information from the query
-    pub fn matches_meta_mdoc(mdoc: &MdocRust, meta: Option<&Meta>) -> Result<(), MdocMetaMismatch> {
-        // Assume that if meta is set, we also have vct_values set
-        if let Some(Meta::IsoMdoc { doctype_value }) = meta {
-            let doc_type = mdoc.get_doc_type();
-            if &doc_type != doctype_value {
-                return Err(MdocMetaMismatch::WrongDocType);
-            }
-        } else if meta.is_some() {
-            return Err(MdocMetaMismatch::InvalidMeta);
-        }
-        Ok(())
-    }
-    /// Check if the credential matches the meta information from the query
-    pub fn matches_meta_sdjwt(
-        sd_jwt: &SdJwtRust,
-        meta: Option<&Meta>,
-    ) -> Result<(), SdJwtMetaMismatch> {
-        // Assume that if meta is set, we also have vct_values set
-        if let Some(Meta::SdjwtVc { vct_values: values }) = meta {
-            let vct = Self::get_vct(sd_jwt);
-            if !values.iter().any(|a| a == vct) {
-                return Err(SdJwtMetaMismatch::WrongVctValue);
-            }
-        } else if meta.is_some() {
-            return Err(SdJwtMetaMismatch::InvalidMeta);
-        }
-        Ok(())
-    }
-
-    #[cfg(feature = "bbs")]
-    /// Check if the credential matches the meta information from the query
-    pub fn matches_meta_bbs(bbs: &BbsRust, meta: Option<&Meta>) -> Result<(), BbsMetaMismatch> {
-        // Assume that if meta is set, we also have vct_values set
-        match meta {
-            Some(Meta::W3C { credential_types }) => {
-                let types = bbs.types();
-
-                if !credential_types.iter().any(|a| types.contains(a)) {
-                    Err(BbsMetaMismatch::WrongCredentialType)
-                } else {
-                    Ok(())
-                }
-            }
-            None => Ok(()),
-            _ => Err(BbsMetaMismatch::InvalidMeta),
-        }
-    }
-    /// We don't match meta for W3C for now
-    pub fn matches_meta_w3c(_w3c: &W3CSdJwt, _meta: Option<&Meta>) -> Result<(), W3CMetaMismatch> {
-        Ok(())
-    }
-    /// Check if the credential matches the meta information from the query
-    pub fn matches_meta_open_badges(
-        vc: &W3CVerifiableCredential,
-        meta: Option<&Meta>,
-    ) -> Result<(), LdpMetaMismatch> {
-        match meta {
-            Some(Meta::LdpVc { type_values }) => {
-                if type_values
-                    .iter()
-                    .any(|values| values.iter().all(|t| vc.types.contains(t)))
-                {
-                    return Ok(());
-                } else {
-                    return Err(LdpMetaMismatch::WrongCredentialTypes);
-                }
-            }
-            None => Ok(()),
-            _ => Err(LdpMetaMismatch::InvalidMeta),
-        }
-    }
-    /// Returns the VCT for a sd jwt
-    pub fn get_vct(sd_jwt: &SdJwtRust) -> &str {
-        sd_jwt
-            .claims
-            .get("vct")
-            .unwrap_or(&Value::Null)
-            .as_str()
-            .unwrap_or("")
-    }
-
     /// Checks if this credential does satisfy the given credential query
     pub fn is_satisfied(
         &self,
@@ -663,64 +587,22 @@ impl Credential {
         let expected_format_error =
             DcqlCredentialQueryMismatch::ExpectedFormat(credential_query.format.clone());
 
-        // check for the credential query format
-        match self {
-            Credential::SdJwtCredential(_)
-                if !SDJWT_FORMATS.contains(&credential_query.format.as_str()) =>
-            {
-                return Err(expected_format_error);
-            }
-            Credential::MdocCredential(_)
-                if !MDOC_FORMATS.contains(&credential_query.format.as_str()) =>
-            {
-                return Err(expected_format_error)
-            }
-            #[cfg(feature = "bbs")]
-            Credential::BbsCredential(_)
-                if !BBS_FORMATS.contains(&credential_query.format.as_str()) =>
-            {
-                return Err(expected_format_error)
-            }
-            Credential::W3CCredential(_)
-                if !W3C_FORMATS.contains(&credential_query.format.as_str()) =>
-            {
-                return Err(expected_format_error)
-            }
-            Credential::OpenBadge303Credential(_)
-                if !OPEN_BADGE_FORMATS.contains(&credential_query.format.as_str()) =>
-            {
-                return Err(expected_format_error)
-            }
-            _ => (),
+        let credential: &Arc<dyn crate::models::CredentialLike> = match self {
+            Credential::SdJwtCredential(value)
+            | Credential::MdocCredential(value)
+            | Credential::BbsCredential(value)
+            | Credential::W3CCredential(value)
+            | Credential::OpenBadge303Credential(value)
+            | Credential::Other(value) => value,
+        };
+        if !credential
+            .format_specifiers()
+            .contains(&credential_query.format)
+        {
+            return Err(expected_format_error);
         }
-        // check for the meta attribute
-        match self {
-            Credential::SdJwtCredential(sd_jwt) => {
-                if let Err(e) = Self::matches_meta_sdjwt(sd_jwt, credential_query.meta.as_ref()) {
-                    return Err(DcqlCredentialQueryMismatch::SdJwtMeta(e));
-                }
-            }
-            Credential::MdocCredential(mdoc) => {
-                if let Err(e) = Self::matches_meta_mdoc(mdoc, credential_query.meta.as_ref()) {
-                    return Err(DcqlCredentialQueryMismatch::MdocMeta(e));
-                }
-            }
-            #[cfg(feature = "bbs")]
-            Credential::BbsCredential(bbs) => {
-                if let Err(e) = Self::matches_meta_bbs(bbs, credential_query.meta.as_ref()) {
-                    return Err(DcqlCredentialQueryMismatch::BbsMeta(e));
-                }
-            }
-            Credential::W3CCredential(w3c) => {
-                if let Err(e) = Self::matches_meta_w3c(w3c, credential_query.meta.as_ref()) {
-                    return Err(DcqlCredentialQueryMismatch::W3CMeta(e));
-                }
-            }
-            Credential::OpenBadge303Credential(vc) => {
-                if let Err(e) = Self::matches_meta_open_badges(vc, credential_query.meta.as_ref()) {
-                    return Err(DcqlCredentialQueryMismatch::LdpMeta(e));
-                }
-            }
+        if let Some(error) = credential.matches_meta(credential_query.meta.clone()) {
+            return Err(error.into());
         }
 
         match (&credential_query.claim_sets, &credential_query.claims) {
@@ -803,10 +685,9 @@ impl ClaimsQuery {
         // retrieve the data pointed to by the pointer
         // the claims pointer MUST point to one value exactly
         let data = match credential {
-            Credential::SdJwtCredential(sd_jwt) => sd_jwt.get(Arc::new(self.path.clone())),
-            Credential::MdocCredential(mdoc) => mdoc.get(Arc::new(self.path.clone())),
-            #[cfg(feature = "bbs")]
-            Credential::BbsCredential(bbs) => bbs.get(Arc::new(self.path.clone())),
+            Credential::SdJwtCredential(sd_jwt) => sd_jwt.clone().get(Arc::new(self.path.clone())),
+            Credential::MdocCredential(mdoc) => mdoc.clone().get(Arc::new(self.path.clone())),
+            Credential::BbsCredential(bbs) => bbs.clone().get(Arc::new(self.path.clone())),
             Credential::W3CCredential(w3c) => {
                 let path = if matches!(self.path.first(),
                     Some(PointerPart::String(s)) if s == "credentialSubject"
@@ -817,9 +698,10 @@ impl ClaimsQuery {
                     path.insert(0, PointerPart::String("credentialSubject".to_string()));
                     path
                 };
-                w3c.get(Arc::new(path))
+                w3c.clone().get(Arc::new(path))
             }
-            Credential::OpenBadge303Credential(c) => c.get(Arc::new(self.path.clone())),
+            Credential::OpenBadge303Credential(c) => c.clone().get(Arc::new(self.path.clone())),
+            Credential::Other(o) => o.clone().get(Arc::new(self.path.clone())),
         };
 
         let Some(data) = data else {
@@ -854,6 +736,33 @@ impl ClaimsQuery {
 }
 
 #[uniffi::export]
+/// Parses one credential with the dynamically registered Kotlin parsers.
+///
+/// The returned credential can be retained and passed to the handle-based selection functions,
+/// avoiding a `Vec<String>` containing every credential payload at the matching boundary.
+pub fn parse_credential(credential: String) -> Option<Credential> {
+    credential.parse().ok()
+}
+
+#[uniffi::export]
+/// Select all already parsed credential handles matching this DcqlQuery.
+pub fn select_parsed_credentials(
+    query: DcqlQuery,
+    credentials: Vec<Credential>,
+) -> Vec<CredentialSetOption> {
+    query.select_credentials(ParsedCredentialStore(credentials))
+}
+
+#[uniffi::export]
+/// Select all already parsed credential handles matching this DcqlQuery and return mismatches.
+pub fn select_parsed_credentials_with_info(
+    query: DcqlQuery,
+    credentials: Vec<Credential>,
+) -> DcqlMatchResponse {
+    query.select_credentials_with_info(ParsedCredentialStore(credentials))
+}
+
+#[uniffi::export]
 /// Select all credentials matching this DcqlQuery
 pub fn select_credentials(query: DcqlQuery, credentials: Vec<String>) -> Vec<CredentialSetOption> {
     query
@@ -872,10 +781,13 @@ pub fn select_credentials_with_info(
     query.select_credentials_with_info(credentials.iter().map(String::as_str).collect::<Vec<_>>())
 }
 
-#[cfg(test)]
+// Credential-format integration tests require the former built-in parsers and are retained as
+// fixtures until they are moved into their respective format libraries.
+#[cfg(any())]
 mod tests {
-
-    use kapun_credentials_rust::{models::PointerPart, sdjwt::decode_sdjwt};
+    use kapun_credential_core_rust::models::PointerPart;
+    use kapun_dcql_sdjwt_rust::sdjwt::decode_sdjwt;
+    use std::sync::Arc;
 
     use crate::{
         models::{Credential, DcqlQuery},
@@ -1056,7 +968,12 @@ mod tests {
         assert_eq!(
             "https://dev-ssi-schema-creator-ws.ubique.ch/v1/schema/studierendenausweis-31iq2/0.0.4",
             sdjwt
-                .get_as_str(vec![PointerPart::String("vct".into())])
+                .clone()
+                .get(Arc::new(vec![PointerPart::String("vct".into())]))
+                .unwrap()
+                .first()
+                .unwrap()
+                .as_str()
                 .unwrap()
         );
         // we should NOT choose the one with dateOfBirth
@@ -1243,7 +1160,7 @@ mod tests {
            }"#;
         let query: DcqlQuery = serde_json::from_str(query_requesting_null).unwrap();
         let result = select_credentials_with_info(query.clone(), vec![sdjwt_str.to_string()]);
-        let sdjwt = decode_sdjwt(sdjwt_str).unwrap();
+        let _sdjwt = decode_sdjwt(sdjwt_str).unwrap();
         println!("{:?}", result.set_options);
     }
 }

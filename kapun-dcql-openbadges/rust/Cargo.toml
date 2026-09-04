@@ -1,0 +1,28 @@
+[package]
+name = "kapun-dcql-openbadges-rust"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib", "staticlib", "lib"]
+name = "kapun_dcql_openbadges_rust"
+
+[dependencies]
+uniffi = { workspace = true, optional = true }
+serde.workspace = true
+serde_json.workspace = true
+png = "0.18.0"
+kapun-util-rust = { path = "../../kapun-util/rust" }
+kapun-crypto-rust = { path = "../../kapun-crypto/rust" }
+kapun-dcql-w3c-rust = { path = "../../kapun-dcql-w3c/rust" }
+
+[target.'cfg(any(target_os = "linux", target_os = "android"))'.dependencies]
+openssl-sys = { version = "0.9.117", features = ["vendored"] }
+
+[dev-dependencies]
+multibase.workspace = true
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+
+[features]
+default = ["uniffi"]
+uniffi = ["dep:uniffi", "kapun-dcql-w3c-rust/uniffi"]

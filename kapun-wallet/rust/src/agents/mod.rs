@@ -25,9 +25,12 @@ under the License.
 
 use crate::log_error;
 
-use heidi_jwt::jwt::{
-    Jwt,
-    verifier::{ClaimValidator, DefaultVerifier},
+use heidi_jwt::{
+    alg::JosekitCryptoProvider,
+    jwt::{
+        Jwt,
+        verifier::{ClaimValidator, DefaultVerifier},
+    },
 };
 
 use std::{collections::VecDeque, fmt::Debug, str::FromStr};
@@ -199,7 +202,7 @@ impl AgentInfo {
 
         // check the integrity of the certificate chain
 
-        if !kapun_x509::x509::verify_chain(chain.clone()) {
+        if !kapun_x509::x509::verify_chain::<JosekitCryptoProvider>(chain.clone()) {
             log_error!("AgentInfo::Parsing", "X5C integrity check failed");
             return decode_jwt_insecure(&jwt).await;
         };

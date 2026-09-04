@@ -20,6 +20,12 @@ under the License.
 
 pub mod jwt;
 
+#[doc(hidden)]
+#[inline(never)]
+pub fn uniffi_link_anchor() -> u8 {
+    3
+}
+
 #[cfg(target_arch = "arm")]
 #[used]
 static _KEEP_EH_FRAME_STUBS: [unsafe extern "C" fn(); 2] = [

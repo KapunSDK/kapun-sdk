@@ -23,12 +23,17 @@ pub fn hello_from_kapun_presentation_rust() {
     println!("Hello, world from Kapun Presentation Rust!");
 }
 
-#[cfg(target_arch = "arm")]
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn __deregister_frame() {}
+#[doc(hidden)]
+#[inline(never)]
+pub fn uniffi_link_anchor() -> u8 {
+    4
+}
 
 #[cfg(target_arch = "arm")]
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn __register_frame() {}
+#[used]
+static _KEEP_EH_FRAME_STUBS: [unsafe extern "C" fn(); 2] = [
+    kapun_util_rust::__register_frame,
+    kapun_util_rust::__deregister_frame,
+];
 
 uniffi::setup_scaffolding!();

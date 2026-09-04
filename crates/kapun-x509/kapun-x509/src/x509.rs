@@ -1,3 +1,4 @@
+use kapun_crypto_provider::KapunCryptoProvider;
 use whitespace_sifter::WhitespaceSifter;
 use x509_parser::{
     parse_x509_certificate,
@@ -24,14 +25,14 @@ pub fn select_root<T: AsRef<[u8]>>(cert: T, root_store: &Vec<Vec<u8>>) -> Option
     None
 }
 
-pub fn complete_simple_chain(
+pub fn complete_simple_chain<Provider: KapunCryptoProvider>(
     chain: &mut Vec<Vec<u8>>,
     trust_store: &Vec<Vec<u8>>,
 ) -> Result<(), X509Error> {
     let Some(last_element) = chain.last() else {
         return Err(X509Error::EmptyChain);
     };
-    if is_valid_ca(last_element) {
+    if is_valid_ca::<_, Provider>(last_element) {
         return Ok(());
     }
     let Some(root) = select_root(last_element.as_slice(), &trust_store) else {
@@ -43,16 +44,20 @@ pub fn complete_simple_chain(
 
 /// This function checks integrity of a self signed certificate used to sign
 /// user signatures. If Basic Constraint is available it MUST be false
-pub fn is_self_signed_user_cert<T: AsRef<[u8]>>(cert: T) -> bool {
-    check_self_signed(cert, false, false)
+pub fn is_self_signed_user_cert<T: AsRef<[u8]>, Provider: KapunCryptoProvider>(cert: T) -> bool {
+    check_self_signed::<_, Provider>(cert, false, false)
 }
 /// This function checks, if the provided certificate is a valid CA (BasicConstrain cA = true).
 /// A CA MUST have the Basic Constraint extension!
-pub fn is_valid_ca<T: AsRef<[u8]>>(cert: T) -> bool {
-    check_self_signed(cert, true, true)
+pub fn is_valid_ca<T: AsRef<[u8]>, Provider: KapunCryptoProvider>(cert: T) -> bool {
+    check_self_signed::<_, Provider>(cert, true, true)
 }
 
-fn check_self_signed<T: AsRef<[u8]>>(cert: T, ca: bool, critical: bool) -> bool {
+fn check_self_signed<T: AsRef<[u8]>, Provider: KapunCryptoProvider>(
+    cert: T,
+    ca: bool,
+    critical: bool,
+) -> bool {
     let Ok((_, issuer_cert)) = x509_parser::parse_x509_certificate(cert.as_ref()) else {
         return false;
     };
@@ -61,7 +66,10 @@ fn check_self_signed<T: AsRef<[u8]>>(cert: T, ca: bool, critical: bool) -> bool 
     let x509_extensions_validity =
         X509ExtensionsValidator.validate(&issuer_cert.extensions(), &mut logger);
     if !(structure_validity && x509_extensions_validity) {
+        tracing::error!("structure_validity: {structure_validity}");
+        tracing::error!("x509_extensions_validity: {x509_extensions_validity}");
         tracing::error!("subject cert has invalid structure");
+        tracing::error!("{:?}", logger);
         return false;
     }
     if !is_key_usage_correct(&issuer_cert) {
@@ -69,7 +77,7 @@ fn check_self_signed<T: AsRef<[u8]>>(cert: T, ca: bool, critical: bool) -> bool 
         return false;
     }
 
-    let is_valid = verify_signature(&issuer_cert, &issuer_cert).is_ok();
+    let is_valid = verify_signature::<Provider>(&issuer_cert, &issuer_cert).is_ok();
     if !is_valid {
         tracing::error!("signature invalid");
         return false;
@@ -89,7 +97,7 @@ fn check_self_signed<T: AsRef<[u8]>>(cert: T, ca: bool, critical: bool) -> bool 
     }
 }
 
-pub fn verify_chain_at(
+pub fn verify_chain_at<Provider: KapunCryptoProvider>(
     certs: Vec<Vec<u8>>,
     time: ASN1Time,
     #[cfg(feature = "crl")] check_crl: bool,
@@ -108,7 +116,7 @@ pub fn verify_chain_at(
     // check that the last certificate is self signed and valid
     match certs.last() {
         Some(last_cert) => {
-            if !is_valid_ca(last_cert) {
+            if !is_valid_ca::<_, Provider>(last_cert) {
                 tracing::error!("trust anchor MUST be valid");
                 return false;
             }
@@ -155,13 +163,17 @@ pub fn verify_chain_at(
                 }
             }
 
-            let is_valid = verify_signature(&issuer_cert, &subject_cert).is_ok();
+            let is_valid = verify_signature::<Provider>(&issuer_cert, &subject_cert).is_ok();
             if !is_valid {
                 tracing::error!("signature invalid");
                 return false;
             }
             if !are_x509_name_equal(&subject_cert.issuer, &issuer_cert.subject) {
-                tracing::error!("issuer name and subject name missmatch");
+                tracing::error!(
+                    "issuer name and subject name missmatch {}/{}",
+                    &subject_cert.issuer.to_string(),
+                    &issuer_cert.subject.to_string()
+                );
                 return false;
             }
 
@@ -201,8 +213,8 @@ pub fn verify_chain_at(
     true
 }
 
-pub fn verify_chain(certs: Vec<Vec<u8>>) -> bool {
-    verify_chain_at(
+pub fn verify_chain<Provider: KapunCryptoProvider>(certs: Vec<Vec<u8>>) -> bool {
+    verify_chain_at::<Provider>(
         certs,
         ASN1Time::now(),
         #[cfg(feature = "crl")]
@@ -385,6 +397,7 @@ mod tests {
 
     use flate2::read::GzDecoder;
 
+    use josekit::jws::alg::JosekitCryptoProvider;
     use x509_parser::x509::{AttributeTypeAndValue, RelativeDistinguishedName, X509Name};
     use x509_parser::{
         der_parser::asn1_rs::{Any, Tag},
@@ -479,7 +492,8 @@ mod tests {
                 .map(|a| a.1.clone())
                 .collect::<Vec<_>>();
             certs.reverse();
-            let result = verify_chain(certs);
+
+            let result = verify_chain::<JosekitCryptoProvider>(certs);
             let matches = if let Some(expected) = truth_table.get(&test.as_str()) {
                 total += 1;
                 if expected == &result {
@@ -571,11 +585,11 @@ mod tests {
             .map(|a| a.contents().to_vec())
             .collect::<Vec<_>>();
         chain.reverse();
-        assert!(verify_chain_at(
+        assert!(verify_chain_at::<JosekitCryptoProvider>(
             chain,
             ASN1Time::from_timestamp(1776845275).unwrap(),
             true,
-            true,
+            true
         ));
         let pems = pem::parse_many(include_str!("../test-chains/schweizmobil.ch")).unwrap();
         let mut chain = pems
@@ -583,7 +597,7 @@ mod tests {
             .map(|a| a.contents().to_vec())
             .collect::<Vec<_>>();
         chain.reverse();
-        assert!(verify_chain_at(
+        assert!(verify_chain_at::<JosekitCryptoProvider>(
             chain,
             ASN1Time::from_timestamp(1776845275).unwrap(),
             true,
@@ -599,6 +613,6 @@ mod tests {
             .try_init();
         let pem = pem::parse(include_str!("../test-chains/mldsa-cert.crt")).unwrap();
 
-        assert!(is_valid_ca(pem.contents()));
+        assert!(is_valid_ca::<_, JosekitCryptoProvider>(pem.contents()));
     }
 }

@@ -19,16 +19,14 @@ under the License.
  */
 
 use crate::crypto::base64_url_encode;
-#[cfg(feature = "cert-builder")]
-use crate::crypto::SignatureCreator;
-use base64::prelude::BASE64_URL_SAFE_NO_PAD;
 use base64::Engine;
+use base64::prelude::BASE64_URL_SAFE_NO_PAD;
+use josekit::jws::alg::JosekitCryptoProvider;
+use josekit::kapun_crypto_provider::{KapunCryptoProvider, Signer, Verifier};
 use kapun_x509::{der_parser::oid, x509_parser};
-use oid_registry::{OidEntry, OidRegistry, OID_KEY_TYPE_EC_PUBLIC_KEY};
-use p256::pkcs8::DecodePublicKey;
+use oid_registry::{OID_KEY_TYPE_EC_PUBLIC_KEY, OidEntry, OidRegistry};
 use p256::NistP256;
-#[cfg(feature = "cert-builder")]
-use std::sync::Arc;
+use p256::pkcs8::DecodePublicKey;
 
 #[derive(uniffi::Record, Clone, Debug)]
 pub struct X509Certificate {
@@ -69,70 +67,40 @@ pub struct SubjectIdentifier {
 }
 
 #[uniffi::export]
-#[cfg(feature = "cert-builder")]
-/// Create certificate signed by signing key
-/// currently we only support p256 keys
 pub fn create_cert(
     certificate_data: CertificateData,
-    pubkey: X509PublicKey,
-    signer: Arc<dyn SignatureCreator>,
+    pubkey: Vec<u8>,
+    signing_key: Vec<u8>,
 ) -> Option<Vec<u8>> {
-    use crate::crypto::base64_url_decode;
-    use p256::pkcs8::der::Encode;
-    use p256::pkcs8::EncodePublicKey;
-    use simple_x509::X509Builder;
+    let v: Box<dyn Verifier> =
+        <JosekitCryptoProvider as KapunCryptoProvider>::verifier(pubkey).ok()?;
+    let s: Box<dyn Signer> =
+        <JosekitCryptoProvider as KapunCryptoProvider>::signer(signing_key).ok()?;
+    let mut issuer = "".to_string();
+    issuer.push_str("CN=");
+    issuer.push_str(&certificate_data.issuer.common_name);
+    if let Some(o) = certificate_data.issuer.organization {
+        issuer.push_str(",O=");
+        issuer.push_str(&o);
+    }
+    let mut subject = "".to_string();
+    subject.push_str("CN=");
+    subject.push_str(&certificate_data.subject.common_name);
+    if let Some(o) = certificate_data.subject.organization {
+        subject.push_str(",O=");
+        subject.push_str(&o);
+    }
 
-    let X509PublicKey::P256 { x, y } = pubkey else {
-        return None;
-    };
-    let mut public_key_bytes = vec![0x04];
-    public_key_bytes.extend(base64_url_decode(x));
-    public_key_bytes.extend(base64_url_decode(y));
-    let public_key = p256::PublicKey::from_sec1_bytes(&public_key_bytes).unwrap();
-    let der_bytes = public_key.to_public_key_der().unwrap().to_der().unwrap();
-    let serial: [u8; 32] = rand::random();
-    let mut builder = X509Builder::new(serial.to_vec()) /* SerialNumber */
-        .version(2);
-    let issuer = certificate_data.issuer;
-    let subject = certificate_data.subject;
-    builder = builder.issuer_utf8(vec![2, 5, 4, 3], &issuer.common_name);
-    if let Some(country) = &issuer.country {
-        builder = builder.issuer_prstr(vec![2, 5, 4, 6], &country); /* countryName */
-    }
-    if let Some(state) = &issuer.state {
-        builder = builder.issuer_utf8(vec![2, 5, 4, 8], state); /* stateOrProvinceName */
-    }
-    if let Some(organization) = &issuer.organization {
-        builder = builder.issuer_utf8(vec![2, 5, 4, 10], &organization); /* organizationName */
-    }
-    if let Some(country) = subject.country {
-        builder = builder.subject_prstr(vec![2, 5, 4, 6], &country); /* countryName */
-    }
-    if let Some(state) = &subject.state {
-        builder = builder.subject_utf8(vec![2, 5, 4, 8], state); /* stateOrProvinceName */
-    }
-    if let Some(organization) = &subject.organization {
-        builder = builder.subject_utf8(vec![2, 5, 4, 10], organization); /* organizationName */
-    }
-    if let Some(locality) = &subject.locality {
-        builder = builder.subject_utf8(vec![2, 5, 4, 7], locality);
-    }
-    builder = builder.subject_utf8(vec![2, 5, 4, 3], &subject.common_name); /* common name */
-    let cert = builder
-        .not_before_utc(certificate_data.not_before)
-        .not_after_utc(certificate_data.not_after)
-        .pub_key_der(&der_bytes)
-        .sign_oid(vec![1, 2, 840, 10045, 4, 3, 2]) /* sha256 with secp256r1  */
-        .build();
-    let cert = cert.sign(|d, _| signer.sign(d.to_vec()).ok(), &[]).unwrap();
-    cert.x509_enc().ok()
+    let cert =
+        kapun_x509::builder::new_cert(v.as_ref(), s.as_ref(), &subject, Some(&issuer), None, false);
+    Some(cert)
 }
 
 #[uniffi::export]
 pub fn extract_certs(buf: Vec<u8>) -> Vec<X509Certificate> {
     let mut oid_registry = OidRegistry::default().with_x509();
     let entry = OidEntry::new("organizationIdentifier", "organizationIdentifier");
-    oid_registry.insert(oid!(2.5.4 .97), entry);
+    oid_registry.insert(oid!(2.5.4.97), entry);
     let mut certificates = vec![];
     let mut remaining_buf = buf.as_slice();
     loop {
@@ -152,7 +120,7 @@ pub fn extract_certs(buf: Vec<u8>) -> Vec<X509Certificate> {
                 }
             }
         }
-        let aki = if let Ok(Some(extension)) = cert.get_extension_unique(&oid!(2.5.29 .35)) {
+        let aki = if let Ok(Some(extension)) = cert.get_extension_unique(&oid!(2.5.29.35)) {
             Some(BASE64_URL_SAFE_NO_PAD.encode(extension.value))
         } else {
             None
@@ -209,7 +177,7 @@ fn verify_chain(certs: Vec<X509Certificate>) -> bool {
         .into_iter()
         .map(|a| a.original_cert)
         .collect::<Vec<_>>();
-    kapun_x509::x509::verify_chain(chain)
+    kapun_x509::x509::verify_chain::<JosekitCryptoProvider>(chain)
 }
 
 #[cfg(test)]

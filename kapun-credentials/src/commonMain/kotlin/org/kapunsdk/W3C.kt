@@ -37,7 +37,11 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.encoding.decodeStructure
 import kotlinx.serialization.encoding.encodeStructure
-import uniffi.kapun_credentials_rust.*
+import uniffi.kapun_credential_core_rust.SignatureCreator
+import uniffi.kapun_credential_core_rust.*
+import uniffi.kapun_dcql_sdjwt_rust.*
+import uniffi.kapun_dcql_w3c_rust.*
+import uniffi.kapun_dcql_openbadges_rust.*
 import uniffi.kapun_crypto_rust.base64UrlEncode
 import uniffi.kapun_util_rust.Value
 
@@ -69,7 +73,7 @@ sealed class W3C {
             inner.json
 
         override fun presentation(): SdJwtBuilder =
-            SdJwtBuilder.fromW3c(inner)
+            sdjwtBuilderFromW3c(inner)
 
         override fun getOriginalNumClaims(): Int =
             inner.numDisclosures.toInt()

@@ -12,7 +12,7 @@ uniffi.workspace = true
 base64.workspace = true
 ciborium.workspace = true
 heidi-jwt.workspace = true
-josekit.workspace = true
+josekit = { features = ["kapun-provider"], workspace = true }
 rand.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -35,7 +35,7 @@ multibase = { workspace = true }
 unsigned-varint = "0.8.0"
 
 [features]
-default = ["uniffi"]
+default = ["uniffi", "cert-builder"]
 uniffi = []
 x448 = ["dep:x448"]
 cert-builder = ["simple_x509"]

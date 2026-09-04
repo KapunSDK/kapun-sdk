@@ -127,7 +127,7 @@ open class EaaIssuanceProcess(
             val identity = identityRepository.getById(identityEntity.id)!!
             val deferredCredential = deferredCredentialsRepository.getForTransactionId(transactionId)!!
             val subjects = deferredCredential.decodeMetadata()!!
-            val credentialIssuerMetadata : CredentialIssuerMetadata = json.decodeFromString(identity.issuer.credentialIssuerMetadata)
+            credentialIssuerMetadata  = json.decodeFromString(identity.issuer.credentialIssuerMetadata)
             trustFlowFromSaved(credentialIssuerMetadata.claims.credentialIssuer, json.decodeFromString(identity.credentialConfigurationIds!!), credentialIssuerMetadata)
 
             val oidcMetadata =

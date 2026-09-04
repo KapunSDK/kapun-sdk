@@ -9,3 +9,6 @@ name = "kapun_presentation_rust"
 
 [dependencies]
 uniffi.workspace = true
+
+[target.'cfg(target_arch = "arm")'.dependencies]
+kapun-util-rust = { path = "../../kapun-util/rust" }

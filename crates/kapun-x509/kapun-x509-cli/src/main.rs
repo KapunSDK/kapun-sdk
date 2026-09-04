@@ -2,7 +2,7 @@ use std::println;
 
 use base64::{Engine, prelude::BASE64_URL_SAFE_NO_PAD};
 use clap::{Parser, Subcommand, ValueEnum};
-use josekit::{Value, jwk::Jwk};
+use josekit::{Value, jwk::Jwk, jws::alg::JosekitCryptoProvider};
 use kapun_x509::x509_parser::{
     self,
     prelude::{X509Certificate, oid_registry},
@@ -181,7 +181,8 @@ fn main() {
                             }
                         }
 
-                        let res = kapun_x509::x509::verify_chain(certs_array);
+                        let res =
+                            kapun_x509::x509::verify_chain::<JosekitCryptoProvider>(certs_array);
                         println!();
                         println!();
                         println!("Certificate Chain valid: {}", res);
@@ -197,7 +198,8 @@ fn main() {
                             println!();
                         }
                         certs_array.reverse();
-                        let res = kapun_x509::x509::verify_chain(certs_array);
+                        let res =
+                            kapun_x509::x509::verify_chain::<JosekitCryptoProvider>(certs_array);
                         println!();
                         println!();
                         println!("Certificate Chain valid: {}", res);

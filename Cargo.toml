@@ -1,7 +1,12 @@
 [workspace]
 resolver = "3"
 members = [
-    "kapun-credentials/rust",
+    "kapun-credential-core/rust",
+    "kapun-dcql-bbs/rust",
+    "kapun-dcql-mdoc/rust",
+    "kapun-dcql-sdjwt/rust",
+    "kapun-dcql-w3c/rust",
+    "kapun-dcql-openbadges/rust",
     "kapun-crypto/rust",
     "kapun-dcql/rust",
     "kapun-issuance/rust",
@@ -14,6 +19,7 @@ members = [
     "crates/rdf-util",
     "crates/kapun-x509/kapun-x509",
     "crates/kapun-x509/kapun-x509-cli",
+    "crates/kapun-crypto-provider",
 ]
 [workspace.dependencies]
 serde_json = "1.0.149"
@@ -35,18 +41,19 @@ reqwest = { version = "0.11", default-features = false, features = [
     "json",
 ] }
 kapun-x509 = { path = "crates/kapun-x509/kapun-x509" }
-heidi-jwt = { git = "https://github.com/heidiverse/heidi-jwt", tag = "v0.2.0" }
+heidi-jwt = { git = "https://github.com/heidiverse/heidi-jwt",  branch = "feeature/kapun" }
 serde_with_macros = "3.16.1"
 jsonschema = { version = "0.17", default-features = false }
-openidconnect-federation = { git = "https://github.com/UbiqueInnovation/openidconnect-federation.git", branch = "main" }
+openidconnect-federation = { git = "https://github.com/UbiqueInnovation/openidconnect-federation.git", branch = "feature/kapun" }
 rand_core = { version = "0.6.4", features = ["getrandom"] }
 ark-serialize = "0.4.2"
 josekit = { git = "https://github.com/heidiverse/josekit-rs.git", default-features = false, features = [
     "rustcrypto",
-] }
+]}
+
 zkp-util = { path = "crates/zkp-util" }
 rdf-util = { path = "crates/rdf-util" }
-next-gen-signatures = { git = "https://github.com/heidiverse/zk-bridge-services.git", features = [
+next-gen-signatures = { git = "https://github.com/heidiverse/zk-bridge-services.git", default-features = false, features = [
     "zkp",
 ] }
 
@@ -74,3 +81,9 @@ debug = false
 [patch."https://github.com/zaverucha/signature-proof"]
 # patches signature-proof to not enable pasta curves
 halo2curves = { git = "https://github.com/heidiverse/signature-proof.git" }
+
+# next-gen-signatures comes from the same upstream workspace as these crates. Keep one copy of
+# their code and dependency graph in the final native library by using the local workspace crates.
+[patch."https://github.com/heidiverse/zk-bridge-services.git"]
+zkp-util = { path = "crates/zkp-util" }
+rdf-util = { path = "crates/rdf-util" }

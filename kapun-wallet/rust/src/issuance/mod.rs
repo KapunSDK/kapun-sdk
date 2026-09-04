@@ -35,7 +35,7 @@ pub use issuance::*;
 mod issuance {
     use anyhow::{Context, anyhow};
     use http::header::CONTENT_LENGTH;
-    use kapun_credentials_rust::w3c::parse_w3c_sd_jwt;
+    use kapun_dcql_w3c_rust::w3c::parse_w3c_sd_jwt;
     use kapun_util_rust::value::Value;
 
     use super::auth::{ClientAttestation, build_refresh_request};
@@ -842,11 +842,11 @@ mod issuance {
                         .collect()
                 } else if let Value::String(payload) = credential {
                     let credential_type =
-                        if kapun_credentials_rust::sdjwt::decode_sdjwt(&payload).is_ok() {
+                        if kapun_dcql_sdjwt_rust::sdjwt::decode_sdjwt(&payload).is_ok() {
                             CredentialType::SdJwt
-                        } else if kapun_credentials_rust::mdoc::decode_mdoc(&payload).is_ok() {
+                        } else if kapun_dcql_mdoc_rust::mdoc::decode_mdoc(&payload).is_ok() {
                             CredentialType::Mdoc
-                        } else if kapun_credentials_rust::bbs::decode_bbs(&payload).is_ok() {
+                        } else if kapun_dcql_bbs_rust::bbs::decode_bbs(&payload).is_ok() {
                             CredentialType::BbsTermWise
                         } else {
                             return Err(anyhow!("no credential type specified").into());
@@ -1898,6 +1898,13 @@ mod issuance {
             signer_factory: Arc<dyn SignerFactory>,
             is_for_pre_authorized_code: bool,
         ) -> Result<IssuedCredentials, ApiError> {
+            // DPoP support in metadata is optional; honor the scheme of the token actually issued.
+            let client = if tokens.token_type.eq_ignore_ascii_case("Bearer") {
+                Arc::new(self.client.clone())
+            } else {
+                client
+            };
+
             // get from scope
             let cred_config_ids = {
                 let cred_config_ids = self.chosen_cred_config_ids.lock()?;
@@ -2436,7 +2443,7 @@ mod issuance {
                 }
             }
         } else {
-            let sdjwt = kapun_credentials_rust::sdjwt::decode_sdjwt(payload);
+            let sdjwt = kapun_dcql_sdjwt_rust::sdjwt::decode_sdjwt(payload);
             let w3c = parse_w3c_sd_jwt(payload);
 
             match (sdjwt, w3c) {
@@ -2454,9 +2461,9 @@ mod issuance {
                 }
             };
 
-            return if kapun_credentials_rust::mdoc::decode_mdoc(&payload).is_ok() {
+            return if kapun_dcql_mdoc_rust::mdoc::decode_mdoc(&payload).is_ok() {
                 Some(CredentialType::Mdoc)
-            } else if kapun_credentials_rust::bbs::decode_bbs(&payload).is_ok() {
+            } else if kapun_dcql_bbs_rust::bbs::decode_bbs(&payload).is_ok() {
                 Some(CredentialType::BbsTermWise)
             } else {
                 log_debug!("ISSUANCE", &format!("invalid format: {:?}", format));

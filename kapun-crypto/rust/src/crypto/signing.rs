@@ -130,6 +130,13 @@ impl KeyPair {
             .map(|key_pair| key_pair.to_jwk_public_key().to_string())
             .unwrap_or_default()
     }
+    pub fn jwk_string_with_key_id(&self, key_id: &str) -> String {
+        let mut jwk: Value = serde_json::from_str(&self.jwk_string()).unwrap_or(Value::Null);
+        if let Some(jwk) = jwk.as_object_mut() {
+            jwk.insert("kid".to_string(), Value::String(key_id.to_string()));
+        }
+        serde_json::to_string(&jwk).unwrap_or_else(|_| self.jwk_string())
+    }
     pub fn private_jwk_string(&self) -> String {
         self.to_jose_key_pair()
             .map(|key_pair| key_pair.to_jwk_private_key().to_string())

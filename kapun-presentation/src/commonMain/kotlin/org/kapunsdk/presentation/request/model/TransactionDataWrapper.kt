@@ -27,7 +27,7 @@ import org.kapunsdk.util.extensions.get
 import org.kapunsdk.util.extensions.json
 import org.kapunsdk.util.log.Logger
 import kotlinx.serialization.Serializable
-import uniffi.kapun_credentials_rust.SpecVersion
+import uniffi.kapun_credential_core_rust.SpecVersion
 import uniffi.kapun_util_rust.Value
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi

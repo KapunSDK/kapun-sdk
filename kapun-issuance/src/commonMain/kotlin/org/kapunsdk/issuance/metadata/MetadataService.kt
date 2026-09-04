@@ -20,8 +20,8 @@ under the License.
 
 package org.kapunsdk.issuance.metadata
 
-import org.kapunsdk.issuance.metadata.data.AuthorizationServerMetadata
 import org.kapunsdk.issuance.metadata.data.CredentialIssuerMetadata
+import org.kapunsdk.issuance.metadata.data.AuthorizationServerMetadata
 import org.kapunsdk.issuance.metadata.data.CredentialIssuerMetadataClaims
 import org.kapunsdk.util.extensions.json
 import io.ktor.client.HttpClient
