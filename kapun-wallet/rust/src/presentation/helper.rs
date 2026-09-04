@@ -40,7 +40,8 @@ use crate::presentation::presentation_exchange::{
     AuthorizationRequest, ClientIdScheme, ClientMetadataResource, PresentationDefinition,
 };
 use crate::vc::PresentableCredential;
-use crate::{ApiError, log_debug, log_warn};
+use crate::ApiError;
+use kapun_util_rust::{log_debug, log_warn};
 
 /// Wrap AuthorizationRequest and AgentInfo into one struct
 pub(crate) struct ARWrapper(pub kapun_util_rust::value::Value, pub AgentInfo, pub String);

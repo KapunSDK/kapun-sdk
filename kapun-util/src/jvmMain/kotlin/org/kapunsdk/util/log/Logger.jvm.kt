@@ -20,24 +20,13 @@ under the License.
 
 package org.kapunsdk.util.log
 
-import org.kapunsdk.util.log.Logger
-
-actual fun Logger.d(msg: String) {
-    System.out.println("[DEBUG] $msg")
-}
-
-actual fun Logger.i(msg: String) {
-   System.out.println("[INFO] $msg")
-}
-
-actual fun Logger.w(msg: String) {
-    System.out.println("[WARN] $msg")
-}
-
-actual fun Logger.e(msg: String) {
-    System.out.println("[ERROR] $msg")
-}
-
-actual fun Logger.e(msg: String, throwable: Throwable) {
-    System.out.println("[ERROR] $msg, $throwable")
+actual fun platformConsoleLogSink(): LogSink = object : LogSink {
+	override fun log(severity: LogSeverity, tag: String, message: String, throwable: Throwable?) {
+		val prefix = "[$severity] [$tag]"
+		if (throwable != null) {
+			System.out.println("$prefix $message, $throwable")
+		} else {
+			System.out.println("$prefix $message")
+		}
+	}
 }

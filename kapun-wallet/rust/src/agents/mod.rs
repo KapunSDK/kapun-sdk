@@ -23,7 +23,7 @@ under the License.
 //! It also performs various validation based on the RFCs, whereas we try to be somewhat
 //! lenient
 
-use crate::log_error;
+use kapun_util_rust::log_error;
 
 use heidi_jwt::{
     alg::JosekitCryptoProvider,

@@ -15,28 +15,19 @@ software distributed under the License is distributed on an
 "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
-under the License.   
+under the License.
  */
 package org.kapunsdk.util.log
 
 import android.util.Log
 
-actual fun Logger.d(msg: String) {
-	Log.d(this.tag, msg)
-}
-
-actual fun Logger.i(msg: String) {
-	Log.i(this.tag, msg)
-}
-
-actual fun Logger.w(msg: String) {
-	Log.w(this.tag, msg)
-}
-
-actual fun Logger.e(msg: String) {
-	Log.e(this.tag, msg)
-}
-
-actual fun Logger.e(msg: String, throwable: Throwable) {
-	Log.e(this.tag, msg, throwable)
+actual fun platformConsoleLogSink(): LogSink = object : LogSink {
+	override fun log(severity: LogSeverity, tag: String, message: String, throwable: Throwable?) {
+		when (severity) {
+			LogSeverity.DEBUG -> Log.d(tag, message)
+			LogSeverity.INFO -> Log.i(tag, message)
+			LogSeverity.WARN -> Log.w(tag, message)
+			LogSeverity.ERROR -> if (throwable != null) Log.e(tag, message, throwable) else Log.e(tag, message)
+		}
+	}
 }

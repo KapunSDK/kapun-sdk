@@ -1,5 +1,6 @@
 [versions]
 accompanist = "0.37.3"
+buildconfig = "5.5.1"
 agp = "9.2.1"
 android-compileSdk = "37"
 android-minSdk = "28"
@@ -79,6 +80,7 @@ compose-material-icons = { module = "androidx.compose.material:material-icons-ex
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 android-kotlin-multiplatform-library = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }
+buildconfig = { id = "com.github.gmazzo.buildconfig", version.ref = "buildconfig" }
 compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 compose-multiplatform = { id = "org.jetbrains.compose", version.ref = "compose-multiplatform" }
 kotlin-atomicfu = { id = "org.jetbrains.kotlin.plugin.atomicfu", version.ref = "kotlin" }

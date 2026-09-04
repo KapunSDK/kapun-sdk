@@ -23,18 +23,23 @@ package org.kapunsdk.wallet
 import android.content.Context
 import org.kapunsdk.issuance.KapunIssuance
 import org.kapunsdk.trust.KapunTrust
+import org.kapunsdk.util.log.LogSink
+import org.kapunsdk.util.log.Logger
 import org.kapunsdk.visualization.KapunVisualization
 import org.kapunsdk.wallet.di.KapunWalletKoinContext
 import org.koin.android.ext.koin.androidContext
 
 actual class KapunSdk(private val context: Context) {
 
-	actual fun initialize() {
+	actual fun initialize(logSink: LogSink?) {
+		Logger.sink = logSink
+		bridgeAllRustLogSinks()
 		KapunTrust(context).initialize()
 		KapunIssuance(context).initialize()
 		KapunVisualization(context).initialize()
 		KapunWalletKoinContext.initialize {
 			androidContext(context)
 		}
+		logKapunSdkInitialized()
 	}
 }

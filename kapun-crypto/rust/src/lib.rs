@@ -29,6 +29,21 @@ pub mod jwx;
 pub mod jws;
 pub mod jwt;
 
+/// This crate compiles to its own native library, statically linking a private copy of
+/// `kapun_util_rust::log` - registering a sink via `kapun-util`'s own binding only reaches
+/// *that* library, not this one's `log_warn!`/`log_error!`/`log_debug!` call sites. This
+/// forwards to this crate's own linked-in copy of the same registration function, so a host app
+/// can reach it too. See `kapun-util/rust/src/log.rs` for the full explanation.
+#[cfg_attr(feature = "uniffi", uniffi::export)]
+pub fn register_log_sink(sink: std::sync::Arc<dyn kapun_util_rust::log::LogSink>) {
+    kapun_util_rust::log::register_log_sink(sink);
+}
+
+#[cfg_attr(feature = "uniffi", uniffi::export)]
+pub fn clear_log_sink() {
+    kapun_util_rust::log::clear_log_sink();
+}
+
 #[derive(Debug)]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Error))]
 pub enum SigningError {

@@ -22,6 +22,7 @@ package org.kapunsdk.sample.wallet
 import android.app.Application
 import org.kapunsdk.proximity.KapunProximity
 import org.kapunsdk.sample.wallet.di.viewModelsModule
+import org.kapunsdk.util.log.platformConsoleLogSink
 import org.kapunsdk.wallet.KapunSdk
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.context.startKoin
@@ -31,7 +32,10 @@ class WalletApplication : Application() {
 	override fun onCreate() {
 		super.onCreate()
 
-		KapunSdk(this).initialize()
+		// platformConsoleLogSink() restores the SDK's old unconditional console-logging
+		// behavior (Logcat here); a real host app would instead implement LogSink to forward
+		// into its own logging pipeline. Without any sink, the SDK logs nothing.
+		KapunSdk(this).initialize(logSink = platformConsoleLogSink())
 		KapunProximity(this).initialize()
 
 		startKoin {
