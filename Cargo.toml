@@ -53,7 +53,7 @@ josekit = { git = "https://github.com/heidiverse/josekit-rs.git", default-featur
 
 zkp-util = { path = "crates/zkp-util" }
 rdf-util = { path = "crates/rdf-util" }
-next-gen-signatures = { git = "https://github.com/heidiverse/zk-bridge-services.git", default-features = false, features = [
+next-gen-signatures = { git = "https://github.com/heidiverse/zk-bridge-services.git", rev = "cc4740c8dd8f30d8ee8bb8e32715a1af295e7941", default-features = false, features = [
     "zkp",
 ] }
 
@@ -82,8 +82,8 @@ debug = false
 # patches signature-proof to not enable pasta curves
 halo2curves = { git = "https://github.com/heidiverse/signature-proof.git" }
 
-# next-gen-signatures comes from the same upstream workspace as these crates. Keep one copy of
-# their code and dependency graph in the final native library by using the local workspace crates.
-[patch."https://github.com/heidiverse/zk-bridge-services.git"]
+# next-gen-signatures consumes these crates from this repository. Keep one copy of their code and
+# dependency graph in the final native library by using the local workspace crates.
+[patch."https://github.com/KapunSDK/kapun-sdk.git"]
 zkp-util = { path = "crates/zkp-util" }
 rdf-util = { path = "crates/rdf-util" }
