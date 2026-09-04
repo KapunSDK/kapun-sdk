@@ -36,9 +36,14 @@ impl Display for FederationError {
 
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct OidcfTrustChainInfo {
-    trust_anchor_keys: Vec<String>,      // JWKs
+    trust_anchor_keys: Vec<TrustAnchor>, // JWKs
     subordinate_statements: Vec<String>, // JWTs
     leaf: OidcfLeafInfo,
+}
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct TrustAnchor {
+    key: String,
+    sub: String,
 }
 
 #[derive(Debug, Clone, uniffi::Record)]
@@ -159,7 +164,10 @@ fn to_oidf_trust_chain_info(
                 .0
                 .keys()
                 .into_iter()
-                .map(|jwk| serde_json::to_string(&jwk.to_public_key().unwrap()).unwrap())
+                .map(|jwk| TrustAnchor {
+                    key: serde_json::to_string(&jwk.to_public_key().unwrap()).unwrap(),
+                    sub: ta.sub(),
+                })
                 .collect::<Vec<_>>();
             keys.into_iter()
         })

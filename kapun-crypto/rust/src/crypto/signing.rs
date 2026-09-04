@@ -18,12 +18,13 @@ specific language governing permissions and limitations
 under the License.
  */
 
-use crate::crypto::{base64_url_decode, SignatureCreator};
+use crate::crypto::{SignatureCreator, base64_url_decode};
 use josekit::jwk::alg::ec::{EcCurve, EcKeyPair};
 use josekit::jwk::{Jwk, KeyPair as JoseKeyPair};
-use p256::ecdsa::{signature::Signer, Signature, SigningKey, VerifyingKey};
+use p256::ecdsa::{Signature, SigningKey, VerifyingKey, signature::Signer};
 use p256::{ecdsa::signature::Verifier, elliptic_curve::sec1::ToEncodedPoint};
 use rand::rngs::OsRng;
+use serde_json::Value as JsonValue;
 use std::sync::Arc;
 
 pub enum KeyType {
@@ -131,9 +132,10 @@ impl KeyPair {
             .unwrap_or_default()
     }
     pub fn jwk_string_with_key_id(&self, key_id: &str) -> String {
-        let mut jwk: Value = serde_json::from_str(&self.jwk_string()).unwrap_or(Value::Null);
+        let mut jwk: JsonValue =
+            serde_json::from_str(&self.jwk_string()).unwrap_or(JsonValue::Null);
         if let Some(jwk) = jwk.as_object_mut() {
-            jwk.insert("kid".to_string(), Value::String(key_id.to_string()));
+            jwk.insert("kid".to_string(), JsonValue::String(key_id.to_string()));
         }
         serde_json::to_string(&jwk).unwrap_or_else(|_| self.jwk_string())
     }

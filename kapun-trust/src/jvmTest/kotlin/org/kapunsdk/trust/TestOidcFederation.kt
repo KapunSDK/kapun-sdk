@@ -5,7 +5,7 @@ import org.kapunsdk.issuance.metadata.data.CredentialIssuerMetadata
 import org.kapunsdk.issuance.metadata.data.CredentialIssuerMetadataClaims
 import org.kapunsdk.presentation.request.PresentationRequest
 import org.kapunsdk.trust.framework.oidcfederation.OidcFederationTrustFramerwork
-import org.kapunsdk.trust.framework.oidcfederation.StaticJWKTrustAnchorProvider
+import org.kapunsdk.trust.framework.oidcfederation.StaticOidfTrustAnchorProvider
 import org.kapunsdk.trust.model.AgentInformation
 import org.kapunsdk.trust.model.AgentType
 import kotlin.test.Ignore
@@ -53,7 +53,7 @@ class TestOidcFederation {
     @Test
     fun `ZVV not trusted`() = runTest {
 		val framework = OidcFederationTrustFramerwork(
-			jwkTrustAnchorProvider = StaticJWKTrustAnchorProvider(trustAnchors = listOf())
+			oidfTrustAnchorProvider = StaticOidfTrustAnchorProvider(trustAnchors = listOf())
 		);
 		val agentInfo = getIssuerInformationZVV(framework);
 		assertNotNull(agentInfo)
