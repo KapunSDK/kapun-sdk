@@ -24,7 +24,6 @@ import org.kapunsdk.issuance.KapunIssuance
 import org.kapunsdk.trust.KapunTrust
 import org.kapunsdk.util.log.LogSink
 import org.kapunsdk.util.log.Logger
-import org.kapunsdk.util.log.bridgeRustLogsToKotlin
 import org.kapunsdk.visualization.KapunVisualization
 import org.kapunsdk.wallet.crypto.factories.HardwareSignerFactory
 import org.kapunsdk.wallet.di.KapunWalletKoinContext
@@ -36,7 +35,7 @@ actual class KapunSdk(
 
 	actual fun initialize(logSink: LogSink?) {
 		Logger.sink = logSink
-		bridgeRustLogsToKotlin()
+		bridgeAllRustLogSinks()
 		KapunTrust().initialize()
 		KapunIssuance().initialize()
 		KapunVisualization().initialize()

@@ -22,12 +22,11 @@ package org.kapunsdk.wallet
 
 import org.kapunsdk.util.log.LogSink
 import org.kapunsdk.util.log.Logger
-import org.kapunsdk.util.log.bridgeRustLogsToKotlin
 
 actual class KapunSdk {
 	actual fun initialize(logSink: LogSink?) {
 		Logger.sink = logSink
-		bridgeRustLogsToKotlin()
+		bridgeAllRustLogSinks()
 		logKapunSdkInitialized()
 	}
 

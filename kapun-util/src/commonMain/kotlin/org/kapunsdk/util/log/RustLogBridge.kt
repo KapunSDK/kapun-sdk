@@ -29,8 +29,13 @@ import uniffi.kapun_util_rust.registerLogSink as registerRustLogSink
  * Forwards log calls made from Rust (the `log_debug!`/`log_warn!`/`log_error!` macros and
  * `kapun_util_rust::log::log`) into the Kotlin [Logger]'s sink, so a host app that registers a
  * single [LogSink] via [Logger.sink] receives both Kotlin- and Rust-originated SDK log output.
+ *
+ * Public because every Rust crate that has its own `registerLogSink`/`clearLogSink` (each one
+ * compiles to its own native library with its own statically-linked copy of this log module -
+ * see `kapun-util/rust/src/log.rs`) needs this same instance registered against it individually.
+ * `KapunSdk.initialize` is where all of those calls happen, from the `kapun-wallet` module.
  */
-private object RustToKotlinLogSink : RustLogSink {
+public object RustToKotlinLogSink : RustLogSink {
 	override fun log(priority: RustLogPriority, tag: String, message: String) {
 		val severity = when (priority) {
 			RustLogPriority.DEBUG, RustLogPriority.VERBOSE -> LogSeverity.DEBUG
