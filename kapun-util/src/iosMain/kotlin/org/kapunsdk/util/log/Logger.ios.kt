@@ -15,7 +15,7 @@ software distributed under the License is distributed on an
 "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
-under the License.   
+under the License.
  */
 @file:OptIn(ExperimentalForeignApi::class)
 
@@ -25,52 +25,25 @@ import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.ptr
 import platform.darwin.*
 
-actual fun Logger.d(msg: String) {
-	_os_log_internal(
-		__dso_handle.ptr,
-		OS_LOG_DEFAULT,
-		OS_LOG_TYPE_DEBUG,
-		"%{public}s",
-		msg
-	)
-}
-
-actual fun Logger.i(msg: String) {
-	_os_log_internal(
-		__dso_handle.ptr,
-		OS_LOG_DEFAULT,
-		OS_LOG_TYPE_INFO,
-		"%{public}s",
-		msg
-	)
-}
-
-actual fun Logger.w(msg: String) {
-	_os_log_internal(
-		__dso_handle.ptr,
-		OS_LOG_DEFAULT,
-		OS_LOG_TYPE_DEFAULT,
-		"%{public}s",
-		msg
-	)
-}
-
-actual fun Logger.e(msg: String) {
-	_os_log_internal(
-		__dso_handle.ptr,
-		OS_LOG_DEFAULT,
-		OS_LOG_TYPE_ERROR,
-		"%{public}s",
-		msg
-	)
-}
-
-actual fun Logger.e(msg: String, throwable: Throwable) {
-	_os_log_internal(
-		__dso_handle.ptr,
-		OS_LOG_DEFAULT,
-		OS_LOG_TYPE_ERROR,
-		"%{public}s",
-		"$msg / Exception: ${throwable.message ?: throwable::class.simpleName}"
-	)
+actual fun platformConsoleLogSink(): LogSink = object : LogSink {
+	override fun log(severity: LogSeverity, tag: String, message: String, throwable: Throwable?) {
+		val osLogType = when (severity) {
+			LogSeverity.DEBUG -> OS_LOG_TYPE_DEBUG
+			LogSeverity.INFO -> OS_LOG_TYPE_INFO
+			LogSeverity.WARN -> OS_LOG_TYPE_DEFAULT
+			LogSeverity.ERROR -> OS_LOG_TYPE_ERROR
+		}
+		val fullMessage = if (throwable != null) {
+			"$message / Exception: ${throwable.message ?: throwable::class.simpleName}"
+		} else {
+			message
+		}
+		_os_log_internal(
+			__dso_handle.ptr,
+			OS_LOG_DEFAULT,
+			osLogType,
+			"%{public}s",
+			fullMessage
+		)
+	}
 }

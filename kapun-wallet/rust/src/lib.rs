@@ -62,8 +62,6 @@ pub mod backup;
 pub mod frost;
 #[cfg(all(feature = "uniffi", feature = "reqwest", feature = "oid4vp"))]
 pub mod hsm;
-// #[cfg(all(feature = "uniffi", feature = "reqwest", feature = "oid4vp"))]
-pub mod log;
 
 #[cfg(all(feature = "reqwest", feature = "uniffi"))]
 lazy_static! {

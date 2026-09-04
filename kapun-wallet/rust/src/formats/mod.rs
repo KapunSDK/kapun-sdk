@@ -23,8 +23,9 @@ use crate::error::{GenericError, InnerError};
 use crate::formats::mdoc::{device_signature, helper};
 use crate::signing::NativeSigner;
 use crate::vc::VerifiableCredential;
-use crate::{ApiError, log::log};
+use crate::ApiError;
 use base64::Engine;
+use kapun_util_rust::log::{LogPriority, log};
 use mdoc::helper as mdoc_helper;
 use mdoc::helper::CBorHelper;
 use serde::{Deserialize, Serialize};
@@ -62,11 +63,11 @@ pub fn mdoc_as_json_representation(m: String) -> Option<String> {
         base64::prelude::BASE64_URL_SAFE_NO_PAD
     };
     let Ok(decoded) = decoder.decode(&m) else {
-        log(crate::log::LogPriority::ERROR, "MDOC", "invalid encoding");
+        log(LogPriority::ERROR, "MDOC", "invalid encoding");
         return None;
     };
     let Ok(deserialized) = mdoc_helper::deserialize(&decoded) else {
-        log(crate::log::LogPriority::ERROR, "MDOC", "no cbor?");
+        log(LogPriority::ERROR, "MDOC", "no cbor?");
         return None;
     };
     let Ok(namespaces) = deserialized.get("nameSpaces") else {
@@ -74,7 +75,7 @@ pub fn mdoc_as_json_representation(m: String) -> Option<String> {
     };
     let Ok(mut json_map) = mdoc::namespaces_to_json_map(&namespaces, false) else {
         log(
-            crate::log::LogPriority::ERROR,
+            LogPriority::ERROR,
             "MDOC",
             "could not map namespaces",
         );
@@ -82,7 +83,7 @@ pub fn mdoc_as_json_representation(m: String) -> Option<String> {
     };
     let Ok(valid_until) = mdoc::get_valid_until(&deserialized) else {
         log(
-            crate::log::LogPriority::ERROR,
+            LogPriority::ERROR,
             "MDOC",
             "could not get valid until",
         );
@@ -110,7 +111,7 @@ pub fn get_mdoc_issuer_auth(credential: VerifiableCredential) -> Result<Vec<u8>,
     let decoded = match decoder.decode(&payload) {
         Ok(decoded) => decoded,
         Err(e) => {
-            log(crate::log::LogPriority::ERROR, "MDOC", "invalid encoding");
+            log(LogPriority::ERROR, "MDOC", "invalid encoding");
             return Err(ApiError::Generic(GenericError::Parse {
                 reason: "Failed to decode credential payload".to_string(),
                 error: InnerError::Anyhow(anyhow::anyhow!(e)),
@@ -120,7 +121,7 @@ pub fn get_mdoc_issuer_auth(credential: VerifiableCredential) -> Result<Vec<u8>,
     let deserialized = match mdoc_helper::deserialize(&decoded) {
         Ok(deserialized) => deserialized,
         Err(e) => {
-            log(crate::log::LogPriority::ERROR, "MDOC", "no cbor?");
+            log(LogPriority::ERROR, "MDOC", "no cbor?");
             return Err(ApiError::Generic(GenericError::Parse {
                 reason: "Failed to deserialize decoded credential".to_string(),
                 error: InnerError::Anyhow(anyhow::anyhow!(e)),
@@ -149,7 +150,7 @@ pub fn get_device_signature(
 mod test_mdoc_namespace {
     use base64::Engine;
 
-    use crate::log;
+    use kapun_util_rust::log::{self, LogPriority};
 
     use super::mdoc::{self, helper::CBorHelper};
 
@@ -162,11 +163,11 @@ mod test_mdoc_namespace {
             base64::prelude::BASE64_URL_SAFE_NO_PAD
         };
         let Ok(decoded) = decoder.decode(&m) else {
-            log::log(crate::log::LogPriority::ERROR, "MDOC", "invalid encoding");
+            log::log(LogPriority::ERROR, "MDOC", "invalid encoding");
             panic!()
         };
         let Ok(deserialized) = mdoc::helper::deserialize(&decoded) else {
-            log::log(crate::log::LogPriority::ERROR, "MDOC", "no cbor?");
+            log::log(LogPriority::ERROR, "MDOC", "no cbor?");
             panic!()
         };
         mdoc::namespaces_to_json_map(&deserialized.get("nameSpaces").unwrap(), true).unwrap();

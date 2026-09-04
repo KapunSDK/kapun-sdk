@@ -34,9 +34,10 @@ use crate::presentation::presentation_exchange::{
 };
 use crate::vc::VerifiableCredential;
 use crate::{
-    ApiError, formats, log_warn, signing::SecureSubject, util::generate_code_verifier,
+    ApiError, formats, signing::SecureSubject, util::generate_code_verifier,
     vc::PresentableCredential,
 };
+use kapun_util_rust::log_warn;
 
 use ciborium::cbor;
 #[cfg(feature = "reqwest")]

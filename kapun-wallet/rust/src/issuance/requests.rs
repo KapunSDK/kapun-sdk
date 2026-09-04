@@ -5,7 +5,7 @@ use std::{
 
 use anyhow::bail;
 use base64::{Engine, prelude::BASE64_URL_SAFE_NO_PAD};
-use kapun_util_rust::{log_warn, value::Value};
+use kapun_util_rust::{log_debug, log_warn, value::Value};
 use reqwest::Url;
 use reqwest_middleware::ClientWithMiddleware;
 
@@ -18,7 +18,6 @@ use crate::{
         ErrorAsCredentialErrorResponse, ErrorForStatusDetailed, KeyProofType, KeyProofsType,
         ProofType, TokenRequest, TokenResponse,
     },
-    log_debug,
     signing::SecureSubject,
 };
 

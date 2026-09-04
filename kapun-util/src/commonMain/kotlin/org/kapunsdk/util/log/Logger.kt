@@ -23,6 +23,15 @@ class Logger(val tag: String) {
 
 	companion object {
 		private const val DEFAULT_TAG = "Heidi"
+
+		/**
+		 * When null (the default), SDK log calls produce no output at all. Set this once, at
+		 * startup - typically via `KapunSdk.initialize(logSink = ...)` - to receive them through
+		 * your own logging pipeline instead. See [platformConsoleLogSink] to opt back into this
+		 * SDK's previous unconditional console-logging behavior.
+		 */
+		var sink: LogSink? = null
+
 		fun debug(msg: String) = Logger(DEFAULT_TAG).debug(msg)
 		fun info(msg: String) = Logger(DEFAULT_TAG).info(msg)
 		fun warn(msg: String) = Logger(DEFAULT_TAG).warn(msg)
@@ -30,19 +39,13 @@ class Logger(val tag: String) {
 		fun error(msg: String, throwable: Throwable) = Logger(DEFAULT_TAG).error(msg, throwable)
 	}
 
-	fun debug(msg: String) = this.d(msg)
-	fun info(msg: String) = this.i(msg)
-	fun warn(msg: String) = this.w(msg)
-	fun error(msg: String) = this.e(msg)
-	fun error(msg: String, throwable: Throwable) = this.e(msg, throwable)
+	fun debug(msg: String) = log(LogSeverity.DEBUG, msg)
+	fun info(msg: String) = log(LogSeverity.INFO, msg)
+	fun warn(msg: String) = log(LogSeverity.WARN, msg)
+	fun error(msg: String) = log(LogSeverity.ERROR, msg)
+	fun error(msg: String, throwable: Throwable) = log(LogSeverity.ERROR, msg, throwable)
+
+	private fun log(severity: LogSeverity, msg: String, throwable: Throwable? = null) {
+		sink?.log(severity, tag, msg, throwable)
+	}
 }
-
-expect fun Logger.d(msg: String)
-
-expect fun Logger.i(msg: String)
-
-expect fun Logger.w(msg: String)
-
-expect fun Logger.e(msg: String)
-
-expect fun Logger.e(msg: String, throwable: Throwable)

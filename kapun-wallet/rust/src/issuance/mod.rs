@@ -85,10 +85,10 @@ mod issuance {
         frost::FrostHsm,
         get_reqwest_client,
         hsm::Hsm,
-        log_debug, log_warn,
         signing::{BatchSigner, KeyType, NativeSigner, SignerFactory},
         uniffi_reqwest::HsmSupportObject,
     };
+    use kapun_util_rust::{log_debug, log_warn};
     use kapun_crypto_rust::jwx::EncryptionParameters;
 
     const RESPONSE_TYPE_CODE: &str = "code";
