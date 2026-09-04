@@ -47,7 +47,7 @@ actual class KapunSdk(
 				},
 			)
 		}
-		Logger("KapunSdk").info("KapunSdk initialized")
+		logKapunSdkInitialized()
 	}
 
 }

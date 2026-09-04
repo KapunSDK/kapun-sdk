@@ -11,6 +11,29 @@ plugins {
     alias(libs.plugins.skie)
     alias(libs.plugins.uniffi.plugin)
     alias(libs.plugins.vanniktech.publish)
+    alias(libs.plugins.buildconfig)
+}
+
+// KapunSdkInfo (version + short git commit) so a build always knows exactly which SDK build it
+// is - useful when comparing what a host app logs/displays against what was actually built.
+// The plugin regenerates on every build by default, so the commit hash stays accurate even
+// across builds with no other Kotlin/Rust changes.
+val gitCommit = runCatching {
+    val process = ProcessBuilder("git", "rev-parse", "--short", "HEAD")
+        .directory(rootDir)
+        .redirectErrorStream(true)
+        .start()
+    val output = process.inputStream.bufferedReader().readText().trim()
+    if (process.waitFor() == 0) output else null
+}.getOrNull() ?: "unknown"
+
+buildConfig {
+    className("KapunSdkInfo")
+    packageName("org.kapunsdk.wallet")
+    useKotlinOutput { internalVisibility = false }
+
+    buildConfigField("VERSION", project.version.toString())
+    buildConfigField("GIT_COMMIT", gitCommit)
 }
 
 kotlin {

@@ -41,6 +41,6 @@ actual class KapunSdk(private val context: Context) {
 		KapunWalletKoinContext.initialize {
 			androidContext(context)
 		}
-		Logger("KapunSdk").info("KapunSdk initialized")
+		logKapunSdkInitialized()
 	}
 }

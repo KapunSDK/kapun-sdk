@@ -95,3 +95,12 @@ pub fn log(priority: LogPriority, tag: &str, text: &str) {
         sink.log(priority, tag.to_string(), text.to_string());
     }
 }
+
+/// Logs one deterministic message through the `log_debug!` macro/[LogSink] path, independent of
+/// any SDK feature or error path actually firing. Call this once after registering a sink (e.g.
+/// right after `KapunSdk.initialize(logSink = ...)`) to confirm Rust-originated logs really do
+/// reach it, without needing to trigger a specific credential flow first.
+#[cfg_attr(feature = "uniffi", uniffi::export)]
+pub fn log_bridge_confirmation() {
+    log_debug!("KapunSdk", "Rust log bridge active");
+}
