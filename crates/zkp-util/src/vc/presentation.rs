@@ -509,27 +509,6 @@ pub fn present_native<R: RngCore>(
             NamedNode::new_unchecked(x_1_type),
         ));
 
-        let RdfValue::Typed(x_value, x_type) = db_map
-            .get(DEVICE_BINDING_KEY_X)
-            .context("device binding has no x_1 value")?
-        else {
-            anyhow::bail!("device binding invalid x_1 value")
-        };
-        let x_term = Term::Literal(Literal::new_typed_literal(
-            x_value,
-            NamedNode::new_unchecked(x_type),
-        ));
-        let RdfValue::Typed(y_value, y_type) = db_map
-            .get(DEVICE_BINDING_KEY_Y)
-            .context("device binding has no x_1 value")?
-        else {
-            anyhow::bail!("device binding invalid x_1 value")
-        };
-        let y_term = Term::Literal(Literal::new_typed_literal(
-            y_value,
-            NamedNode::new_unchecked(y_type),
-        ));
-
         let RdfValue::Typed(x_2_value, x_2_type) = db_map
             .get(DEVICE_BINDING_KEY_X_2)
             .context("device binding has no x_2 value")?
@@ -541,10 +520,6 @@ pub fn present_native<R: RngCore>(
             NamedNode::new_unchecked(x_2_type),
         ));
 
-        vp_document[DEVICE_BINDING_KEY][DEVICE_BINDING_KEY_X] =
-            RdfValue::ObjectRef(ObjectId::BlankNode("d0".into()));
-        vp_document[DEVICE_BINDING_KEY][DEVICE_BINDING_KEY_Y] =
-            RdfValue::ObjectRef(ObjectId::BlankNode("d1".into()));
         vp_document[DEVICE_BINDING_KEY][DEVICE_BINDING_KEY_X_1] =
             RdfValue::ObjectRef(ObjectId::BlankNode("d2".into()));
         vp_document[DEVICE_BINDING_KEY][DEVICE_BINDING_KEY_X_2] =
@@ -557,14 +532,6 @@ pub fn present_native<R: RngCore>(
         deanon_map.insert(
             NamedOrBlankNode::BlankNode(BlankNode::new_unchecked("d3")),
             x2_term.clone(),
-        );
-        deanon_map.insert(
-            NamedOrBlankNode::BlankNode(BlankNode::new_unchecked("d0")),
-            x_term.clone(),
-        );
-        deanon_map.insert(
-            NamedOrBlankNode::BlankNode(BlankNode::new_unchecked("d1")),
-            y_term.clone(),
         );
 
         let terms = rdf_proofs::signature::transform(&vc.document).unwrap();
