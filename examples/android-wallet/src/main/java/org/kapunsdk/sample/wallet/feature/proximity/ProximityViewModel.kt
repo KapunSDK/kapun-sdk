@@ -64,7 +64,9 @@ class ProximityViewModel : ViewModel(), KoinComponent {
 
 	override fun onCleared() {
 		super.onCleared()
-		wallet.disconnect()
+		if (::wallet.isInitialized) {
+			wallet.disconnect()
+		}
 	}
 
 	fun startEngagement(qrCodeData: String) {
