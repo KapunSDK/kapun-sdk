@@ -18,14 +18,12 @@ specific language governing permissions and limitations
 under the License.
  */
 
-use ark_ec::{AffineRepr, CurveGroup};
+use ark_ec::CurveGroup;
 use ark_ff::{biginteger::BigInteger, PrimeField};
-use ark_secp256r1::Fq;
 use ark_std::UniformRand;
 use base64::{prelude::BASE64_STANDARD, Engine};
 use chrono::DateTime;
 use ecdsa_pops::utils::{arkfp_to_fp, fp_to_scalars};
-use equality_across_groups::ec::commitments::from_base_field_to_scalar_field;
 use kvac::bbs_sharp::ecdsa;
 use rdf_util::oxrdf::vocab::xsd;
 use rdf_util::{ObjectId, Value as RdfValue};
@@ -91,10 +89,11 @@ fn device_binding_with_both_and_special() {
             let x_bytes = public_key.x.into_bigint().to_bytes_be();
 
             let x_encoded = BASE64_STANDARD.encode(x_bytes);
-            let y_encoded = BASE64_STANDARD.encode(public_key.y.into_bigint().to_bytes_be());
             let (x_1, x_2) = limbs_from_public_key(&x_encoded);
 
-            (x_encoded, y_encoded, x_1, x_2)
+            // x and y are no longer written into the credential (see `issue`) but
+            // are kept in the tuple for compatibility with external issuer callers.
+            (x_encoded, String::new(), x_1, x_2)
         };
 
         let message = SecpFr::rand(&mut rng);
@@ -254,14 +253,11 @@ fn device_binding_native_with_special() {
             let x2_bytes = x2.into_bigint().to_bytes_be();
             println!("after5");
 
-            let x_encoded = BASE64_STANDARD.encode(public_key.x.into_bigint().to_bytes_be());
-            println!("after6");
-            let y_encoded = BASE64_STANDARD.encode(public_key.y.into_bigint().to_bytes_be());
-            println!("after7");
-
+            // x and y are no longer written into the credential (see `issue`) but
+            // are kept in the tuple for compatibility with external issuer callers.
             (
-                x_encoded,
-                y_encoded,
+                String::new(),
+                String::new(),
                 BASE64_STANDARD.encode(x1_bytes),
                 BASE64_STANDARD.encode(x2_bytes),
             )

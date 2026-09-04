@@ -35,10 +35,7 @@ use std::collections::{BTreeSet, HashMap};
 
 use crate::{
     constants::{CHALLENGE_LABEL, MERLIN_TRANSCRIPT_LABEL},
-    device_binding::{
-        from_g1_to_arkg1, DEVICE_BINDING_KEY_X, DEVICE_BINDING_KEY_X_1, DEVICE_BINDING_KEY_X_2,
-        DEVICE_BINDING_KEY_Y,
-    },
+    device_binding::{from_g1_to_arkg1, DEVICE_BINDING_KEY_X_1, DEVICE_BINDING_KEY_X_2},
     vc::{index::index_of_vp, presentation::VerifiablePresentationNative},
 };
 
@@ -89,19 +86,19 @@ pub fn verify<R: RngCore>(
         // add the statements about the public key commitment
         statements.add(PedersenCommitment::new_statement_from_params(
             db.bls_comm_key.clone(),
-            db.bls_comm_pk_x,
+            db.bls_comm_pk_x1,
         ));
         // add the statements about the public key commitment
         statements.add(PedersenCommitment::new_statement_from_params(
             db.bls_comm_key.clone(),
-            db.bls_comm_pk_y,
+            db.bls_comm_pk_x2,
         ));
 
         // TODO: This is a biiiiig hack
-        let (x_index, graph_idx) = {
+        let (x1_index, graph_idx) = {
             if let Some(idx) = index_of_vp(
                 &presentation.proof.dataset(),
-                &NamedNode::new_unchecked(DEVICE_BINDING_KEY_X),
+                &NamedNode::new_unchecked(DEVICE_BINDING_KEY_X_1),
                 0,
             ) {
                 (idx + 1, 0)
@@ -109,7 +106,7 @@ pub fn verify<R: RngCore>(
                 (
                     index_of_vp(
                         &presentation.proof.dataset(),
-                        &NamedNode::new_unchecked(DEVICE_BINDING_KEY_X),
+                        &NamedNode::new_unchecked(DEVICE_BINDING_KEY_X_1),
                         1,
                     )
                     .unwrap()
@@ -118,20 +115,20 @@ pub fn verify<R: RngCore>(
                 )
             }
         };
-        let y_index = index_of_vp(
+        let x2_index = index_of_vp(
             &presentation.proof.dataset(),
-            &NamedNode::new_unchecked(DEVICE_BINDING_KEY_Y),
+            &NamedNode::new_unchecked(DEVICE_BINDING_KEY_X_2),
             graph_idx,
         )
         .unwrap()
             + 1;
 
         meta_statements.add_witness_equality(EqualWitnesses(BTreeSet::from([
-            (graph_idx, x_index),
+            (graph_idx, x1_index),
             (num_vcs + 0, 0),
         ])));
         meta_statements.add_witness_equality(EqualWitnesses(BTreeSet::from([
-            (graph_idx, y_index),
+            (graph_idx, x2_index),
             (num_vcs + 1, 0),
         ])));
 

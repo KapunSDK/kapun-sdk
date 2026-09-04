@@ -29,10 +29,7 @@ use rdf_util::{
     ObjectId, Value as RdfValue,
 };
 
-use crate::device_binding::{
-    DEVICE_BINDING_KEY, DEVICE_BINDING_KEY_X, DEVICE_BINDING_KEY_X_1, DEVICE_BINDING_KEY_X_2,
-    DEVICE_BINDING_KEY_Y,
-};
+use crate::device_binding::{DEVICE_BINDING_KEY, DEVICE_BINDING_KEY_X_1, DEVICE_BINDING_KEY_X_2};
 
 #[allow(clippy::too_many_arguments)]
 pub fn issue<R: RngCore>(
@@ -45,6 +42,10 @@ pub fn issue<R: RngCore>(
     issuance_date: Option<DateTime<Utc>>,
     created_date: Option<DateTime<Utc>>,
     expiration_date: Option<DateTime<Utc>>,
+    // (x, y, x_1, x_2). x and y are accepted for backwards compatibility with
+    // callers but are no longer written into the credential: a raw secp256r1
+    // coordinate doesn't fit the BLS scalar field the BBS+ signature operates
+    // over, so only the limbs (x_1, x_2, see `limbs_from_public_key`) are.
     device_binding: Option<(String, String, String, String)>,
     vc_type: Option<&str>,
 ) -> anyhow::Result<VerifiableCredential> {
@@ -103,17 +104,9 @@ pub fn issue<R: RngCore>(
     data["https://www.w3.org/2018/credentials#credentialSubject"] =
         RdfValue::Object(claims, claims_id);
 
-    if let Some((x, y, x_1, x_2)) = device_binding {
+    if let Some((_x, _y, x_1, x_2)) = device_binding {
         data[DEVICE_BINDING_KEY] = RdfValue::Object(
             BTreeMap::from([
-                (
-                    DEVICE_BINDING_KEY_X.into(),
-                    RdfValue::Typed(x, BASE_64_BYTES_BE.into()),
-                ),
-                (
-                    DEVICE_BINDING_KEY_Y.into(),
-                    RdfValue::Typed(y, BASE_64_BYTES_BE.into()),
-                ),
                 (
                     DEVICE_BINDING_KEY_X_1.into(),
                     RdfValue::Typed(x_1, BASE_64_BYTES_BE.into()),
