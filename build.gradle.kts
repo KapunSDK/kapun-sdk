@@ -1,4 +1,5 @@
 import ch.ubique.uniffi.plugin.dsl.CargoExtension
+import ch.ubique.uniffi.plugin.tasks.CargoBuildTask
 import org.gradle.kotlin.dsl.configure
 
 plugins {
@@ -33,6 +34,16 @@ subprojects {
 		extensions.configure<CargoExtension> {
 			// Keep the cache outside Gradle's build directories so clean does not remove it.
 			targetDirectory.set(rootProject.layout.projectDirectory.dir(".gradle/cargo-target"))
+		}
+
+		// gradle.properties defines this as a Gradle project property, but Cargo/clang only read it
+		// from the process environment. Forward it so Rust iOS links use the same deployment target
+		// as the Kotlin/Native and Xcode parts of the build.
+		tasks.withType<CargoBuildTask>().configureEach {
+			additionalEnvironment.put(
+				"IPHONEOS_DEPLOYMENT_TARGET",
+				rootProject.providers.gradleProperty("IPHONEOS_DEPLOYMENT_TARGET")
+			)
 		}
 	}
 }
