@@ -212,6 +212,15 @@ internal class GattServer(
 		}
 	}
 
+	override fun onServiceAdded(status: Int, service: BluetoothGattService?) {
+		// The peer's central has to enumerate this whole database before it can talk to us, and that
+		// cost scales with its size. Logging it makes the two directions comparable.
+		val localServiceCount = gattServer?.services?.size ?: 0
+		Logger(TAG).debug(
+			"service added: status=$status uuid=${service?.uuid} localServices=$localServiceCount"
+		)
+	}
+
 	override fun onConnectionStateChange(device: BluetoothDevice, status: Int, newState: Int) {
 		if (inhibitCallbacks) return
 

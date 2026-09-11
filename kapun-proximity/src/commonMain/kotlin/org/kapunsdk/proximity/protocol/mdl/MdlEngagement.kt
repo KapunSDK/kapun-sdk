@@ -48,7 +48,7 @@ data class MdlEngagement(val coseKey: ByteArray,
 			val firstOption = transportOptions[0]
 			// BLE options are the third element
 			val bleOptions = firstOption[2].asOrderedObject()!!
-			val peripheralServerModeSupported = bleOptions[Value.Number(JsonNumber.Integer(0))]
+			peripheralServerModeSupported = bleOptions[Value.Number(JsonNumber.Integer(0))]
 			centralClientModeSupported = bleOptions[Value.Number(JsonNumber.Integer(1))]
 			centralClientUuid = if (centralClientModeSupported?.asBoolean() == true) {
 				bleOptions[Value.Number(JsonNumber.Integer(11))]?.asBytes()?.let {

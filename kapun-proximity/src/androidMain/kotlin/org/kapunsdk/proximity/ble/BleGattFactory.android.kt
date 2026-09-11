@@ -21,13 +21,26 @@ import org.kapunsdk.proximity.ble.client.BleGattClient
 import org.kapunsdk.proximity.ble.client.GattClient
 import org.kapunsdk.proximity.ble.server.BleGattServer
 import org.kapunsdk.proximity.ble.server.GattServer
+import org.kapunsdk.util.log.Logger
 import kotlin.uuid.Uuid
 import kotlin.uuid.toJavaUuid
 
 internal actual class BleGattFactory(private val context: Context) {
+	companion object {
+		private const val TAG = "BleGattFactory"
+	}
+
 	internal actual fun isBleAdvSupported() : Boolean {
 		val bm = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
-		return bm.adapter.isLePeriodicAdvertisingSupported
+		val adapter = bm.adapter ?: return false
+		// Connectable advertising is what central client mode needs. isLePeriodicAdvertisingSupported
+		// answers a different question (BT 5.0 periodic advertising) and is false on devices that
+		// advertise perfectly well, which silently disabled central client mode for the verifier.
+		val supported = adapter.isEnabled && adapter.bluetoothLeAdvertiser != null
+		Logger(TAG).debug(
+			"ble advertising supported=$supported (multiAdvertisement=${adapter.isMultipleAdvertisementSupported}, periodic=${adapter.isLePeriodicAdvertisingSupported})"
+		)
+		return supported
 	}
 	internal actual fun createServer(
 		serviceUuid: Uuid,
@@ -43,6 +56,7 @@ internal actual class BleGattFactory(private val context: Context) {
 
 	internal actual fun createClient(
 		serviceUuid: Uuid,
+		options: ProximityBleOptions,
 	): BleGattClient {
 		val bm = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
 		return GattClient(
@@ -50,6 +64,7 @@ internal actual class BleGattFactory(private val context: Context) {
 			bluetoothManager = bm,
 			serviceUuid = serviceUuid.toJavaUuid(),
 			encodedEphemeralDeviceKey = null, // TODO CBOR encoded ephemeral device public key
+			options = options,
 		)
 	}
 
