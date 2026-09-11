@@ -1,3 +1,6 @@
+import ch.ubique.uniffi.plugin.dsl.CargoExtension
+import org.gradle.kotlin.dsl.configure
+
 plugins {
 	// Kotlin & KMP plugins
 	alias(libs.plugins.kotlin.multiplatform) apply false
@@ -23,6 +26,15 @@ plugins {
 
 	// Library publishing plugins
 	alias(libs.plugins.vanniktech.publish) apply false
+}
+
+subprojects {
+	pluginManager.withPlugin("ch.ubique.uniffi.plugin") {
+		extensions.configure<CargoExtension> {
+			// Keep the cache outside Gradle's build directories so clean does not remove it.
+			targetDirectory.set(rootProject.layout.projectDirectory.dir(".gradle/cargo-target"))
+		}
+	}
 }
 
 allprojects {
