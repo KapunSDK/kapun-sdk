@@ -1,0 +1,87 @@
+plugins {
+	alias(libs.plugins.kotlin.multiplatform)
+	alias(libs.plugins.kotlin.atomicfu)
+	alias(libs.plugins.kotlin.serialization)
+	alias(libs.plugins.compose.multiplatform)
+	alias(libs.plugins.compose.compiler)
+	alias(libs.plugins.android.kotlin.multiplatform.library)
+	alias(libs.plugins.skie)
+	alias(libs.plugins.vanniktech.publish)
+}
+
+kotlin {
+	compilerOptions {
+		freeCompilerArgs.add("-Xexpect-actual-classes")
+	}
+
+	jvmToolchain(17)
+
+	jvm()
+
+	android {
+		namespace = "org.kapunsdk.visualization"
+		compileSdk = libs.versions.android.compileSdk.get().toInt()
+		minSdk = libs.versions.android.minSdk.get().toInt()
+
+		withHostTest {}
+	}
+
+	listOf(
+
+		iosArm64(),
+		iosSimulatorArm64()
+	).forEach { iosTarget ->
+		iosTarget.binaries.framework {
+			baseName = "kapun-visualization"
+			isStatic = true
+		}
+
+		iosTarget.binaries.all {
+		}
+	}
+
+	sourceSets {
+		commonMain.dependencies {
+			implementation(project(":kapun-util"))
+			implementation(project(":kapun-credentials"))
+			implementation(project(":kapun-crypto"))
+
+			implementation(libs.kotlin.coroutines)
+			implementation(libs.kotlin.datetime)
+			implementation(libs.kotlin.serialization)
+
+			implementation(libs.koin.core)
+
+			// Compose Resources (currently only used for tests, but doesn't work in commonTest)
+			// See: https://youtrack.jetbrains.com/issue/CMP-4442
+			implementation(compose.runtime)
+			implementation(compose.components.resources)
+		}
+
+		commonTest.dependencies {
+			implementation(libs.kotlin.test)
+		}
+
+		androidMain.dependencies {
+			implementation(libs.koin.android)
+		}
+	}
+}
+
+skie {
+	analytics {
+		enabled = false
+		disableUpload = true
+	}
+}
+
+compose.resources {
+	publicResClass = false
+	packageOfResClass = "org.kapunsdk.visualization"
+	generateResClass = always
+}
+
+mavenPublishing {
+	coordinates(artifactId= property("ARTIFACT_ID").toString(), version= project.version.toString())
+	publishToMavenCentral(true)
+}

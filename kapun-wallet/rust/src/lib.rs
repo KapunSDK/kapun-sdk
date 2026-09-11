@@ -1,0 +1,241 @@
+/* Copyright 2024 Ubique Innovation AG
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+ */
+
+//! Helper functions for the wallet.
+#![deny(clippy::unwrap_used, clippy::expect_used)]
+use std::sync::{Arc, Mutex, atomic::AtomicBool};
+
+pub use crate::error::ApiError;
+#[cfg(all(feature = "reqwest", feature = "oid4vp", feature = "uniffi"))]
+use frost::FrostHsm;
+#[cfg(all(feature = "reqwest", feature = "oid4vp", feature = "uniffi"))]
+use hsm::Hsm;
+use lazy_static::lazy_static;
+#[cfg(feature = "uniffi")]
+use reqwest::Proxy;
+#[cfg(feature = "reqwest")]
+use reqwest::{Client, ClientBuilder};
+
+#[cfg(all(feature = "uniffi", feature = "reqwest", feature = "oid4vp"))]
+pub mod backend;
+pub mod crypto;
+#[cfg(all(feature = "reqwest", feature = "uniffi"))]
+pub mod dpop;
+pub mod error;
+#[cfg(all(feature = "uniffi", feature = "reqwest"))]
+pub mod faker;
+#[cfg(feature = "oid4vp")]
+pub mod formats;
+#[cfg(all(feature = "reqwest", feature = "oid4vp"))]
+pub mod issuance;
+#[cfg(feature = "oid4vp")]
+pub mod presentation;
+pub mod signing;
+pub mod testing;
+pub mod util;
+#[cfg(feature = "oid4vp")]
+pub mod vc;
+
+// #[cfg(feature = "oid4vp")]
+#[cfg(feature = "oid4vp")]
+pub mod agents;
+#[cfg(all(feature = "uniffi", feature = "reqwest", feature = "oid4vp"))]
+pub mod backup;
+
+pub mod frost;
+#[cfg(all(feature = "uniffi", feature = "reqwest", feature = "oid4vp"))]
+pub mod hsm;
+
+/// This crate compiles to its own native library, statically linking a private copy of
+/// `kapun_util_rust::log` - registering a sink via `kapun-util`'s own binding only reaches
+/// *that* library, not this one's `log_warn!`/`log_error!`/`log_debug!` call sites. This
+/// forwards to this crate's own linked-in copy of the same registration function, so a host app
+/// can reach it too. See `kapun-util/rust/src/log.rs` for the full explanation.
+#[cfg_attr(feature = "uniffi", uniffi::export)]
+pub fn register_log_sink(sink: std::sync::Arc<dyn kapun_util_rust::log::LogSink>) {
+    kapun_util_rust::log::register_log_sink(sink);
+}
+
+#[cfg_attr(feature = "uniffi", uniffi::export)]
+pub fn clear_log_sink() {
+    kapun_util_rust::log::clear_log_sink();
+}
+
+#[cfg(all(feature = "reqwest", feature = "uniffi"))]
+lazy_static! {
+    pub static ref PROXY: Mutex<Arc<Option<Proxy>>> = Mutex::new(Arc::new(None));
+    pub static ref UNSAFE_TLS: AtomicBool = AtomicBool::new(false);
+    pub static ref TRUSTED_CAS: Mutex<Arc<Vec<Vec<u8>>>> = Mutex::new(Arc::new(vec![]));
+    pub static ref TRUSTED_ISSUERS: Mutex<Arc<Vec<String>>> = Mutex::new(Arc::new(vec![]));
+}
+
+static APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
+
+/// Get a common reqwest client (e.g. when proxy enabled)
+pub fn get_reqwest_client() -> ClientBuilder {
+    use std::time::Duration;
+    let mut client_builder = ClientBuilder::new();
+    #[cfg(not(target_family = "wasm"))]
+    {
+        client_builder = client_builder.tls_info(true);
+        client_builder = client_builder.timeout(Duration::from_secs(10));
+    }
+    #[cfg(feature = "uniffi")]
+    if UNSAFE_TLS.load(std::sync::atomic::Ordering::Relaxed) {
+        client_builder = client_builder.danger_accept_invalid_certs(true);
+    }
+    #[cfg(feature = "uniffi")]
+    if let Ok(guard) = PROXY.lock() {
+        if let Some(proxy) = guard.as_ref() {
+            client_builder = client_builder.proxy(proxy.clone());
+        }
+    }
+    client_builder = client_builder.user_agent(APP_USER_AGENT);
+    client_builder
+}
+#[allow(clippy::unwrap_used)]
+pub fn get_default_client() -> Client {
+    get_reqwest_client().build().unwrap()
+}
+
+#[cfg(all(feature = "uniffi", feature = "reqwest"))]
+pub mod uniffi_reqwest {
+    use super::*;
+    use async_trait::async_trait;
+    use std::sync::Arc;
+
+    #[cfg_attr(feature = "uniffi", uniffi::export)]
+    /// Set trusted issuers/verifiers and trusted CA
+    pub fn set_trust(trusted_cas: Vec<Vec<u8>>, trusted_issuers: Vec<String>) {
+        let _ = TRUSTED_CAS.lock().map(|mut a| *a = Arc::new(trusted_cas));
+        let _ = TRUSTED_ISSUERS
+            .lock()
+            .map(|mut a| *a = Arc::new(trusted_issuers));
+    }
+
+    #[cfg_attr(feature = "uniffi", uniffi::export)]
+    /// Set a proxy for the reqwest client
+    pub fn set_proxy(ip_address: String, port: u16) {
+        let _ = PROXY
+            .lock()
+            .map(|mut a| *a = Arc::new(Proxy::all(format!("http://{ip_address}:{port}")).ok()));
+        UNSAFE_TLS.store(true, std::sync::atomic::Ordering::Relaxed);
+    }
+    #[cfg_attr(feature = "uniffi", uniffi::export)]
+    pub fn unset_proxy() {
+        let _ = PROXY.lock().map(|mut a| *a = Arc::new(None));
+    }
+
+    #[async_trait]
+    pub trait HsmSupport: Send + Sync {
+        fn get_wallet_attestation(&self) -> Option<String>;
+        async fn generate_pop(
+            &self,
+            client_id: String,
+            credential_issuer_url: String,
+        ) -> Option<String>;
+    }
+
+    #[cfg_attr(feature = "uniffi", derive(uniffi::Object))]
+    pub struct HsmSupportObject(pub Arc<dyn HsmSupport>);
+
+    #[cfg_attr(feature = "uniffi", uniffi::export)]
+    impl HsmSupportObject {
+        #[cfg_attr(feature = "uniffi", uniffi::constructor)]
+        pub fn with_hsm(hsm: Arc<Hsm>) -> Self {
+            Self(hsm)
+        }
+        #[cfg_attr(feature = "uniffi", uniffi::constructor)]
+        pub fn with_frost(hsm: Arc<FrostHsm>) -> Self {
+            Self(hsm)
+        }
+    }
+}
+
+#[macro_export]
+macro_rules! unix_timestamp {
+    () => {{
+        let now = web_time::SystemTime::now();
+        let duration = now
+            .duration_since(web_time::UNIX_EPOCH)
+            .expect("Tachyonic behaviour");
+        duration.as_secs()
+    }};
+    (ms) => {{
+        let now = web_time::SystemTime::now();
+        let duration = now
+            .duration_since(web_time::UNIX_EPOCH)
+            .expect("Tachyonic behaviour");
+        duration.as_millis()
+    }};
+}
+
+#[cfg(target_arch = "arm")]
+#[used]
+static _KEEP_EH_FRAME_STUBS: [unsafe extern "C" fn(); 2] = [
+    kapun_util_rust::__register_frame,
+    kapun_util_rust::__deregister_frame,
+];
+
+// The Android wallet is the umbrella native library. Referencing every component's UniFFI
+// contract symbol makes the linker retain all component exports in this cdylib, even when a
+// component is only called directly from Kotlin and not from wallet Rust code.
+#[cfg(all(feature = "uniffi", target_os = "android"))]
+unsafe extern "C" {
+    fn ffi_kapun_util_rust_uniffi_contract_version() -> u32;
+    fn ffi_kapun_crypto_rust_uniffi_contract_version() -> u32;
+    fn ffi_kapun_credential_core_rust_uniffi_contract_version() -> u32;
+    fn ffi_kapun_dcql_rust_uniffi_contract_version() -> u32;
+    fn ffi_kapun_dcql_bbs_rust_uniffi_contract_version() -> u32;
+    fn ffi_kapun_dcql_mdoc_rust_uniffi_contract_version() -> u32;
+    fn ffi_kapun_dcql_sdjwt_rust_uniffi_contract_version() -> u32;
+    fn ffi_kapun_dcql_w3c_rust_uniffi_contract_version() -> u32;
+    fn ffi_kapun_dcql_openbadges_rust_uniffi_contract_version() -> u32;
+    fn ffi_kapun_issuance_rust_uniffi_contract_version() -> u32;
+    fn ffi_kapun_presentation_rust_uniffi_contract_version() -> u32;
+    fn ffi_kapun_trust_rust_uniffi_contract_version() -> u32;
+}
+
+#[cfg(all(feature = "uniffi", target_os = "android"))]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn kapun_wallet_linked_components_contract_version() -> u32 {
+    let link_anchor = kapun_dcql_rust::uniffi_link_anchor()
+        ^ kapun_dcql_openbadges_rust::uniffi_link_anchor()
+        ^ kapun_issuance_rust::uniffi_link_anchor()
+        ^ kapun_presentation_rust::uniffi_link_anchor()
+        ^ kapun_trust_rust::uniffi_link_anchor();
+
+    // SAFETY: these are the parameterless UniFFI contract functions generated by
+    // `uniffi::setup_scaffolding!()` in the linked workspace crates.
+    unsafe {
+        u32::from(link_anchor)
+            ^ ffi_kapun_util_rust_uniffi_contract_version()
+            ^ ffi_kapun_crypto_rust_uniffi_contract_version()
+            ^ ffi_kapun_credential_core_rust_uniffi_contract_version()
+            ^ ffi_kapun_dcql_rust_uniffi_contract_version()
+            ^ ffi_kapun_dcql_bbs_rust_uniffi_contract_version()
+            ^ ffi_kapun_dcql_mdoc_rust_uniffi_contract_version()
+            ^ ffi_kapun_dcql_sdjwt_rust_uniffi_contract_version()
+            ^ ffi_kapun_dcql_w3c_rust_uniffi_contract_version()
+            ^ ffi_kapun_dcql_openbadges_rust_uniffi_contract_version()
+            ^ ffi_kapun_issuance_rust_uniffi_contract_version()
+            ^ ffi_kapun_presentation_rust_uniffi_contract_version()
+            ^ ffi_kapun_trust_rust_uniffi_contract_version()
+    }
+}
+
+#[cfg(feature = "uniffi")]
+uniffi::setup_scaffolding!();

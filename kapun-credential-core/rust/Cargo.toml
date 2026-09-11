@@ -1,0 +1,22 @@
+[package]
+name = "kapun-credential-core-rust"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib", "staticlib", "lib"]
+name = "kapun_credential_core_rust"
+
+[dependencies]
+uniffi = { workspace = true, optional = true }
+rand.workspace = true
+serde.workspace = true
+chrono.workspace = true
+kapun-util-rust = { path = "../../kapun-util/rust" }
+
+[dev-dependencies]
+serde_json.workspace = true
+
+[features]
+default = ["uniffi"]
+uniffi = ["dep:uniffi"]
