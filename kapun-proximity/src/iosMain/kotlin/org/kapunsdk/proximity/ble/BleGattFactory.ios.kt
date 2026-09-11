@@ -31,6 +31,7 @@ internal actual class BleGattFactory() {
 
 	internal actual fun createClient(
 		serviceUuid: Uuid,
+		options: ProximityBleOptions,
 	): BleGattClient {
 		return GattClient(serviceUuid)
 	}

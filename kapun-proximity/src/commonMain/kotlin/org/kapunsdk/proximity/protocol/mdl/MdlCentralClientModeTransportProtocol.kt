@@ -17,6 +17,7 @@ package org.kapunsdk.proximity.protocol.mdl
 
 import org.kapunsdk.proximity.ProximityError
 import org.kapunsdk.proximity.ble.BleGattFactory
+import org.kapunsdk.proximity.ble.ProximityBleOptions
 import org.kapunsdk.proximity.ble.client.BleGattClient
 import org.kapunsdk.proximity.ble.client.BleGattClientListener
 import org.kapunsdk.proximity.ble.client.BleScannerListener
@@ -49,6 +50,7 @@ internal class MdlCentralClientModeTransportProtocol(
 	private val serviceUuid: Uuid,
 	private val ephemeralKey: EphemeralKey,
 	private val deviceMacAddress: String? = null,
+	private val options: ProximityBleOptions = ProximityBleOptions.Default,
 ) : BleTransportProtocol(role), KapunProximityKoinComponent, MdlTransportProtocolExtensions {
 	companion object {
 		private const val TAG = "MdlCentralClientMode"
@@ -183,7 +185,7 @@ internal class MdlCentralClientModeTransportProtocol(
 	}
 
 	private fun connectAsClient() {
-		gattClient = gattFactory.createClient(serviceUuid).apply {
+		gattClient = gattFactory.createClient(serviceUuid, options).apply {
 			setListener(clientListener)
 
 			if (!deviceMacAddress.isNullOrEmpty()) {
