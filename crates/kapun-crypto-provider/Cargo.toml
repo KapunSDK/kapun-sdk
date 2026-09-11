@@ -1,0 +1,12 @@
+[package]
+name = "kapun-crypto-provider"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+uniffi = {workspace = true, optional = true}
+oid-registry = "0.7.0"
+
+[features]
+default = []
+uniffi = ["dep:uniffi"]

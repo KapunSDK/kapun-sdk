@@ -1,0 +1,22 @@
+[package]
+name = "kapun-dcql-rust"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "staticlib", "lib"]
+name = "kapun_dcql_rust"
+
+[dependencies]
+uniffi.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+jlc = { git = "https://github.com/heidiverse/possum.git", optional = true }
+kapun-util-rust = { path = "../../kapun-util/rust" }
+kapun-credential-core-rust = { path = "../../kapun-credential-core/rust", default-features = false }
+
+[features]
+default = ["uniffi"]
+uniffi = ["kapun-credential-core-rust/uniffi"]
+jlc = ["dep:jlc"]

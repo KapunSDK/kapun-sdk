@@ -1,0 +1,53 @@
+name: Bug report
+description: Report a reproducible problem in the Kapun SDK.
+title: ""
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: Which released version or commit are you using?
+      placeholder: "1.0.0 or abc1234"
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Platform
+      description: Where did the problem occur?
+      placeholder: "Android, iOS, JVM, or Rust"
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Describe the problem and include the smallest useful context.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: List the steps or provide a minimal code sample.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or traces
+      description: Remove private keys, credentials, personal data, and internal URLs before posting.
+      render: shell
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy check
+      options:
+        - label: I have removed secrets and personal or confidential data from this report.
+          required: true

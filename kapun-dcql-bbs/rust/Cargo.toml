@@ -1,0 +1,26 @@
+[package]
+name = "kapun-dcql-bbs-rust"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib", "staticlib", "lib"]
+name = "kapun_dcql_bbs_rust"
+
+[dependencies]
+uniffi = { workspace = true, optional = true }
+serde.workspace = true
+serde_json.workspace = true
+base64.workspace = true
+rand_core.workspace = true
+ark-serialize.workspace = true
+num-bigint.workspace = true
+next-gen-signatures.workspace = true
+zkp-util.workspace = true
+rdf-util.workspace = true
+kapun-util-rust = { path = "../../kapun-util/rust" }
+kapun-credential-core-rust = { path = "../../kapun-credential-core/rust" }
+
+[features]
+default = ["uniffi"]
+uniffi = ["dep:uniffi", "kapun-credential-core-rust/uniffi"]

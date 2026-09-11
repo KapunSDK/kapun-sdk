@@ -1,0 +1,21 @@
+[package]
+name = "kapun-dcql-mdoc-rust"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib", "staticlib", "lib"]
+name = "kapun_dcql_mdoc_rust"
+
+[dependencies]
+uniffi = { workspace = true, optional = true }
+serde.workspace = true
+ciborium.workspace = true
+base64.workspace = true
+rand.workspace = true
+kapun-util-rust = { path = "../../kapun-util/rust" }
+kapun-credential-core-rust = { path = "../../kapun-credential-core/rust" }
+
+[features]
+default = ["uniffi"]
+uniffi = ["dep:uniffi", "kapun-credential-core-rust/uniffi"]

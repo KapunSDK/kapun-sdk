@@ -1,0 +1,27 @@
+name: Feature request
+description: Suggest an improvement to the Kapun SDK.
+title: ""
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: What problem would this solve, and who would benefit?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the behavior or API you would like.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: textarea
+    id: standards
+    attributes:
+      label: Standards or interoperability impact
+      description: Link any relevant specification, implementation, or compatibility requirement.

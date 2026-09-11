@@ -1,0 +1,31 @@
+/* Copyright 2025 Ubique Innovation AG
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+ */
+
+package org.kapunsdk.visualization.oca.model
+
+import org.kapunsdk.visualization.oca.model.content.AttributeName
+import org.kapunsdk.visualization.oca.model.content.AttributeType
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+
+@Serializable
+data class CaptureBase(
+	@SerialName("type") val type: String = "spec/capture_base/1.0",
+	@SerialName("digest") val digest: String = org.kapunsdk.visualization.oca.model.SAID_HASH_PLACEHOLDER,
+	@SerialName("classification") val classification: String = "GICS:45102010",
+	@SerialName("attributes") val attributes: Map<org.kapunsdk.visualization.oca.model.content.AttributeName, org.kapunsdk.visualization.oca.model.content.AttributeType>,
+	@SerialName("flagged_attributes") val flaggedAttributes: List<org.kapunsdk.visualization.oca.model.content.AttributeName> = emptyList(),
+)

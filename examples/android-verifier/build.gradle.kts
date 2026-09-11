@@ -1,0 +1,95 @@
+plugins {
+	alias(libs.plugins.android.application)
+	alias(libs.plugins.kotlin.parcelize)
+	alias(libs.plugins.kotlin.serialization)
+	alias(libs.plugins.compose.compiler)
+
+	alias(libs.plugins.ksp)
+	alias(libs.plugins.ktorfit)
+}
+
+kotlin {
+	jvmToolchain(17)
+}
+
+android {
+	namespace = "org.kapunsdk.sample.verifier"
+	compileSdk = libs.versions.android.compileSdk.get().toInt()
+
+	ndkVersion = libs.versions.android.ndk.get()
+
+	defaultConfig {
+		applicationId = "org.kapunsdk.sample.verifier"
+		minSdk = libs.versions.android.minSdk.get().toInt()
+		targetSdk = libs.versions.android.targetSdk.get().toInt()
+		versionCode = 1
+		versionName = "1.0.0"
+
+		testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+	}
+	flavorDimensions += "version"
+
+	buildTypes {
+		release {
+			isMinifyEnabled = false
+			proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+		}
+	}
+
+	productFlavors {
+		create("prod") {
+			// Only needed for the Alpaka plugin
+		}
+	}
+
+	buildFeatures {
+		compose = true
+		viewBinding = true
+	}
+
+	packaging {
+		resources {
+			excludes += listOf(
+				"META-INF/versions/9/OSGI-INF/MANIFEST.MF",
+			)
+		}
+	}
+}
+
+dependencies {
+	implementation(project(":kapun-wallet"))
+	implementation(project(":kapun-proximity"))
+
+
+	implementation(libs.androidx.coreKtx)
+	implementation(libs.androidx.appcompat)
+	implementation(libs.androidx.lifecycle.runtimeKtx)
+	implementation(libs.androidx.activity.compose)
+
+	implementation(libs.kotlin.serialization)
+	implementation(libs.kotlin.coroutines)
+	implementation(libs.koin.android)
+
+	implementation(platform(libs.compose.bom))
+	implementation(libs.compose.ui)
+	implementation(libs.compose.ui.graphics)
+	implementation(libs.compose.ui.tooling.preview)
+	implementation(libs.compose.material3)
+	debugImplementation(libs.compose.ui.tooling)
+	debugImplementation(libs.compose.ui.test.manifest)
+	implementation(libs.compose.material.icons)
+	implementation(libs.accompanist.permissions)
+
+	implementation(libs.ubique.qrscanner.zxing)
+	implementation(libs.ubique.qrscanner.compose)
+
+	implementation(libs.ktor.client.core)
+	implementation(libs.ktor.client.okhttp)
+	implementation(libs.ktor.client.content.negotiation)
+	implementation(libs.ktor.serialization.json)
+	implementation(libs.ktorfit)
+	implementation(libs.ktorfit.converters.response)
+	implementation(libs.ktorfit.converters.call)
+	implementation(libs.ktorfit.converters.flow)
+}
