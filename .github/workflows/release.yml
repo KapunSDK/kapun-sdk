@@ -12,6 +12,9 @@ permissions:
 
 jobs:
   release:
+    # Publishing must only ever happen for version tags, even if this workflow is
+    # accidentally dispatched or GitHub reports an invalid workflow on a branch push.
+    if: startsWith(github.ref, 'refs/tags/v')
     strategy:
       fail-fast: false
       max-parallel: 4
@@ -26,7 +29,9 @@ jobs:
     env:
       # Keep Cargo's compilation cache separate from Gradle outputs. Release builds still compile
       # every ABI required by the published artifact.
-      CARGO_TARGET_DIR: ${{ runner.temp }}/cargo-target
+      # runner.temp is unavailable in a job-level env block. Keep this aligned with
+      # the shared target directory configured by the Gradle/UniFFI plugin.
+      CARGO_TARGET_DIR: ${{ github.workspace }}/cargo-target
       CARGO_INCREMENTAL: "0"
       RUSTC_WRAPPER: sccache
       SCCACHE_DIR: ${{ github.workspace }}/.sccache
