@@ -26,7 +26,7 @@ jobs:
     env:
       # Keep Cargo's compilation cache separate from Gradle outputs. Release builds still compile
       # every ABI required by the published artifact.
-      CARGO_TARGET_DIR: ${{ github.workspace }}/.gradle/cargo-target
+      CARGO_TARGET_DIR: ${{ runner.temp }}/cargo-target
       CARGO_INCREMENTAL: "0"
       RUSTC_WRAPPER: sccache
       SCCACHE_DIR: ${{ github.workspace }}/.sccache
