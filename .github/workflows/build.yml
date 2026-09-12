@@ -23,7 +23,7 @@ jobs:
     env:
       # Share Cargo's target directory between SDK modules in this job. Keep it outside Gradle's
       # build directory so clean does not delete it.
-      CARGO_TARGET_DIR: ${{ github.workspace }}/.gradle/cargo-target
+      CARGO_TARGET_DIR: ${{ github.workspace }}/cargo-target
       CARGO_INCREMENTAL: "0"
       RUSTC_WRAPPER: sccache
       SCCACHE_DIR: ${{ github.workspace }}/.sccache
