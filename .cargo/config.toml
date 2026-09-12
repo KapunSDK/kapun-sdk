@@ -1,7 +1,0 @@
-# Xcode 26's Apple clang emits stack-check calls for current Rust dependencies.
-# Cargo's target triples still default to old iOS minimum versions, so export the
-# project's deployment target to every Cargo/rustc/clang subprocess. This also
-# covers the UniFFI plugin's direct `cargo rustc` def-file invocation.
-
-[env]
-IPHONEOS_DEPLOYMENT_TARGET = { value = "16.4", force = false }
