@@ -90,5 +90,7 @@ rdf-util = { path = "crates/rdf-util" }
 
 # Keep the transferred x509/josekit dependencies on the workspace crypto-provider
 # implementation so provider traits remain identical across the dependency graph.
-[patch."https://github.com/heidiverse/kapun-sdk.git"]
+[patch."https://github.com/KapunSDK/kapun-sdk.git"]
 kapun-crypto-provider = { path = "crates/kapun-crypto-provider" }
+zkp-util = { path = "crates/zkp-util" }
+rdf-util = { path = "crates/rdf-util" }

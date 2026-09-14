@@ -409,7 +409,7 @@ fn commit_coordinate_limbs<R: RngCore>(
     comm_key_bls: &PedersenCommitmentKeyBls,
 ) -> anyhow::Result<BlsLimbCommitment> {
     let coord_b64 = base64::prelude::BASE64_STANDARD.encode(coord.into_bigint().to_bytes_be());
-    let (l1_b64, l2_b64) = limbs_from_public_key(&coord_b64);
+    let (l1_b64, l2_b64) = limbs_from_coordinate(&coord_b64)?;
     let l1 = BlsFr::from_be_bytes_mod_order(
         &base64::prelude::BASE64_STANDARD
             .decode(&l1_b64)
@@ -696,19 +696,19 @@ pub fn limb_shift() -> BlsFr {
     BlsFr::from(2u64).pow([128u64])
 }
 
-pub fn limbs_from_public_key(x: &str) -> (String, String) {
+pub fn limbs_from_coordinate(x: &str) -> anyhow::Result<(String, String)> {
     use base64::prelude::BASE64_STANDARD;
-    let x = BASE64_STANDARD.decode(x).unwrap();
+    let x = BASE64_STANDARD.decode(x).context("Invalid B64")?;
     let x = SecpFq::from(BigUint::from_bytes_be(&x));
-    let (x1, x2) = secp_x_to_bls_limbs(&x).unwrap();
+    let (x1, x2) = secp_x_to_bls_limbs(&x).context("Failed to convert to bls limbs")?;
 
     let x1_bytes = x1.into_bigint().to_bytes_be();
     let x2_bytes = x2.into_bigint().to_bytes_be();
 
-    (
+    Ok((
         BASE64_STANDARD.encode(x1_bytes),
         BASE64_STANDARD.encode(x2_bytes),
-    )
+    ))
 }
 
 #[cfg(test)]

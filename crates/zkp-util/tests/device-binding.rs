@@ -24,7 +24,7 @@ use kvac::bbs_sharp::ecdsa;
 use rdf_util::oxrdf::vocab::xsd;
 use rdf_util::{ObjectId, Value as RdfValue};
 use std::{collections::BTreeMap, str::FromStr, time::Instant};
-use zkp_util::device_binding::{from_blsfr_to_arkblsfr, limbs_from_public_key};
+use zkp_util::device_binding::{from_blsfr_to_arkblsfr, limbs_from_coordinate};
 use zkp_util::vc::presentation::present_native;
 use zkp_util::vc::verification::verify_native;
 use zkp_util::{
@@ -85,7 +85,7 @@ fn device_binding_with_both_and_special() {
             let x_bytes = public_key.x.into_bigint().to_bytes_be();
 
             let x_encoded = BASE64_STANDARD.encode(x_bytes);
-            let (x_1, x_2) = limbs_from_public_key(&x_encoded);
+            let (x_1, x_2) = limbs_from_coordinate(&x_encoded);
 
             // x and y are no longer written into the credential (see `issue`) but
             // are kept in the tuple for compatibility with external issuer callers.
