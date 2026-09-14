@@ -15,4 +15,8 @@ class StaticOidfTrustAnchorProvider(
     override fun isTrusted(cannonicalizedJWK: TrustAnchor): Boolean {
         return trustAnchors.contains(cannonicalizedJWK.key);
     }
+
+    override fun getTrustAnchors(): List<TrustAnchor> = trustAnchors.map {
+        TrustAnchor(key = it, sub = "")
+    }
 }

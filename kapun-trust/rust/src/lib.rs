@@ -163,6 +163,11 @@ fn to_oidf_trust_chain_info(
         })
         .map_err(|e| wrap_validation_error(e.first().unwrap().clone()))?;
 
+    // Prefer metadata resolved through the federation chain, which includes
+    // metadata policies, while retaining the leaf metadata as a fallback for
+    // chains that do not expose a resolvable path.
+    let resolved_metadata = trust_chain.resolve_metadata(None);
+
     let trust_anchor_keys: Vec<_> = trust_chain
         .trust_entities
         .values()
@@ -191,7 +196,7 @@ fn to_oidf_trust_chain_info(
 
     let leaf = if let Some(EntityConfig::Leaf(leaf)) = trust_chain.leaf.entity_config {
         let pld = leaf.payload_unverified();
-        to_leaf_info(pld.insecure())
+        to_leaf_info(pld.insecure(), &resolved_metadata)
     } else {
         return Err(FederationError::ValidationFailed(anyhow::anyhow!(
             "no leaf"
@@ -214,13 +219,18 @@ fn as_vec_string(v: &serde_json::Value) -> Option<Vec<String>> {
     })
 }
 
-fn to_leaf_info(leaf: &EntityStatement) -> OidcfLeafInfo {
+fn to_leaf_info(
+    leaf: &EntityStatement,
+    resolved_metadata: &std::collections::HashMap<String, transformer::Value>,
+) -> OidcfLeafInfo {
     let domain = leaf.sub();
+    let metadata = if resolved_metadata.is_empty() {
+        leaf.metadata.as_ref()
+    } else {
+        Some(resolved_metadata)
+    };
 
-    let cred_issuer = leaf
-        .metadata
-        .as_ref()
-        .and_then(|v| v.get("openid_credential_issuer"));
+    let cred_issuer = metadata.and_then(|v| v.get("openid_credential_issuer"));
     let credential_configurations_supported = cred_issuer
         .and_then(|v| v.get("credential_configurations_supported"))
         .and_then(|v| v.as_object())
@@ -254,10 +264,7 @@ fn to_leaf_info(leaf: &EntityStatement) -> OidcfLeafInfo {
     //
     // - openid_credential_verifier.client_name
     // - openid_credential_verifier.logo_uri
-    let cred_verifier = leaf
-        .metadata
-        .as_ref()
-        .and_then(|v| v.get("openid_credential_verifier"));
+    let cred_verifier = metadata.and_then(|v| v.get("openid_credential_verifier"));
 
     display_name = display_name.or_else(|| {
         cred_verifier
@@ -278,10 +285,7 @@ fn to_leaf_info(leaf: &EntityStatement) -> OidcfLeafInfo {
     //  - *.display_name
     //  - *.organization_name
     //  - *.logo_uri
-    let federation_entity = leaf
-        .metadata
-        .as_ref()
-        .and_then(|v| v.get("federation_entity"));
+    let federation_entity = metadata.and_then(|v| v.get("federation_entity"));
 
     let oidf_display_name = |obj: &Option<&transformer::Value>| {
         obj.and_then(|v| v.get("display_name"))
@@ -308,7 +312,7 @@ fn to_leaf_info(leaf: &EntityStatement) -> OidcfLeafInfo {
         .or_else(|| oidf_logo_uri(&cred_issuer))
         .or_else(|| oidf_logo_uri(&cred_verifier));
 
-    let display_name = display_name.unwrap_or("".to_string());
+    let display_name = display_name.unwrap_or_else(|| domain.clone());
 
     OidcfLeafInfo {
         domain,

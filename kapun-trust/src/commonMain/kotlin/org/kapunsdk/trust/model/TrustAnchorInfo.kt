@@ -26,4 +26,6 @@ data class TrustAnchorInfo(
 	val key: String,
 	val subject: String,
 	val trustFrameworkId: String,
+	/** Whether the anchor was added by the user and can be removed. */
+	val isRemovable: Boolean = true,
 )

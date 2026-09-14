@@ -1,0 +1,24 @@
+CREATE TABLE trustAnchorEntity (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    trust_framework_id TEXT NOT NULL,
+    key TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    UNIQUE (trust_framework_id, key, subject)
+);
+
+insert:
+INSERT OR IGNORE INTO trustAnchorEntity(trust_framework_id, key, subject)
+VALUES (?, ?, ?);
+
+getAll:
+SELECT * FROM trustAnchorEntity ORDER BY trust_framework_id, subject, key;
+
+getByFramework:
+SELECT * FROM trustAnchorEntity WHERE trust_framework_id = ? ORDER BY subject, key;
+
+remove:
+DELETE FROM trustAnchorEntity
+WHERE trust_framework_id = ? AND key = ? AND subject = ?;
+
+clear:
+DELETE FROM trustAnchorEntity;

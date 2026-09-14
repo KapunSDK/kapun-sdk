@@ -22,7 +22,6 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use base64::{Engine, prelude::BASE64_URL_SAFE_NO_PAD};
 use kapun_util_rust::value::Value;
 use next_gen_signatures::crypto::zkp::{

@@ -23,6 +23,7 @@ import org.kapunsdk.wallet.keyvalue.di.keyValueModule
 import org.kapunsdk.wallet.network.di.networkModule
 import org.kapunsdk.wallet.process.legacy.di.processesModule
 import org.kapunsdk.wallet.resources.di.resourcesModule
+import org.kapunsdk.wallet.trust.TrustAnchorRepository
 import org.kapunsdk.wallet.DEFAULT_DATABASE_NAME
 import org.koin.core.KoinApplication
 
@@ -32,6 +33,7 @@ fun KoinApplication.kapunWalletModules(databaseName: String = DEFAULT_DATABASE_N
 		databaseModule(databaseName),
 		networkModule(),
 		keyValueModule(),
+		TrustAnchorRepository.koinModule,
 		resourcesModule(),
 		credentialsModule(),
 		processesModule(),

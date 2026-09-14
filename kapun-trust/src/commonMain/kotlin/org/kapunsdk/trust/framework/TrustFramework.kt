@@ -51,6 +51,12 @@ interface TrustFramework {
 	/** Saves a trust anchor after explicit user approval. Trust frameworks may ignore this. */
 	fun saveTrustAnchor(trustAnchor: TrustAnchorInfo) = Unit
 
+	/** Returns the configured trust anchors exposed by this framework. */
+	fun getTrustAnchors(): List<TrustAnchorInfo> = emptyList()
+
+	/** Removes a user-managed trust anchor. Trust frameworks may ignore this. */
+	fun removeTrustAnchor(trustAnchor: TrustAnchorInfo) = Unit
+
 
     fun isMetadataSignatureTrustedX509(
 		metadataJwt: String,

@@ -56,6 +56,13 @@ class TrustFrameworkController(
 			?.saveTrustAnchor(trustAnchor)
 	}
 
+	fun getTrustAnchors(): List<TrustAnchorInfo> = frameworks.flatMap { it.getTrustAnchors() }
+
+	fun removeTrustAnchor(trustAnchor: TrustAnchorInfo) {
+		frameworks.firstOrNull { it.frameworkId == trustAnchor.trustFrameworkId }
+			?.removeTrustAnchor(trustAnchor)
+	}
+
 	private suspend fun startFlow(agentProvider: suspend (org.kapunsdk.trust.framework.TrustFramework) -> AgentInformation?): TrustFlow? {
 		// Each framework may resolve DIDs / trust statements over the network, so log per attempt:
 		// this is what turns an opaque "trust resolution" block into a per-framework breakdown.

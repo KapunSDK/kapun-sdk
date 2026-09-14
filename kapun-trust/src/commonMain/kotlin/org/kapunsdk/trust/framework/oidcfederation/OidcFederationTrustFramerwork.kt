@@ -118,10 +118,29 @@ class OidcFederationTrustFramerwork(
 		)
 	}
 
-	private fun uniffi.kapun_trust_rust.TrustAnchor.toTrustAnchorInfo() = TrustAnchorInfo(
+	override fun getTrustAnchors(): List<TrustAnchorInfo> {
+		val userTrustAnchors = oidfTrustAnchorProvider.getUserTrustAnchors().toSet()
+		return oidfTrustAnchorProvider.getTrustAnchors()
+			.distinct()
+			.map { it.toTrustAnchorInfo(isRemovable = it in userTrustAnchors) }
+	}
+
+	override fun removeTrustAnchor(trustAnchor: TrustAnchorInfo) {
+		if (trustAnchor.trustFrameworkId != frameworkId || !trustAnchor.isRemovable) {
+			return
+		}
+		oidfTrustAnchorProvider.removeTrustAnchor(
+			uniffi.kapun_trust_rust.TrustAnchor(trustAnchor.key, trustAnchor.subject)
+		)
+	}
+
+	private fun uniffi.kapun_trust_rust.TrustAnchor.toTrustAnchorInfo(
+		isRemovable: Boolean = true,
+	) = TrustAnchorInfo(
 		key = key,
 		subject = sub,
 		trustFrameworkId = OIDC_FEDERATION_TRUST_FRAMEWORK_ID,
+		isRemovable = isRemovable,
 	)
 
 
