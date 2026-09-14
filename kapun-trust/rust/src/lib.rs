@@ -56,7 +56,10 @@ pub struct OidcfLeafInfo {
 }
 
 #[uniffi::export]
-pub fn oidcf_trust_chain_from_url(url: &str) -> Result<OidcfTrustChainInfo, FederationError> {
+pub fn oidcf_trust_chain_from_url(
+    url: &str,
+    lenient_leaf_entity_config: bool,
+) -> Result<OidcfTrustChainInfo, FederationError> {
     let wrap_fetch_error = |e: oidcf::models::errors::FederationError| {
         FederationError::FetchingFailed(anyhow::anyhow!(e))
     };
@@ -64,13 +67,14 @@ pub fn oidcf_trust_chain_from_url(url: &str) -> Result<OidcfTrustChainInfo, Fede
     let mut trust_chain =
         oidcf::DefaultFederationRelation::new_from_url(url).map_err(wrap_fetch_error)?;
 
-    validate_oidf_trust_chain(&mut trust_chain)?;
-    to_oidf_trust_chain_info(trust_chain)
+    validate_oidf_trust_chain(&mut trust_chain, lenient_leaf_entity_config)?;
+    to_oidf_trust_chain_info(trust_chain, lenient_leaf_entity_config)
 }
 
 #[uniffi::export]
 pub fn oidcf_trust_chain_from_presentation_request(
     presentation_request_jwt: String,
+    lenient_leaf_entity_config: bool,
 ) -> Result<OidcfTrustChainInfo, FederationError> {
     let wrap_parse_error = |e: heidi_jwt::models::errors::JwtError| {
         FederationError::JwtParsingFailed(anyhow::anyhow!(e))
@@ -111,7 +115,7 @@ pub fn oidcf_trust_chain_from_presentation_request(
         )));
     };
 
-    validate_oidf_trust_chain(&mut trust_chain)?;
+    validate_oidf_trust_chain(&mut trust_chain, lenient_leaf_entity_config)?;
 
     let leaf = trust_chain
         .trust_entities
@@ -124,11 +128,12 @@ pub fn oidcf_trust_chain_from_presentation_request(
     jwt.verify_signature(&leaf.jwks())
         .map_err(wrap_validation_error)?;
 
-    to_oidf_trust_chain_info(trust_chain)
+    to_oidf_trust_chain_info(trust_chain, lenient_leaf_entity_config)
 }
 
 fn validate_oidf_trust_chain(
     trust_chain: &mut oidcf::DefaultFederationRelation,
+    lenient_leaf_entity_config: bool,
 ) -> Result<(), FederationError> {
     let wrap_validation_error = |e: oidcf::models::errors::FederationError| {
         FederationError::ValidationFailed(anyhow::anyhow!(e))
@@ -136,13 +141,16 @@ fn validate_oidf_trust_chain(
 
     trust_chain.build_trust().map_err(wrap_validation_error)?;
     trust_chain
-        .verify()
+        .verify_with_options(oidcf::models::trust_chain::VerificationOptions {
+            lenient_leaf_entity_config,
+        })
         .map_err(|e| wrap_validation_error(e.first().unwrap().clone()))?;
     Ok(())
 }
 
 fn to_oidf_trust_chain_info(
     mut trust_chain: oidcf::DefaultFederationRelation,
+    lenient_leaf_entity_config: bool,
 ) -> Result<OidcfTrustChainInfo, FederationError> {
     let wrap_validation_error = |e: oidcf::models::errors::FederationError| {
         FederationError::ValidationFailed(anyhow::anyhow!(e))
@@ -150,7 +158,9 @@ fn to_oidf_trust_chain_info(
 
     trust_chain.build_trust().map_err(wrap_validation_error)?;
     trust_chain
-        .verify()
+        .verify_with_options(oidcf::models::trust_chain::VerificationOptions {
+            lenient_leaf_entity_config,
+        })
         .map_err(|e| wrap_validation_error(e.first().unwrap().clone()))?;
 
     let trust_anchor_keys: Vec<_> = trust_chain

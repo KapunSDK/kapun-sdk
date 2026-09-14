@@ -9,6 +9,7 @@ import org.kapunsdk.trust.framework.TrustFramework
 import org.kapunsdk.trust.framework.ValidationInfo
 import org.kapunsdk.trust.model.AgentInformation
 import org.kapunsdk.trust.model.AgentType
+import org.kapunsdk.trust.model.TrustAnchorInfo
 import org.kapunsdk.util.log.Logger
 import uniffi.kapun_trust_rust.FederationException
 import uniffi.kapun_trust_rust.oidcfTrustChainFromPresentationRequest
@@ -19,6 +20,7 @@ const val OIDC_FEDERATION_TRUST_FRAMEWORK_ID: String = "oidc_federation_framewor
 class OidcFederationTrustFramerwork(
 	val documentProvider: DocumentProvider? = null,
 	val oidfTrustAnchorProvider: OidfTrustAnchorProvider = StaticOidfTrustAnchorProvider(),
+	private val lenientTrustChainVerification: () -> Boolean = { false },
 ) : TrustFramework {
 	override val frameworkId: String
 		get() = OIDC_FEDERATION_TRUST_FRAMEWORK_ID
@@ -31,15 +33,23 @@ class OidcFederationTrustFramerwork(
 	): AgentInformation? {
 		// TODO: get credentialIssuerMetadata from here instead of fetching it earlier.
 		val trustInfo = try {
-			oidcfTrustChainFromUrl(credentialIssuerMetadata.claims.credentialIssuer);
+			oidcfTrustChainFromUrl(
+				credentialIssuerMetadata.claims.credentialIssuer,
+				lenientTrustChainVerification(),
+			);
 		} catch (e: FederationException) {
 			Logger("Federation").error("Federation failed, skipping it", e)
 			return null
 		}
 
-		val isTrusted = trustInfo.trustAnchorKeys.any {
-			oidfTrustAnchorProvider.isTrusted(it)
-		};
+		val invalidTrustAnchors = trustInfo.trustAnchorKeys.filterNot {
+			val isTrusted = oidfTrustAnchorProvider.isTrusted(it)
+			if (!isTrusted) {
+				oidfTrustAnchorProvider.onInvalidTrustAnchor(it)
+			}
+			isTrusted
+		}
+		val isTrusted = invalidTrustAnchors.size < trustInfo.trustAnchorKeys.size
 		val isVerified = credentialConfigurationIds.all {
 			trustInfo.leaf.credentialConfigurationsSupported?.contains(it) ?: false
 		};
@@ -55,6 +65,7 @@ class OidcFederationTrustFramerwork(
 			identityTrust = null,
 			issuanceTrust = trustInfo.subordinateStatements.joinToString(separator = "\n"),
 			verificationTrust = null,
+			untrustedTrustAnchor = invalidTrustAnchors.firstOrNull()?.toTrustAnchorInfo(),
 		)
 	}
 
@@ -65,14 +76,22 @@ class OidcFederationTrustFramerwork(
 			return null
 		}
 		val trustInfo = try {
-			oidcfTrustChainFromPresentationRequest(originalRequest!!);
+			oidcfTrustChainFromPresentationRequest(
+				originalRequest!!,
+				lenientTrustChainVerification(),
+			);
 		} catch (e: FederationException.FetchingFailed) {
 			return null
 		}
 
-		val isTrusted = trustInfo.trustAnchorKeys.any {
-			oidfTrustAnchorProvider.isTrusted(it)
-		};
+		val invalidTrustAnchors = trustInfo.trustAnchorKeys.filterNot {
+			val isTrusted = oidfTrustAnchorProvider.isTrusted(it)
+			if (!isTrusted) {
+				oidfTrustAnchorProvider.onInvalidTrustAnchor(it)
+			}
+			isTrusted
+		}
+		val isTrusted = invalidTrustAnchors.size < trustInfo.trustAnchorKeys.size
 		val isVerified = true;
 
 		return AgentInformation(
@@ -86,8 +105,24 @@ class OidcFederationTrustFramerwork(
 			identityTrust = null,
 			issuanceTrust = null,
 			verificationTrust = trustInfo.subordinateStatements.joinToString(separator = "\n"),
+			untrustedTrustAnchor = invalidTrustAnchors.firstOrNull()?.toTrustAnchorInfo(),
 		);
 	}
+
+	override fun saveTrustAnchor(trustAnchor: TrustAnchorInfo) {
+		if (trustAnchor.trustFrameworkId != frameworkId) {
+			return
+		}
+		oidfTrustAnchorProvider.addTrustAnchor(
+			uniffi.kapun_trust_rust.TrustAnchor(trustAnchor.key, trustAnchor.subject)
+		)
+	}
+
+	private fun uniffi.kapun_trust_rust.TrustAnchor.toTrustAnchorInfo() = TrustAnchorInfo(
+		key = key,
+		subject = sub,
+		trustFrameworkId = OIDC_FEDERATION_TRUST_FRAMEWORK_ID,
+	)
 
 
 	override suspend fun validatePresentationRequest(presentationRequest: PresentationRequest): ValidationInfo {

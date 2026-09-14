@@ -29,5 +29,6 @@ data class AgentInformation(
 	val isVerified: Boolean,
 	val identityTrust: String? = null,
 	val issuanceTrust: String? = null,
-	val verificationTrust: String? = null
+	val verificationTrust: String? = null,
+	val untrustedTrustAnchor: TrustAnchorInfo? = null,
 )

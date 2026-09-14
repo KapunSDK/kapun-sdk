@@ -18,4 +18,13 @@ package org.kapunsdk.trust.framework
 
 interface TrustAnchorProvider<T> {
     fun isTrusted(param: T): Boolean
+
+    /**
+     * Reports a trust anchor encountered while resolving a trust chain that is
+     * not currently trusted. Implementations may ignore this hook.
+     */
+    fun onInvalidTrustAnchor(param: T) = Unit
+
+    /** Adds a trust anchor after explicit user approval. Implementations may ignore this hook. */
+    fun addTrustAnchor(param: T) = Unit
 }
