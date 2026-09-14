@@ -19,19 +19,9 @@ use std::time::Instant;
 
 use anyhow::{anyhow, Context};
 use ark_bls12_381::G1Affine as BlsG1Affine;
-use ark_ec::{AffineRepr, CurveGroup};
-use ark_ff::{BigInteger, Field as ArkField, PrimeField as ArkPrimeField};
-use ark_secp256r1::Fq;
+use ark_ff::{BigInteger, PrimeField as ArkPrimeField};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use ark_std::UniformRand;
 use base64::Engine;
-use blake2::Blake2b512;
-use bulletproofs_plus_plus::prelude::SetupParams as BppSetupParams;
-use dock_crypto_utils::commitment::PedersenCommitmentKey;
-use dock_crypto_utils::{
-    randomized_mult_checker::RandomizedMultChecker,
-    transcript::{new_merlin_transcript, Transcript},
-};
 use ecdsa_pops::halo2curves::ff::derive::byteorder::{
     self, BigEndian, ReadBytesExt, WriteBytesExt,
 };
@@ -39,19 +29,8 @@ use ecdsa_pops::halo2curves::secp256r1::Secp256r1Affine;
 use ecdsa_pops::utils::ecdsa::{ECDSASignature, ECDSA};
 use ecdsa_pops::utils::{arkfp_to_fp, arkfq_to_fq, arkp256_to_p256, fp_to_scalars};
 use ecdsa_pops::{
-    bincode, G1Affine, PoPNativeComposedRoK, PoPNativeNizk, RelECDSA, RelECDSAParams,
+    bincode, G1Affine, PoPNativeComposedRoK, PoPNativeNizk, PoPSigmaNizk, RelECDSA, RelECDSAParams,
     RelECDSAStatement, RelECDSAWitness,
-};
-use equality_across_groups::{
-    ec::commitments::{
-        from_base_field_to_scalar_field, PointCommitment, PointCommitmentWithOpening,
-    },
-    pok_ecdsa_pubkey::{
-        PoKEcdsaSigCommittedPublicKey, PoKEcdsaSigCommittedPublicKeyProtocol, TransformedEcdsaSig,
-    },
-};
-use equality_across_groups::{
-    eq_across_groups::ProofLargeWitness as ProofLargeWitnessOrig, tom256::Affine as Tom256Affine,
 };
 
 use ecdsa_pops::halo2curves::ff::{Field, PrimeField};
@@ -59,13 +38,6 @@ use kvac::bbs_sharp::ecdsa;
 use num_bigint::BigUint;
 use rand_core::{OsRng, RngCore};
 use rok::{Nizk, Relation, RoK};
-
-const WITNESS_BIT_SIZE: usize = 64;
-const CHALLENGE_BIT_SIZE: usize = 180;
-const ABORT_PARAM: usize = 8;
-const RESPONSE_BYTE_SIZE: usize = 32;
-const NUM_REPS: usize = 1;
-const NUM_CHUNKS: usize = 4;
 
 pub const DEVICE_BINDING_KEY: &str = "https://zkp-ld.org/deviceBinding";
 pub const DEVICE_BINDING_KEY_X: &str = "https://zkp-ld.org/deviceBinding#x";
@@ -78,44 +50,20 @@ pub type SecpFq = ark_secp256r1::Fq;
 pub type SecpAffine = ark_secp256r1::Affine;
 pub type BlsFr = ark_bls12_381::Fr;
 
-type PedersenCommitmentKeySecp = PedersenCommitmentKey<SecpAffine>;
-type PedersenCommitmentKeyTom = PedersenCommitmentKey<Tom256Affine>;
-type PedersenCommitmentKeyBls = PedersenCommitmentKey<BlsG1Affine>;
-type ProofLargeWitness = ProofLargeWitnessOrig<
-    Tom256Affine,
-    BlsG1Affine,
-    NUM_CHUNKS,
-    WITNESS_BIT_SIZE,
-    CHALLENGE_BIT_SIZE,
-    ABORT_PARAM,
-    RESPONSE_BYTE_SIZE,
-    NUM_REPS,
->;
+type PoPSigmaProof = <PoPSigmaNizk as Nizk>::Proof;
 
-#[derive(Debug, Clone)]
+#[allow(nonstandard_style)]
+#[derive(Clone)]
 pub struct DeviceBindingSigma {
-    pub proof: PoKEcdsaSigCommittedPublicKey,
-    /// Proves that the x/y coordinates committed on Tom-256 (as part of
-    /// `comm_pk`) are the same values as the ones reassembled from
-    /// `bls_comm_pk_x1`/`bls_comm_pk_x2` (resp. `bls_comm_pk_y1`/`bls_comm_pk_y2`)
-    /// on BLS12-381. Neither raw secp256r1 coordinate fits the BLS scalar
-    /// field, so each is carried across split into two limbs; only the x
-    /// limbs (`#x1`/`#x2`) are additionally tied to the credential, matching
-    /// what the issuer signs — the y limbs only establish internal
-    /// cross-curve consistency, with no credential-side counterpart.
-    pub eq_x: ProofLargeWitness,
-    pub eq_y: ProofLargeWitness,
-
-    pub comm_pk: PointCommitment<Tom256Affine>,
-
+    pub proof: PoPSigmaProof,
     pub bls_comm_key: Vec<BlsG1Affine>,
     pub bls_comm_pk_x1: BlsG1Affine,
     pub bls_comm_pk_x2: BlsG1Affine,
     pub bls_comm_pk_y1: BlsG1Affine,
     pub bls_comm_pk_y2: BlsG1Affine,
-
     pub bls_scalars_x1: Vec<BlsFr>,
     pub bls_scalars_x2: Vec<BlsFr>,
+    pub K: Secp256r1Affine,
 }
 
 #[allow(nonstandard_style)]
@@ -139,19 +87,115 @@ impl std::fmt::Debug for DeviceBindingNative {
     }
 }
 
-#[derive(Debug, Clone, CanonicalSerialize, CanonicalDeserialize)]
+#[derive(Clone)]
+#[allow(nonstandard_style)]
 pub struct DeviceBindingPresentationSigma {
-    pub proof: PoKEcdsaSigCommittedPublicKey,
-    pub eq_x: ProofLargeWitness,
-    pub eq_y: ProofLargeWitness,
-
-    pub comm_pk: PointCommitment<Tom256Affine>,
-
+    pub proof: PoPSigmaProof,
     pub bls_comm_key: Vec<BlsG1Affine>,
     pub bls_comm_pk_x1: BlsG1Affine,
     pub bls_comm_pk_x2: BlsG1Affine,
     pub bls_comm_pk_y1: BlsG1Affine,
     pub bls_comm_pk_y2: BlsG1Affine,
+    pub K: Secp256r1Affine,
+}
+
+const SIGMA_SERIALIZATION_MAGIC: &[u8] = b"zkp-util-device-binding-sigma-v2";
+const SIGMA_TRANSCRIPT_LABEL: &[u8] = b"pop sigma proof";
+
+fn sigma_setup_label(label: &[u8]) -> String {
+    format!(
+        "zkp-util device binding sigma:{}",
+        base64::prelude::BASE64_STANDARD.encode(label)
+    )
+}
+
+impl std::fmt::Debug for DeviceBindingPresentationSigma {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DeviceBindingPresentationSigma")
+            .field("proof", &"<ecdsa_pops sigma proof>")
+            .field("bls_comm_pk_x1", &self.bls_comm_pk_x1)
+            .field("bls_comm_pk_x2", &self.bls_comm_pk_x2)
+            .field("bls_comm_pk_y1", &self.bls_comm_pk_y1)
+            .field("bls_comm_pk_y2", &self.bls_comm_pk_y2)
+            .field("K", &self.K)
+            .finish()
+    }
+}
+
+impl DeviceBindingPresentationSigma {
+    pub fn serialize_compressed<W: Write>(&self, mut writer: W) -> std::io::Result<()> {
+        writer.write_all(SIGMA_SERIALIZATION_MAGIC)?;
+
+        let proof = bincode::serialize(&self.proof).map_err(std::io::Error::other)?;
+        writer.write_u64::<BigEndian>(proof.len() as u64)?;
+        writer.write_all(&proof)?;
+
+        for point in [
+            &self.bls_comm_key[0],
+            &self.bls_comm_key[1],
+            &self.bls_comm_pk_x1,
+            &self.bls_comm_pk_x2,
+            &self.bls_comm_pk_y1,
+            &self.bls_comm_pk_y2,
+        ] {
+            writer.write_u64::<BigEndian>(point.compressed_size() as u64)?;
+            point
+                .serialize_compressed(&mut writer)
+                .map_err(std::io::Error::other)?;
+        }
+
+        let k = bincode::serialize(&self.K).map_err(std::io::Error::other)?;
+        writer.write_u64::<BigEndian>(k.len() as u64)?;
+        writer.write_all(&k)?;
+        Ok(())
+    }
+
+    pub fn deserialize_compressed<R: Read>(reader: R) -> anyhow::Result<Self> {
+        let mut reader = BufReader::new(reader);
+        let mut magic = vec![0; SIGMA_SERIALIZATION_MAGIC.len()];
+        reader.read_exact(&mut magic)?;
+        anyhow::ensure!(
+            magic == SIGMA_SERIALIZATION_MAGIC,
+            "unsupported Sigma device-binding serialization"
+        );
+
+        let read_blob = |reader: &mut BufReader<R>| -> anyhow::Result<Vec<u8>> {
+            let len = reader.read_u64::<BigEndian>()?;
+            let len: usize = len
+                .try_into()
+                .map_err(|_| anyhow!("serialized field is too large"))?;
+            let mut bytes = vec![0; len];
+            reader.read_exact(&mut bytes)?;
+            Ok(bytes)
+        };
+
+        let proof_bytes = read_blob(&mut reader)?;
+        let proof = bincode::deserialize(&proof_bytes)?;
+
+        let point = |reader: &mut BufReader<R>| -> anyhow::Result<BlsG1Affine> {
+            let bytes = read_blob(reader)?;
+            Ok(BlsG1Affine::deserialize_compressed(bytes.as_slice())?)
+        };
+
+        let bls_comm_key_0 = point(&mut reader)?;
+        let bls_comm_key_1 = point(&mut reader)?;
+        let bls_comm_pk_x1 = point(&mut reader)?;
+        let bls_comm_pk_x2 = point(&mut reader)?;
+        let bls_comm_pk_y1 = point(&mut reader)?;
+        let bls_comm_pk_y2 = point(&mut reader)?;
+        let k_bytes = read_blob(&mut reader)?;
+        let k = bincode::deserialize(&k_bytes)?;
+
+        Ok(Self {
+            proof,
+            bls_comm_key: vec![bls_comm_key_0, bls_comm_key_1],
+            bls_comm_pk_x1,
+            bls_comm_pk_x2,
+            bls_comm_pk_y1,
+            bls_comm_pk_y2,
+            K: k,
+        })
+    }
 }
 
 #[derive(Clone)]
@@ -388,53 +432,6 @@ impl DeviceBindingNative {
     }
 }
 
-/// A secp256r1 field element committed on BLS12-381 as two BLS-scalar-sized
-/// limbs (see `limbs_from_public_key`), rather than as a single value that
-/// wouldn't fit the BLS scalar field.
-struct BlsLimbCommitment {
-    c1: BlsG1Affine,
-    c2: BlsG1Affine,
-    scalars1: Vec<BlsFr>,
-    scalars2: Vec<BlsFr>,
-    /// `r1 + limb_shift() * r2`: the blinding under which `comm_key_bls.commit`
-    /// of the *full* (unsplit) value would equal `c1 + c2 * limb_shift()`, by
-    /// Pedersen commitment homomorphism. Lets an equality proof be run against
-    /// the full value's Tom-256 commitment without ever materializing it.
-    combined_blinding: BlsFr,
-}
-
-fn commit_coordinate_limbs<R: RngCore>(
-    rng: &mut R,
-    coord: &SecpFq,
-    comm_key_bls: &PedersenCommitmentKeyBls,
-) -> anyhow::Result<BlsLimbCommitment> {
-    let coord_b64 = base64::prelude::BASE64_STANDARD.encode(coord.into_bigint().to_bytes_be());
-    let (l1_b64, l2_b64) = limbs_from_coordinate(&coord_b64)?;
-    let l1 = BlsFr::from_be_bytes_mod_order(
-        &base64::prelude::BASE64_STANDARD
-            .decode(&l1_b64)
-            .map_err(|e| anyhow!("Failed to decode limb: {e:?}"))?,
-    );
-    let l2 = BlsFr::from_be_bytes_mod_order(
-        &base64::prelude::BASE64_STANDARD
-            .decode(&l2_b64)
-            .map_err(|e| anyhow!("Failed to decode limb: {e:?}"))?,
-    );
-
-    let r1 = BlsFr::rand(rng);
-    let r2 = BlsFr::rand(rng);
-    let c1 = comm_key_bls.commit(&l1, &r1);
-    let c2 = comm_key_bls.commit(&l2, &r2);
-
-    Ok(BlsLimbCommitment {
-        c1,
-        c2,
-        scalars1: vec![l1, r1],
-        scalars2: vec![l2, r2],
-        combined_blinding: r1 + limb_shift() * r2,
-    })
-}
-
 impl DeviceBindingSigma {
     #[allow(clippy::too_many_arguments)]
     pub fn new<R: RngCore>(
@@ -442,238 +439,121 @@ impl DeviceBindingSigma {
         public_key: SecpAffine,
         message: SecpFr,
         message_signature: ecdsa::Signature,
-        comm_key_secp_label: &[u8],
-        comm_key_tom_label: &[u8],
+        _comm_key_secp_label: &[u8],
+        _comm_key_tom_label: &[u8],
         comm_key_bls_label: &[u8],
-        bpp_setup_label: &[u8],
-        merlin_transcript_label: &'static [u8],
-        challenge_label: &'static [u8],
+        _bpp_setup_label: &[u8],
+        _merlin_transcript_label: &'static [u8],
+        _challenge_label: &'static [u8],
     ) -> anyhow::Result<Self> {
-        let comm_key_secp = PedersenCommitmentKeySecp::new::<Blake2b512>(comm_key_secp_label);
-        let comm_key_tom = PedersenCommitmentKeyTom::new::<Blake2b512>(comm_key_tom_label);
-        let comm_key_bls = PedersenCommitmentKeyBls::new::<Blake2b512>(comm_key_bls_label);
+        let nizk = PoPSigmaNizk::new(&sigma_setup_label(comm_key_bls_label));
+        let ecdsa = ECDSA {
+            pp: Secp256r1Affine::generator(),
+        };
+        let pp = RelECDSAParams::<G1Affine, 2>::new(
+            [*nizk.ck_bls(), *nizk.ck_bls()],
+            *nizk.ck_bls_blinding(),
+            ecdsa,
+        );
 
-        let bls_comm_key = vec![comm_key_bls.g, comm_key_bls.h];
+        let pk =
+            arkp256_to_p256(&public_key).ok_or_else(|| anyhow!("failed to convert public key"))?;
+        let m = arkfq_to_fq(&message).ok_or_else(|| anyhow!("failed to convert message"))?;
+        let sigma = ECDSASignature {
+            Rx: arkfq_to_fq(&message_signature.rand_x_coord)
+                .ok_or_else(|| anyhow!("failed to convert signature nonce"))?,
+            response: arkfq_to_fq(&message_signature.response)
+                .ok_or_else(|| anyhow!("failed to convert signature response"))?,
+        };
+        let sigma_converted = ecdsa.convert(&pk, &m, &sigma);
 
-        let base = 2;
-        let mut bpp_setup_params =
-            BppSetupParams::<Tom256Affine>::new_for_perfect_range_proof::<Blake2b512>(
-                bpp_setup_label,
-                base,
-                WITNESS_BIT_SIZE as u16,
-                NUM_CHUNKS as u32,
-            );
-        bpp_setup_params.G = comm_key_tom.g;
-        bpp_setup_params.H_vec[0] = comm_key_tom.h;
-
-        // Commit to ECDSA public key on Tom-256 curve
-        let comm_pk = PointCommitmentWithOpening::new(rng, &public_key, &comm_key_tom)
-            .map_err(|e| anyhow!("Failed to create PointCommitmentWithOpening: {e:?}"))?;
-
-        // Commit to the ECDSA public key's x and y coordinates on BLS12-381.
-        // Neither raw secp256r1 coordinate fits the BLS scalar field, so each
-        // is split into two BLS-scalar-sized limbs via the same
-        // `limbs_from_public_key` helper the issuer uses to sign `#x1`/`#x2`
-        // into the credential (y is never disclosed to the credential, only
-        // bound internally below).
-        let x_coord = public_key
-            .x()
-            .context("Failed to get public_key x coordinate!")?;
-        let y_coord = public_key
-            .y()
-            .context("Failed to get public_key y coordinate!")?;
-        let x_limbs = commit_coordinate_limbs(rng, x_coord, &comm_key_bls)?;
-        let y_limbs = commit_coordinate_limbs(rng, y_coord, &comm_key_bls)?;
-
-        let bls_comm_pk_x1 = x_limbs.c1;
-        let bls_comm_pk_x2 = x_limbs.c2;
-        let bls_scalars_x1 = x_limbs.scalars1;
-        let bls_scalars_x2 = x_limbs.scalars2;
-
-        let transformed_sig =
-            TransformedEcdsaSig::new(&message_signature, message, public_key).unwrap();
-        transformed_sig
-            .verify_prehashed(message, public_key)
-            .unwrap();
-
-        let mut prover_transcript = new_merlin_transcript(merlin_transcript_label);
-        prover_transcript.append(b"comm_key_secp", &comm_key_secp);
-        prover_transcript.append(b"comm_key_tom", &comm_key_tom);
-        prover_transcript.append(b"comm_key_bls", &comm_key_bls);
-        prover_transcript.append(b"bpp_setup_params", &bpp_setup_params);
-        prover_transcript.append(b"comm_pk", &comm_pk.comm);
-        prover_transcript.append(b"bls_comm_pk_x1", &x_limbs.c1);
-        prover_transcript.append(b"bls_comm_pk_x2", &x_limbs.c2);
-        prover_transcript.append(b"bls_comm_pk_y1", &y_limbs.c1);
-        prover_transcript.append(b"bls_comm_pk_y2", &y_limbs.c2);
-        prover_transcript.append(b"message", &message);
-
-        let protocol = PoKEcdsaSigCommittedPublicKeyProtocol::<128>::init(
-            rng,
-            transformed_sig,
-            message,
-            public_key,
-            comm_pk.clone(),
-            &comm_key_secp,
-            &comm_key_tom,
-        )
-        .map_err(|e| anyhow!("Failed to create the protocol: {e:?}"))?;
-        protocol
-            .challenge_contribution(&mut prover_transcript)
-            .map_err(|e| anyhow!("Failed to challenge contribution of the protocol: {e:?}"))?;
-        let challenge_prover = prover_transcript.challenge_scalar(challenge_label);
-        let proof = protocol.gen_proof(&challenge_prover);
-
-        // Proof that x coordinate is same in both Tom-256 and BLS12-381 commitments
-        let proof_eq_pk_x = ProofLargeWitness::new(
-            rng,
-            &comm_pk.x,
-            comm_pk.r_x,
-            x_limbs.combined_blinding,
-            &comm_key_tom,
-            &comm_key_bls,
-            base,
-            bpp_setup_params.clone(),
-            &mut prover_transcript,
-        )
-        .map_err(|e| anyhow!("Failed to create proof_eq_pk_x: {e:?}"))?;
-
-        // Proof that y coordinate is same in both Tom-256 and BLS12-381 commitments
-        let proof_eq_pk_y = ProofLargeWitness::new(
-            rng,
-            &comm_pk.y,
-            comm_pk.r_y,
-            y_limbs.combined_blinding,
-            &comm_key_tom,
-            &comm_key_bls,
-            base,
-            bpp_setup_params.clone(),
-            &mut prover_transcript,
-        )
-        .map_err(|e| anyhow!("Failed to create proof_eq_pk_y: {e:?}"))?;
+        let rho_x = [
+            ecdsa_pops::halo2curves::bls12381::Fr::random(&mut *rng),
+            ecdsa_pops::halo2curves::bls12381::Fr::random(&mut *rng),
+        ];
+        let rho_y = [
+            ecdsa_pops::halo2curves::bls12381::Fr::random(&mut *rng),
+            ecdsa_pops::halo2curves::bls12381::Fr::random(&mut *rng),
+        ];
+        let witness = RelECDSAWitness::new(pk, sigma_converted.z, rho_x, Some(rho_y));
+        let limbs_x = fp_to_scalars::<G1Affine, 2>(&witness.q().x)
+            .map_err(|e| anyhow!("failed to split public key x coordinate: {e:?}"))?;
+        let commitments = (0..2)
+            .map(|i| RelECDSA::<G1Affine, 2>::create_commitment(&pp, &witness, i))
+            .collect::<Result<Vec<_>, _>>()?;
+        let coms_x = [commitments[0].0, commitments[1].0];
+        let coms_y = [commitments[0].1.unwrap(), commitments[1].1.unwrap()];
+        let statement = RelECDSAStatement::new(coms_x, Some(coms_y), m, sigma_converted.K);
+        let relation = RelECDSA::new(pp, statement, Some(witness));
+        let mut transcript = ecdsa_pops::merlin::Transcript::new(SIGMA_TRANSCRIPT_LABEL);
+        let proof = nizk
+            .prove(&mut transcript, &relation, &mut OsRng)
+            .map_err(|e| anyhow!("failed to create Sigma device-binding proof: {e:?}"))?;
 
         Ok(Self {
             proof,
-            eq_x: proof_eq_pk_x,
-            eq_y: proof_eq_pk_y,
-            comm_pk: comm_pk.comm,
-            bls_comm_key,
-            bls_comm_pk_x1,
-            bls_comm_pk_x2,
-            bls_comm_pk_y1: y_limbs.c1,
-            bls_comm_pk_y2: y_limbs.c2,
-            bls_scalars_x1,
-            bls_scalars_x2,
+            bls_comm_key: vec![
+                from_g1_to_arkg1(nizk.ck_bls()),
+                from_g1_to_arkg1(nizk.ck_bls_blinding()),
+            ],
+            bls_comm_pk_x1: from_g1_to_arkg1(&coms_x[0]),
+            bls_comm_pk_x2: from_g1_to_arkg1(&coms_x[1]),
+            bls_comm_pk_y1: from_g1_to_arkg1(&coms_y[0]),
+            bls_comm_pk_y2: from_g1_to_arkg1(&coms_y[1]),
+            bls_scalars_x1: vec![
+                from_blsfr_to_arkblsfr(&limbs_x[0]),
+                from_blsfr_to_arkblsfr(&rho_x[0]),
+            ],
+            bls_scalars_x2: vec![
+                from_blsfr_to_arkblsfr(&limbs_x[1]),
+                from_blsfr_to_arkblsfr(&rho_x[1]),
+            ],
+            K: sigma_converted.K,
         })
     }
 
     pub fn present(self) -> DeviceBindingPresentationSigma {
         DeviceBindingPresentationSigma {
             proof: self.proof,
-            eq_x: self.eq_x,
-            eq_y: self.eq_y,
-            comm_pk: self.comm_pk,
             bls_comm_key: self.bls_comm_key,
             bls_comm_pk_x1: self.bls_comm_pk_x1,
             bls_comm_pk_x2: self.bls_comm_pk_x2,
             bls_comm_pk_y1: self.bls_comm_pk_y1,
             bls_comm_pk_y2: self.bls_comm_pk_y2,
+            K: self.K,
         }
     }
 }
 
 impl DeviceBindingPresentationSigma {
-    #[allow(clippy::too_many_arguments)]
-    pub fn verify<R: RngCore>(
-        &self,
-        rng: &mut R,
-        message: SecpFr,
-        comm_key_secp_label: &[u8],
-        comm_key_tom_label: &[u8],
-        comm_key_bls_label: &[u8],
-        bpp_setup_label: &[u8],
-        merlin_transcript_label: &'static [u8],
-        challenge_label: &'static [u8],
-    ) -> anyhow::Result<()> {
-        let comm_key_secp = PedersenCommitmentKeySecp::new::<Blake2b512>(comm_key_secp_label);
-        let comm_key_tom = PedersenCommitmentKeyTom::new::<Blake2b512>(comm_key_tom_label);
-        let comm_key_bls = PedersenCommitmentKeyBls::new::<Blake2b512>(comm_key_bls_label);
-
-        let base = 2;
-        let mut bpp_setup_params =
-            BppSetupParams::<Tom256Affine>::new_for_perfect_range_proof::<Blake2b512>(
-                bpp_setup_label,
-                base,
-                WITNESS_BIT_SIZE as u16,
-                NUM_CHUNKS as u32,
-            );
-        bpp_setup_params.G = comm_key_tom.g;
-        bpp_setup_params.H_vec[0] = comm_key_tom.h;
-
-        let mut verifier_transcript = new_merlin_transcript(merlin_transcript_label);
-        verifier_transcript.append(b"comm_key_secp", &comm_key_secp);
-        verifier_transcript.append(b"comm_key_tom", &comm_key_tom);
-        verifier_transcript.append(b"comm_key_bls", &comm_key_bls);
-        verifier_transcript.append(b"bpp_setup_params", &bpp_setup_params);
-        verifier_transcript.append(b"comm_pk", &self.comm_pk);
-        verifier_transcript.append(b"bls_comm_pk_x1", &self.bls_comm_pk_x1);
-        verifier_transcript.append(b"bls_comm_pk_x2", &self.bls_comm_pk_x2);
-        verifier_transcript.append(b"bls_comm_pk_y1", &self.bls_comm_pk_y1);
-        verifier_transcript.append(b"bls_comm_pk_y2", &self.bls_comm_pk_y2);
-        verifier_transcript.append(b"message", &message);
-        self.proof
-            .challenge_contribution(&mut verifier_transcript)
-            .map_err(|e| anyhow!("Failed to challenge contribution: {e:?}"))?;
-
-        let challenge_verifier = verifier_transcript.challenge_scalar(challenge_label);
-
-        self.proof
-            .verify_using_randomized_mult_checker(
-                message,
-                self.comm_pk,
-                &challenge_verifier,
-                comm_key_secp,
-                comm_key_tom,
-                &mut RandomizedMultChecker::<SecpAffine>::new_using_rng(rng),
-                &mut RandomizedMultChecker::<Tom256Affine>::new_using_rng(rng),
-            )
-            .map_err(|e| anyhow!("Failed to verify proof: {e:?}"))?;
-
-        // Reconstruct the aggregate coordinate commitments from their limb
-        // commitments via Pedersen homomorphism (see `DeviceBindingSigma::new`).
-        let bls_comm_pk_x =
-            (self.bls_comm_pk_x1 + self.bls_comm_pk_x2 * limb_shift()).into_affine();
-        let bls_comm_pk_y =
-            (self.bls_comm_pk_y1 + self.bls_comm_pk_y2 * limb_shift()).into_affine();
-
-        self.eq_x
-            .verify(
-                &self.comm_pk.x,
-                &bls_comm_pk_x,
-                &comm_key_tom,
-                &comm_key_bls,
-                &bpp_setup_params,
-                &mut verifier_transcript,
-            )
-            .map_err(|e| anyhow!("Failed to verify eq_x: {e:?}"))?;
-
-        self.eq_y
-            .verify(
-                &self.comm_pk.y,
-                &bls_comm_pk_y,
-                &comm_key_tom,
-                &comm_key_bls,
-                &bpp_setup_params,
-                &mut verifier_transcript,
-            )
-            .map_err(|e| anyhow!("Failed to verify eq_y: {e:?}"))?;
-
+    pub fn verify(&self, message: SecpFr, comm_key_bls_label: &[u8]) -> anyhow::Result<()> {
+        let nizk = PoPSigmaNizk::new(&sigma_setup_label(comm_key_bls_label));
+        let ecdsa = ECDSA {
+            pp: Secp256r1Affine::generator(),
+        };
+        let pp = RelECDSAParams::<G1Affine, 2>::new(
+            [*nizk.ck_bls(), *nizk.ck_bls()],
+            *nizk.ck_bls_blinding(),
+            ecdsa,
+        );
+        let statement = RelECDSAStatement::new(
+            [
+                from_arkg1_to_g1(&self.bls_comm_pk_x1),
+                from_arkg1_to_g1(&self.bls_comm_pk_x2),
+            ],
+            Some([
+                from_arkg1_to_g1(&self.bls_comm_pk_y1),
+                from_arkg1_to_g1(&self.bls_comm_pk_y2),
+            ]),
+            arkfq_to_fq(&message).ok_or_else(|| anyhow!("failed to convert message"))?,
+            self.K,
+        );
+        let relation = RelECDSA::new(pp, statement, None);
+        let mut transcript = ecdsa_pops::merlin::Transcript::new(SIGMA_TRANSCRIPT_LABEL);
+        nizk.verify(&mut transcript, &relation, &self.proof)
+            .map_err(|e| anyhow!("failed to verify Sigma device-binding proof: {e:?}"))?;
         Ok(())
     }
-}
-
-pub fn change_field(p: &SecpFq) -> BlsFr {
-    from_base_field_to_scalar_field::<Fq, BlsFr>(p)
 }
 
 /// Splits a secp256r1 field element into two BLS-scalar-sized limbs `(x1, x2)`
@@ -688,12 +568,6 @@ pub fn secp_x_to_bls_limbs(x: &SecpFq) -> anyhow::Result<(BlsFr, BlsFr)> {
         from_blsfr_to_arkblsfr(&limbs[0]),
         from_blsfr_to_arkblsfr(&limbs[1]),
     ))
-}
-
-/// The factor by which the high limb is scaled when reconstructing a full
-/// value from `secp_x_to_bls_limbs`/`limbs_from_public_key`, i.e. `2^128`.
-pub fn limb_shift() -> BlsFr {
-    BlsFr::from(2u64).pow([128u64])
 }
 
 pub fn limbs_from_coordinate(x: &str) -> anyhow::Result<(String, String)> {
@@ -716,6 +590,7 @@ mod tests {
     use std::io::Cursor;
 
     use super::*;
+    use ark_std::UniformRand;
 
     #[test]
     pub fn test_device_binding() {
@@ -758,18 +633,7 @@ mod tests {
         let presentation =
             DeviceBindingPresentationSigma::deserialize_compressed(Cursor::new(bytes)).unwrap();
 
-        presentation
-            .verify(
-                &mut rng,
-                message,
-                b"comm-key-secp",
-                b"comm-key-tom",
-                b"comm-key-bls",
-                b"bpp-setup",
-                b"transcript",
-                b"challenge",
-            )
-            .unwrap();
+        presentation.verify(message, b"comm-key-bls").unwrap();
     }
 
     #[test]

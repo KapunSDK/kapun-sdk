@@ -68,7 +68,7 @@ fn claim_based() {
     let db = {
         let x_bytes = public_key.x.into_bigint().to_bytes_be();
         let x_encoded = BASE64_STANDARD.encode(x_bytes);
-        let (x_1, x_2) = limbs_from_coordinate(&x_encoded);
+        let (x_1, x_2) = limbs_from_coordinate(&x_encoded).unwrap();
 
         // x and y are no longer written into the credential (see `issue`) but
         // are kept in the tuple for compatibility with external issuer callers.

@@ -1057,25 +1057,6 @@ dependencies = [
 
 [[package]]
 name = "bulletproofs_plus_plus"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9ea4a7f11ebed454325e0db4191f08ad2c2b6a4c53342db28e6855360494ce9b"
-dependencies = [
- "ark-ec",
- "ark-ff",
- "ark-poly",
- "ark-serialize",
- "ark-std",
- "digest 0.10.7",
- "dock_crypto_utils 0.22.0",
- "rayon",
- "serde",
- "serde_with 1.14.0",
- "zeroize",
-]
-
-[[package]]
-name = "bulletproofs_plus_plus"
 version = "0.9.0"
 source = "git+https://github.com/alexandroszacharakis8/docknetwork-crypto#712136517409050bd3950294d78b2343774805cc"
 dependencies = [
@@ -2663,7 +2644,7 @@ dependencies = [
  "bellpepper-core",
  "bincode",
  "dock_crypto_utils 0.23.0",
- "equality_across_groups 0.2.0",
+ "equality_across_groups",
  "ff 0.13.1",
  "halo2curves",
  "merlin",
@@ -2946,26 +2927,6 @@ dependencies = [
 
 [[package]]
 name = "equality_across_groups"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c37680bf3356658cb2dc689e60943c6c28b13a9e28e7de39c1f8b4811561106"
-dependencies = [
- "ark-ec",
- "ark-ff",
- "ark-secp256r1",
- "ark-serialize",
- "ark-std",
- "bulletproofs_plus_plus 0.8.0",
- "crypto-bigint 0.6.1",
- "dock_crypto_utils 0.22.0",
- "kvac 0.7.0",
- "rayon",
- "schnorr_pok 0.22.0",
- "zeroize",
-]
-
-[[package]]
-name = "equality_across_groups"
 version = "0.2.0"
 source = "git+https://github.com/alexandroszacharakis8/docknetwork-crypto#712136517409050bd3950294d78b2343774805cc"
 dependencies = [
@@ -2996,7 +2957,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -6230,7 +6191,7 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -8197,7 +8158,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -9544,7 +9505,7 @@ dependencies = [
  "getrandom 0.4.3",
  "once_cell",
  "rustix",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -11265,7 +11226,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -11917,13 +11878,9 @@ dependencies = [
  "ark-std",
  "base64 0.22.1",
  "bbs_plus 0.24.0",
- "blake2",
- "bulletproofs_plus_plus 0.8.0",
  "chrono",
  "ciborium",
- "dock_crypto_utils 0.22.0",
  "ecdsa_pops",
- "equality_across_groups 0.1.0",
  "kvac 0.7.0",
  "legogroth16",
  "multibase",

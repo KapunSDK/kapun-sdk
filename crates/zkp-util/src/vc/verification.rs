@@ -30,7 +30,6 @@ use serde_json::Value as JsonValue;
 use std::collections::{BTreeSet, HashMap};
 
 use crate::{
-    constants::{CHALLENGE_LABEL, MERLIN_TRANSCRIPT_LABEL},
     device_binding::{from_g1_to_arkg1, DEVICE_BINDING_KEY_X_1, DEVICE_BINDING_KEY_X_2},
     vc::{index::index_of_vp, presentation::VerifiablePresentationNative},
 };
@@ -128,16 +127,7 @@ pub fn verify<R: RngCore>(
             (num_vcs + 1, 0),
         ])));
 
-        db.verify(
-            rng,
-            params.message,
-            &params.comm_key_secp_label,
-            &params.comm_key_tom_label,
-            &params.comm_key_bls_label,
-            &params.bpp_setup_label,
-            MERLIN_TRANSCRIPT_LABEL,
-            CHALLENGE_LABEL,
-        )?;
+        db.verify(params.message, &params.comm_key_bls_label)?;
     }
 
     let issuer = KeyGraph::from(rdf_util::from_str_with_hint(format!(
