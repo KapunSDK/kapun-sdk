@@ -39,18 +39,10 @@ jobs:
       # Use Git CLI so the credential.helper override below is honored. Cargo's default libgit2
       # transport does not apply this Git configuration and can wait for credentials.
       CARGO_NET_GIT_FETCH_WITH_CLI: "true"
-      GIT_CONFIG_COUNT: "4"
-      GIT_CONFIG_KEY_0: "http.connectTimeout"
-      GIT_CONFIG_VALUE_0: "30"
-      GIT_CONFIG_KEY_1: "http.lowSpeedLimit"
-      GIT_CONFIG_VALUE_1: "1"
-      GIT_CONFIG_KEY_2: "http.lowSpeedTime"
-      GIT_CONFIG_VALUE_2: "30"
       # Do not let a missing CI credential invoke a developer credential helper indefinitely.
-      GIT_CONFIG_KEY_3: "credential.helper"
-      GIT_CONFIG_VALUE_3: ""
-      CARGO_NET_RETRY: "1"
-      CARGO_HTTP_TIMEOUT: "30"
+      GIT_CONFIG_COUNT: "1"
+      GIT_CONFIG_KEY_0: "credential.helper"
+      GIT_CONFIG_VALUE_0: ""
       CARGO_INCREMENTAL: "0"
       RUSTC_WRAPPER: sccache
       SCCACHE_DIR: ${{ github.workspace }}/.sccache
