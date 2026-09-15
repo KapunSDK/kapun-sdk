@@ -24,6 +24,16 @@ jobs:
       # Share Cargo's target directory between SDK modules in this job. Keep it outside Gradle's
       # build directory so clean does not delete it.
       CARGO_TARGET_DIR: ${{ github.workspace }}/cargo-target
+      # Keep Cargo's registry and Git caches private to this matrix job. The self-hosted runner
+      # can execute matrix jobs concurrently; sharing $HOME/.cargo makes them wait on Cargo's
+      # package-cache lock.
+      CARGO_HOME: ${{ github.workspace }}/.cargo
+      # Use Git CLI for Git dependencies so Git's non-interactive setting is honored. Cargo's
+      # default libgit2 transport does not honor GIT_TERMINAL_PROMPT and can wait for credentials.
+      CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+      GIT_TERMINAL_PROMPT: "0"
+      CARGO_NET_RETRY: "1"
+      CARGO_HTTP_TIMEOUT: "30"
       CARGO_INCREMENTAL: "0"
       RUSTC_WRAPPER: sccache
       SCCACHE_DIR: ${{ github.workspace }}/.sccache
