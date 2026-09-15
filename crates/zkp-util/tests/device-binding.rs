@@ -19,17 +19,16 @@ use ark_ff::{biginteger::BigInteger, PrimeField};
 use ark_std::UniformRand;
 use base64::{prelude::BASE64_STANDARD, Engine};
 use chrono::DateTime;
-use ecdsa_pops::utils::{arkfp_to_fp, fp_to_scalars};
 use kvac::bbs_sharp::ecdsa;
 use rdf_util::oxrdf::vocab::xsd;
 use rdf_util::{ObjectId, Value as RdfValue};
 use std::{collections::BTreeMap, str::FromStr, time::Instant};
-use zkp_util::device_binding::{from_blsfr_to_arkblsfr, limbs_from_coordinate};
+use zkp_util::device_binding::limbs_from_coordinate;
 use zkp_util::vc::presentation::present_native;
 use zkp_util::vc::verification::verify_native;
 use zkp_util::{
     circuits,
-    device_binding::{BlsFr, SecpFr},
+    device_binding::SecpFr,
     vc::{
         issuance::issue,
         presentation::present,
@@ -83,13 +82,14 @@ fn device_binding_with_both_and_special() {
 
         let db = {
             let x_bytes = public_key.x.into_bigint().to_bytes_be();
+            let y_bytes = public_key.y.into_bigint().to_bytes_be();
 
             let x_encoded = BASE64_STANDARD.encode(x_bytes);
+            let y_encoded = BASE64_STANDARD.encode(y_bytes);
             let (x_1, x_2) = limbs_from_coordinate(&x_encoded).unwrap();
+            let (y_1, y_2) = limbs_from_coordinate(&y_encoded).unwrap();
 
-            // x and y are no longer written into the credential (see `issue`) but
-            // are kept in the tuple for compatibility with external issuer callers.
-            (x_encoded, String::new(), x_1, x_2)
+            (x_1, x_2, y_1, y_2)
         };
 
         let message = SecpFr::rand(&mut rng);
@@ -114,6 +114,13 @@ fn device_binding_with_both_and_special() {
             None,
         )
         .unwrap();
+
+        let document = RdfValue::from(&vc.document);
+        let (binding, _) = document["https://zkp-ld.org/deviceBinding"]
+            .as_object()
+            .unwrap();
+        assert!(binding.contains_key("https://zkp-ld.org/deviceBinding#y1"));
+        assert!(binding.contains_key("https://zkp-ld.org/deviceBinding#y2"));
 
         // println!("issuance done! {vc}");
 
@@ -235,28 +242,12 @@ fn device_binding_native_with_special() {
         let public_key = (SECP_GEN * secret_key).into_affine();
 
         let db = {
-            println!("before");
-            let limbs =
-                fp_to_scalars::<ecdsa_pops::G1Affine, 2>(&arkfp_to_fp(&public_key.x).unwrap())
-                    .unwrap();
-            println!("after");
-            let x1: BlsFr = from_blsfr_to_arkblsfr(&limbs[0]);
-            println!("after2");
-            let x1_bytes = x1.into_bigint().to_bytes_be();
-            println!("after3");
-            let x2: BlsFr = from_blsfr_to_arkblsfr(&limbs[1]);
-            println!("after4");
-            let x2_bytes = x2.into_bigint().to_bytes_be();
-            println!("after5");
+            let x_encoded = BASE64_STANDARD.encode(public_key.x.into_bigint().to_bytes_be());
+            let y_encoded = BASE64_STANDARD.encode(public_key.y.into_bigint().to_bytes_be());
+            let (x_1, x_2) = limbs_from_coordinate(&x_encoded).unwrap();
+            let (y_1, y_2) = limbs_from_coordinate(&y_encoded).unwrap();
 
-            // x and y are no longer written into the credential (see `issue`) but
-            // are kept in the tuple for compatibility with external issuer callers.
-            (
-                String::new(),
-                String::new(),
-                BASE64_STANDARD.encode(x1_bytes),
-                BASE64_STANDARD.encode(x2_bytes),
-            )
+            (x_1, x_2, y_1, y_2)
         };
 
         let message = SecpFr::rand(&mut rng);

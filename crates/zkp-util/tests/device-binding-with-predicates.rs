@@ -78,12 +78,13 @@ fn device_binding_with_predicates() {
 
     let db = {
         let x_bytes = public_key.x.into_bigint().to_bytes_be();
+        let y_bytes = public_key.y.into_bigint().to_bytes_be();
         let x_encoded = BASE64_STANDARD.encode(x_bytes);
+        let y_encoded = BASE64_STANDARD.encode(y_bytes);
         let (x_1, x_2) = limbs_from_coordinate(&x_encoded).unwrap();
+        let (y_1, y_2) = limbs_from_coordinate(&y_encoded).unwrap();
 
-        // x and y are no longer written into the credential (see `issue`) but
-        // are kept in the tuple for compatibility with external issuer callers.
-        (x_encoded, String::new(), x_1, x_2)
+        (x_1, x_2, y_1, y_2)
     };
 
     let message = SecpFr::rand(&mut rng);

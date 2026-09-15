@@ -38,7 +38,8 @@ use crate::{
     device_binding::{
         from_blsfr_to_arkblsfr, from_g1_to_arkg1, DeviceBindingNative,
         DeviceBindingPresentationNative, DeviceBindingPresentationSigma, DeviceBindingSigma,
-        DEVICE_BINDING_KEY, DEVICE_BINDING_KEY_X_1, DEVICE_BINDING_KEY_X_2,
+        DEVICE_BINDING_KEY, DEVICE_BINDING_KEY_X_1, DEVICE_BINDING_KEY_X_2, DEVICE_BINDING_KEY_Y_1,
+        DEVICE_BINDING_KEY_Y_2,
     },
     vc::{
         index::index_of_vc,
@@ -191,9 +192,19 @@ pub fn present<R: RngCore>(
             db.bls_comm_key.clone(),
             db.bls_comm_pk_x2,
         ));
+        statements.add(PedersenCommitment::new_statement_from_params(
+            db.bls_comm_key.clone(),
+            db.bls_comm_pk_y1,
+        ));
+        statements.add(PedersenCommitment::new_statement_from_params(
+            db.bls_comm_key.clone(),
+            db.bls_comm_pk_y2,
+        ));
 
         witnesses.add(Witness::PedersenCommitment(db.bls_scalars_x1.clone()));
         witnesses.add(Witness::PedersenCommitment(db.bls_scalars_x2.clone()));
+        witnesses.add(Witness::PedersenCommitment(db.bls_scalars_y1.clone()));
+        witnesses.add(Witness::PedersenCommitment(db.bls_scalars_y2.clone()));
 
         let (db_map, db_id) = vc_document[DEVICE_BINDING_KEY]
             .as_object()
@@ -224,11 +235,35 @@ pub fn present<R: RngCore>(
             x_2_value,
             NamedNode::new_unchecked(x_2_type),
         ));
+        let RdfValue::Typed(y_1_value, y_1_type) = db_map
+            .get(DEVICE_BINDING_KEY_Y_1)
+            .context("device binding has no y_1 value")?
+        else {
+            anyhow::bail!("device binding invalid y_1 value")
+        };
+        let y1_term = Term::Literal(Literal::new_typed_literal(
+            y_1_value,
+            NamedNode::new_unchecked(y_1_type),
+        ));
+        let RdfValue::Typed(y_2_value, y_2_type) = db_map
+            .get(DEVICE_BINDING_KEY_Y_2)
+            .context("device binding has no y_2 value")?
+        else {
+            anyhow::bail!("device binding invalid y_2 value")
+        };
+        let y2_term = Term::Literal(Literal::new_typed_literal(
+            y_2_value,
+            NamedNode::new_unchecked(y_2_type),
+        ));
 
         vp_document[DEVICE_BINDING_KEY][DEVICE_BINDING_KEY_X_1] =
             RdfValue::ObjectRef(ObjectId::BlankNode("d2".into()));
         vp_document[DEVICE_BINDING_KEY][DEVICE_BINDING_KEY_X_2] =
             RdfValue::ObjectRef(ObjectId::BlankNode("d3".into()));
+        vp_document[DEVICE_BINDING_KEY][DEVICE_BINDING_KEY_Y_1] =
+            RdfValue::ObjectRef(ObjectId::BlankNode("d4".into()));
+        vp_document[DEVICE_BINDING_KEY][DEVICE_BINDING_KEY_Y_2] =
+            RdfValue::ObjectRef(ObjectId::BlankNode("d5".into()));
 
         deanon_map.insert(
             NamedOrBlankNode::BlankNode(BlankNode::new_unchecked("d2")),
@@ -238,16 +273,30 @@ pub fn present<R: RngCore>(
             NamedOrBlankNode::BlankNode(BlankNode::new_unchecked("d3")),
             x2_term.clone(),
         );
+        deanon_map.insert(
+            NamedOrBlankNode::BlankNode(BlankNode::new_unchecked("d4")),
+            y1_term.clone(),
+        );
+        deanon_map.insert(
+            NamedOrBlankNode::BlankNode(BlankNode::new_unchecked("d5")),
+            y2_term.clone(),
+        );
 
         let terms = rdf_proofs::signature::transform(&vc.document).unwrap();
 
         let x1_index = index_of_vc(&vc, &x1_term, &terms);
         let x2_index = index_of_vc(&vc, &x2_term, &terms);
+        let y1_index = index_of_vc(&vc, &y1_term, &terms);
+        let y2_index = index_of_vc(&vc, &y2_term, &terms);
 
         meta_statements
             .add_witness_equality(EqualWitnesses(BTreeSet::from([(0, x1_index), (1, 0)])));
         meta_statements
             .add_witness_equality(EqualWitnesses(BTreeSet::from([(0, x2_index), (2, 0)])));
+        meta_statements
+            .add_witness_equality(EqualWitnesses(BTreeSet::from([(0, y1_index), (3, 0)])));
+        meta_statements
+            .add_witness_equality(EqualWitnesses(BTreeSet::from([(0, y2_index), (4, 0)])));
 
         Some(db)
     } else {
@@ -440,6 +489,14 @@ pub fn present_native<R: RngCore>(
             coms.clone(),
             from_g1_to_arkg1(&db.bls_comm_pk_x2),
         ));
+        statements.add(PedersenCommitment::new_statement_from_params(
+            coms.clone(),
+            from_g1_to_arkg1(&db.bls_comm_pk_y1),
+        ));
+        statements.add(PedersenCommitment::new_statement_from_params(
+            coms.clone(),
+            from_g1_to_arkg1(&db.bls_comm_pk_y2),
+        ));
         let scalars_x1 = vec![
             from_blsfr_to_arkblsfr(&db.bls_scalar_x1),
             from_blsfr_to_arkblsfr(&db.bls_scalar_x1_blinding),
@@ -448,9 +505,19 @@ pub fn present_native<R: RngCore>(
             from_blsfr_to_arkblsfr(&db.bls_scalar_x2),
             from_blsfr_to_arkblsfr(&db.bls_scalar_x2_blinding),
         ];
+        let scalars_y1 = vec![
+            from_blsfr_to_arkblsfr(&db.bls_scalar_y1),
+            from_blsfr_to_arkblsfr(&db.bls_scalar_y1_blinding),
+        ];
+        let scalars_y2 = vec![
+            from_blsfr_to_arkblsfr(&db.bls_scalar_y2),
+            from_blsfr_to_arkblsfr(&db.bls_scalar_y2_blinding),
+        ];
 
         witnesses.add(Witness::PedersenCommitment(scalars_x1));
         witnesses.add(Witness::PedersenCommitment(scalars_x2));
+        witnesses.add(Witness::PedersenCommitment(scalars_y1));
+        witnesses.add(Witness::PedersenCommitment(scalars_y2));
 
         let (db_map, db_id) = vc_document[DEVICE_BINDING_KEY]
             .as_object()
@@ -481,11 +548,35 @@ pub fn present_native<R: RngCore>(
             x_2_value,
             NamedNode::new_unchecked(x_2_type),
         ));
+        let RdfValue::Typed(y_1_value, y_1_type) = db_map
+            .get(DEVICE_BINDING_KEY_Y_1)
+            .context("device binding has no y_1 value")?
+        else {
+            anyhow::bail!("device binding invalid y_1 value")
+        };
+        let y1_term = Term::Literal(Literal::new_typed_literal(
+            y_1_value,
+            NamedNode::new_unchecked(y_1_type),
+        ));
+        let RdfValue::Typed(y_2_value, y_2_type) = db_map
+            .get(DEVICE_BINDING_KEY_Y_2)
+            .context("device binding has no y_2 value")?
+        else {
+            anyhow::bail!("device binding invalid y_2 value")
+        };
+        let y2_term = Term::Literal(Literal::new_typed_literal(
+            y_2_value,
+            NamedNode::new_unchecked(y_2_type),
+        ));
 
         vp_document[DEVICE_BINDING_KEY][DEVICE_BINDING_KEY_X_1] =
             RdfValue::ObjectRef(ObjectId::BlankNode("d2".into()));
         vp_document[DEVICE_BINDING_KEY][DEVICE_BINDING_KEY_X_2] =
             RdfValue::ObjectRef(ObjectId::BlankNode("d3".into()));
+        vp_document[DEVICE_BINDING_KEY][DEVICE_BINDING_KEY_Y_1] =
+            RdfValue::ObjectRef(ObjectId::BlankNode("d4".into()));
+        vp_document[DEVICE_BINDING_KEY][DEVICE_BINDING_KEY_Y_2] =
+            RdfValue::ObjectRef(ObjectId::BlankNode("d5".into()));
 
         deanon_map.insert(
             NamedOrBlankNode::BlankNode(BlankNode::new_unchecked("d2")),
@@ -495,16 +586,30 @@ pub fn present_native<R: RngCore>(
             NamedOrBlankNode::BlankNode(BlankNode::new_unchecked("d3")),
             x2_term.clone(),
         );
+        deanon_map.insert(
+            NamedOrBlankNode::BlankNode(BlankNode::new_unchecked("d4")),
+            y1_term.clone(),
+        );
+        deanon_map.insert(
+            NamedOrBlankNode::BlankNode(BlankNode::new_unchecked("d5")),
+            y2_term.clone(),
+        );
 
         let terms = rdf_proofs::signature::transform(&vc.document).unwrap();
 
         let x1_index = index_of_vc(&vc, &x1_term, &terms);
         let x2_index = index_of_vc(&vc, &x2_term, &terms);
+        let y1_index = index_of_vc(&vc, &y1_term, &terms);
+        let y2_index = index_of_vc(&vc, &y2_term, &terms);
 
         meta_statements
             .add_witness_equality(EqualWitnesses(BTreeSet::from([(0, x1_index), (1, 0)])));
         meta_statements
             .add_witness_equality(EqualWitnesses(BTreeSet::from([(0, x2_index), (2, 0)])));
+        meta_statements
+            .add_witness_equality(EqualWitnesses(BTreeSet::from([(0, y1_index), (3, 0)])));
+        meta_statements
+            .add_witness_equality(EqualWitnesses(BTreeSet::from([(0, y2_index), (4, 0)])));
 
         Some(db)
     } else {
@@ -659,9 +764,19 @@ pub fn present_two<R: RngCore>(
                 db.bls_comm_key.clone(),
                 db.bls_comm_pk_x2,
             ));
+            statements.add(PedersenCommitment::new_statement_from_params(
+                db.bls_comm_key.clone(),
+                db.bls_comm_pk_y1,
+            ));
+            statements.add(PedersenCommitment::new_statement_from_params(
+                db.bls_comm_key.clone(),
+                db.bls_comm_pk_y2,
+            ));
 
             witnesses.add(Witness::PedersenCommitment(db.bls_scalars_x1.clone()));
             witnesses.add(Witness::PedersenCommitment(db.bls_scalars_x2.clone()));
+            witnesses.add(Witness::PedersenCommitment(db.bls_scalars_y1.clone()));
+            witnesses.add(Witness::PedersenCommitment(db.bls_scalars_y2.clone()));
 
             let (db_map, db_id) = vc1_doc[DEVICE_BINDING_KEY]
                 .as_object()
@@ -692,11 +807,35 @@ pub fn present_two<R: RngCore>(
                 x_2_value,
                 NamedNode::new_unchecked(x_2_type),
             ));
+            let RdfValue::Typed(y_1_value, y_1_type) = db_map
+                .get(DEVICE_BINDING_KEY_Y_1)
+                .context("device binding has no y_1 value")?
+            else {
+                anyhow::bail!("device binding invalid y_1 value")
+            };
+            let y1_term = Term::Literal(Literal::new_typed_literal(
+                y_1_value,
+                NamedNode::new_unchecked(y_1_type),
+            ));
+            let RdfValue::Typed(y_2_value, y_2_type) = db_map
+                .get(DEVICE_BINDING_KEY_Y_2)
+                .context("device binding has no y_2 value")?
+            else {
+                anyhow::bail!("device binding invalid y_2 value")
+            };
+            let y2_term = Term::Literal(Literal::new_typed_literal(
+                y_2_value,
+                NamedNode::new_unchecked(y_2_type),
+            ));
 
             doc[DEVICE_BINDING_KEY][DEVICE_BINDING_KEY_X_1] =
                 RdfValue::ObjectRef(ObjectId::BlankNode("d2".into()));
             doc[DEVICE_BINDING_KEY][DEVICE_BINDING_KEY_X_2] =
                 RdfValue::ObjectRef(ObjectId::BlankNode("d3".into()));
+            doc[DEVICE_BINDING_KEY][DEVICE_BINDING_KEY_Y_1] =
+                RdfValue::ObjectRef(ObjectId::BlankNode("d4".into()));
+            doc[DEVICE_BINDING_KEY][DEVICE_BINDING_KEY_Y_2] =
+                RdfValue::ObjectRef(ObjectId::BlankNode("d5".into()));
 
             deanon_map.insert(
                 NamedOrBlankNode::BlankNode(BlankNode::new_unchecked("d2")),
@@ -706,15 +845,29 @@ pub fn present_two<R: RngCore>(
                 NamedOrBlankNode::BlankNode(BlankNode::new_unchecked("d3")),
                 x2_term.clone(),
             );
+            deanon_map.insert(
+                NamedOrBlankNode::BlankNode(BlankNode::new_unchecked("d4")),
+                y1_term.clone(),
+            );
+            deanon_map.insert(
+                NamedOrBlankNode::BlankNode(BlankNode::new_unchecked("d5")),
+                y2_term.clone(),
+            );
             let terms = rdf_proofs::signature::transform(&vc1.document).unwrap();
 
             let x1_index = index_of_vc(&vc1, &x1_term, &terms);
             let x2_index = index_of_vc(&vc1, &x2_term, &terms);
+            let y1_index = index_of_vc(&vc1, &y1_term, &terms);
+            let y2_index = index_of_vc(&vc1, &y2_term, &terms);
 
             meta_statements
                 .add_witness_equality(EqualWitnesses(BTreeSet::from([(0, x1_index), (2, 0)])));
             meta_statements
                 .add_witness_equality(EqualWitnesses(BTreeSet::from([(0, x2_index), (3, 0)])));
+            meta_statements
+                .add_witness_equality(EqualWitnesses(BTreeSet::from([(0, y1_index), (4, 0)])));
+            meta_statements
+                .add_witness_equality(EqualWitnesses(BTreeSet::from([(0, y2_index), (5, 0)])));
 
             Some(db)
         } else {
@@ -907,6 +1060,14 @@ pub fn present_two_native<R: RngCore>(
                 coms.clone(),
                 from_g1_to_arkg1(&db.bls_comm_pk_x2),
             ));
+            statements.add(PedersenCommitment::new_statement_from_params(
+                coms.clone(),
+                from_g1_to_arkg1(&db.bls_comm_pk_y1),
+            ));
+            statements.add(PedersenCommitment::new_statement_from_params(
+                coms.clone(),
+                from_g1_to_arkg1(&db.bls_comm_pk_y2),
+            ));
             let scalars_x1 = vec![
                 from_blsfr_to_arkblsfr(&db.bls_scalar_x1),
                 from_blsfr_to_arkblsfr(&db.bls_scalar_x1_blinding),
@@ -915,9 +1076,19 @@ pub fn present_two_native<R: RngCore>(
                 from_blsfr_to_arkblsfr(&db.bls_scalar_x2),
                 from_blsfr_to_arkblsfr(&db.bls_scalar_x2_blinding),
             ];
+            let scalars_y1 = vec![
+                from_blsfr_to_arkblsfr(&db.bls_scalar_y1),
+                from_blsfr_to_arkblsfr(&db.bls_scalar_y1_blinding),
+            ];
+            let scalars_y2 = vec![
+                from_blsfr_to_arkblsfr(&db.bls_scalar_y2),
+                from_blsfr_to_arkblsfr(&db.bls_scalar_y2_blinding),
+            ];
 
             witnesses.add(Witness::PedersenCommitment(scalars_x1));
             witnesses.add(Witness::PedersenCommitment(scalars_x2));
+            witnesses.add(Witness::PedersenCommitment(scalars_y1));
+            witnesses.add(Witness::PedersenCommitment(scalars_y2));
 
             let (db_map, db_id) = vc1_doc[DEVICE_BINDING_KEY]
                 .as_object()
@@ -948,11 +1119,35 @@ pub fn present_two_native<R: RngCore>(
                 x_2_value,
                 NamedNode::new_unchecked(x_2_type),
             ));
+            let RdfValue::Typed(y_1_value, y_1_type) = db_map
+                .get(DEVICE_BINDING_KEY_Y_1)
+                .context("device binding has no y_1 value")?
+            else {
+                anyhow::bail!("device binding invalid y_1 value")
+            };
+            let y1_term = Term::Literal(Literal::new_typed_literal(
+                y_1_value,
+                NamedNode::new_unchecked(y_1_type),
+            ));
+            let RdfValue::Typed(y_2_value, y_2_type) = db_map
+                .get(DEVICE_BINDING_KEY_Y_2)
+                .context("device binding has no y_2 value")?
+            else {
+                anyhow::bail!("device binding invalid y_2 value")
+            };
+            let y2_term = Term::Literal(Literal::new_typed_literal(
+                y_2_value,
+                NamedNode::new_unchecked(y_2_type),
+            ));
 
             doc[DEVICE_BINDING_KEY][DEVICE_BINDING_KEY_X_1] =
                 RdfValue::ObjectRef(ObjectId::BlankNode("d2".into()));
             doc[DEVICE_BINDING_KEY][DEVICE_BINDING_KEY_X_2] =
                 RdfValue::ObjectRef(ObjectId::BlankNode("d3".into()));
+            doc[DEVICE_BINDING_KEY][DEVICE_BINDING_KEY_Y_1] =
+                RdfValue::ObjectRef(ObjectId::BlankNode("d4".into()));
+            doc[DEVICE_BINDING_KEY][DEVICE_BINDING_KEY_Y_2] =
+                RdfValue::ObjectRef(ObjectId::BlankNode("d5".into()));
 
             deanon_map.insert(
                 NamedOrBlankNode::BlankNode(BlankNode::new_unchecked("d2")),
@@ -962,15 +1157,29 @@ pub fn present_two_native<R: RngCore>(
                 NamedOrBlankNode::BlankNode(BlankNode::new_unchecked("d3")),
                 x2_term.clone(),
             );
+            deanon_map.insert(
+                NamedOrBlankNode::BlankNode(BlankNode::new_unchecked("d4")),
+                y1_term.clone(),
+            );
+            deanon_map.insert(
+                NamedOrBlankNode::BlankNode(BlankNode::new_unchecked("d5")),
+                y2_term.clone(),
+            );
             let terms = rdf_proofs::signature::transform(&vc1.document).unwrap();
 
             let x1_index = index_of_vc(&vc1, &x1_term, &terms);
             let x2_index = index_of_vc(&vc1, &x2_term, &terms);
+            let y1_index = index_of_vc(&vc1, &y1_term, &terms);
+            let y2_index = index_of_vc(&vc1, &y2_term, &terms);
 
             meta_statements
                 .add_witness_equality(EqualWitnesses(BTreeSet::from([(0, x1_index), (2, 0)])));
             meta_statements
                 .add_witness_equality(EqualWitnesses(BTreeSet::from([(0, x2_index), (3, 0)])));
+            meta_statements
+                .add_witness_equality(EqualWitnesses(BTreeSet::from([(0, y1_index), (4, 0)])));
+            meta_statements
+                .add_witness_equality(EqualWitnesses(BTreeSet::from([(0, y2_index), (5, 0)])));
 
             Some(db)
         } else {

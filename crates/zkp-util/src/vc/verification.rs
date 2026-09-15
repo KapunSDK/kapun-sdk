@@ -30,7 +30,10 @@ use serde_json::Value as JsonValue;
 use std::collections::{BTreeSet, HashMap};
 
 use crate::{
-    device_binding::{from_g1_to_arkg1, DEVICE_BINDING_KEY_X_1, DEVICE_BINDING_KEY_X_2},
+    device_binding::{
+        from_g1_to_arkg1, DEVICE_BINDING_KEY_X_1, DEVICE_BINDING_KEY_X_2, DEVICE_BINDING_KEY_Y_1,
+        DEVICE_BINDING_KEY_Y_2,
+    },
     vc::{index::index_of_vp, presentation::VerifiablePresentationNative},
 };
 
@@ -88,6 +91,14 @@ pub fn verify<R: RngCore>(
             db.bls_comm_key.clone(),
             db.bls_comm_pk_x2,
         ));
+        statements.add(PedersenCommitment::new_statement_from_params(
+            db.bls_comm_key.clone(),
+            db.bls_comm_pk_y1,
+        ));
+        statements.add(PedersenCommitment::new_statement_from_params(
+            db.bls_comm_key.clone(),
+            db.bls_comm_pk_y2,
+        ));
 
         // TODO: This is a biiiiig hack
         let (x1_index, graph_idx) = {
@@ -117,6 +128,20 @@ pub fn verify<R: RngCore>(
         )
         .unwrap()
             + 1;
+        let y1_index = index_of_vp(
+            &presentation.proof.dataset(),
+            &NamedNode::new_unchecked(DEVICE_BINDING_KEY_Y_1),
+            graph_idx,
+        )
+        .unwrap()
+            + 1;
+        let y2_index = index_of_vp(
+            &presentation.proof.dataset(),
+            &NamedNode::new_unchecked(DEVICE_BINDING_KEY_Y_2),
+            graph_idx,
+        )
+        .unwrap()
+            + 1;
 
         meta_statements.add_witness_equality(EqualWitnesses(BTreeSet::from([
             (graph_idx, x1_index),
@@ -125,6 +150,14 @@ pub fn verify<R: RngCore>(
         meta_statements.add_witness_equality(EqualWitnesses(BTreeSet::from([
             (graph_idx, x2_index),
             (num_vcs + 1, 0),
+        ])));
+        meta_statements.add_witness_equality(EqualWitnesses(BTreeSet::from([
+            (graph_idx, y1_index),
+            (num_vcs + 2, 0),
+        ])));
+        meta_statements.add_witness_equality(EqualWitnesses(BTreeSet::from([
+            (graph_idx, y2_index),
+            (num_vcs + 3, 0),
         ])));
 
         db.verify(params.message, &params.comm_key_bls_label)?;
@@ -306,6 +339,14 @@ pub fn verify_native<R: RngCore>(
             keys.clone(),
             db.bls_comm_pk_x2,
         ));
+        statements.add(PedersenCommitment::new_statement_from_params(
+            keys.clone(),
+            db.bls_comm_pk_y1,
+        ));
+        statements.add(PedersenCommitment::new_statement_from_params(
+            keys.clone(),
+            db.bls_comm_pk_y2,
+        ));
 
         // TODO: This is a biiiiig hack
         let (x_index, graph_idx) = {
@@ -328,9 +369,23 @@ pub fn verify_native<R: RngCore>(
                 )
             }
         };
-        let y_index = index_of_vp(
+        let x2_index = index_of_vp(
             &presentation.proof.dataset(),
             &NamedNode::new_unchecked(DEVICE_BINDING_KEY_X_2),
+            graph_idx,
+        )
+        .unwrap()
+            + 1;
+        let y1_index = index_of_vp(
+            &presentation.proof.dataset(),
+            &NamedNode::new_unchecked(DEVICE_BINDING_KEY_Y_1),
+            graph_idx,
+        )
+        .unwrap()
+            + 1;
+        let y2_index = index_of_vp(
+            &presentation.proof.dataset(),
+            &NamedNode::new_unchecked(DEVICE_BINDING_KEY_Y_2),
             graph_idx,
         )
         .unwrap()
@@ -341,8 +396,16 @@ pub fn verify_native<R: RngCore>(
             (num_vcs + 0, 0),
         ])));
         meta_statements.add_witness_equality(EqualWitnesses(BTreeSet::from([
-            (graph_idx, y_index),
+            (graph_idx, x2_index),
             (num_vcs + 1, 0),
+        ])));
+        meta_statements.add_witness_equality(EqualWitnesses(BTreeSet::from([
+            (graph_idx, y1_index),
+            (num_vcs + 2, 0),
+        ])));
+        meta_statements.add_witness_equality(EqualWitnesses(BTreeSet::from([
+            (graph_idx, y2_index),
+            (num_vcs + 3, 0),
         ])));
 
         db.verify(b"pop native proof", params.message)?;

@@ -44,6 +44,8 @@ pub const DEVICE_BINDING_KEY_X: &str = "https://zkp-ld.org/deviceBinding#x";
 pub const DEVICE_BINDING_KEY_Y: &str = "https://zkp-ld.org/deviceBinding#y";
 pub const DEVICE_BINDING_KEY_X_1: &str = "https://zkp-ld.org/deviceBinding#x1";
 pub const DEVICE_BINDING_KEY_X_2: &str = "https://zkp-ld.org/deviceBinding#x2";
+pub const DEVICE_BINDING_KEY_Y_1: &str = "https://zkp-ld.org/deviceBinding#y1";
+pub const DEVICE_BINDING_KEY_Y_2: &str = "https://zkp-ld.org/deviceBinding#y2";
 
 pub type SecpFr = ark_secp256r1::Fr;
 pub type SecpFq = ark_secp256r1::Fq;
@@ -63,6 +65,8 @@ pub struct DeviceBindingSigma {
     pub bls_comm_pk_y2: BlsG1Affine,
     pub bls_scalars_x1: Vec<BlsFr>,
     pub bls_scalars_x2: Vec<BlsFr>,
+    pub bls_scalars_y1: Vec<BlsFr>,
+    pub bls_scalars_y2: Vec<BlsFr>,
     pub K: Secp256r1Affine,
 }
 
@@ -73,11 +77,17 @@ pub struct DeviceBindingNative {
 
     pub bls_comm_pk_x1: ecdsa_pops::G1Affine,
     pub bls_comm_pk_x2: ecdsa_pops::G1Affine,
+    pub bls_comm_pk_y1: ecdsa_pops::G1Affine,
+    pub bls_comm_pk_y2: ecdsa_pops::G1Affine,
 
     pub bls_scalar_x1: ecdsa_pops::halo2curves::bls12381::Fr,
     pub bls_scalar_x2: ecdsa_pops::halo2curves::bls12381::Fr,
     pub bls_scalar_x1_blinding: ecdsa_pops::halo2curves::bls12381::Fr,
     pub bls_scalar_x2_blinding: ecdsa_pops::halo2curves::bls12381::Fr,
+    pub bls_scalar_y1: ecdsa_pops::halo2curves::bls12381::Fr,
+    pub bls_scalar_y2: ecdsa_pops::halo2curves::bls12381::Fr,
+    pub bls_scalar_y1_blinding: ecdsa_pops::halo2curves::bls12381::Fr,
+    pub bls_scalar_y2_blinding: ecdsa_pops::halo2curves::bls12381::Fr,
 
     pub K: Secp256r1Affine,
 }
@@ -205,6 +215,8 @@ pub struct DeviceBindingPresentationNative {
     pub params: PoPNativeNizk,
     pub bls_comm_pk_x1: BlsG1Affine,
     pub bls_comm_pk_x2: BlsG1Affine,
+    pub bls_comm_pk_y1: BlsG1Affine,
+    pub bls_comm_pk_y2: BlsG1Affine,
     pub K: Secp256r1Affine,
 }
 
@@ -226,6 +238,14 @@ impl DeviceBindingPresentationNative {
         w.write_u64::<byteorder::BigEndian>(compressed_size as u64)
             .unwrap();
         self.bls_comm_pk_x2.serialize_compressed(&mut w).unwrap();
+        let compressed_size = self.bls_comm_pk_y1.compressed_size();
+        w.write_u64::<byteorder::BigEndian>(compressed_size as u64)
+            .unwrap();
+        self.bls_comm_pk_y1.serialize_compressed(&mut w).unwrap();
+        let compressed_size = self.bls_comm_pk_y2.compressed_size();
+        w.write_u64::<byteorder::BigEndian>(compressed_size as u64)
+            .unwrap();
+        self.bls_comm_pk_y2.serialize_compressed(&mut w).unwrap();
 
         let k_bytes = bincode::serialize(&self.K).unwrap();
         w.write_u64::<byteorder::BigEndian>(k_bytes.len() as u64)
@@ -259,6 +279,16 @@ impl DeviceBindingPresentationNative {
 
         let x2 = BlsG1Affine::deserialize_compressed(&x2_bytes[..]).unwrap();
 
+        let len_y1 = reader.read_u64::<BigEndian>().unwrap();
+        let mut y1_bytes = vec![0; len_y1 as usize];
+        reader.read_exact(&mut y1_bytes).unwrap();
+
+        let len_y2 = reader.read_u64::<BigEndian>().unwrap();
+        let mut y2_bytes = vec![0; len_y2 as usize];
+        reader.read_exact(&mut y2_bytes).unwrap();
+        let y1 = BlsG1Affine::deserialize_compressed(&y1_bytes[..]).unwrap();
+        let y2 = BlsG1Affine::deserialize_compressed(&y2_bytes[..]).unwrap();
+
         let len_K = reader.read_u64::<BigEndian>().unwrap();
         let mut k_bytes = vec![0; len_K as usize];
         reader.read_exact(&mut k_bytes).unwrap();
@@ -269,6 +299,8 @@ impl DeviceBindingPresentationNative {
             params,
             bls_comm_pk_x1: x1,
             bls_comm_pk_x2: x2,
+            bls_comm_pk_y1: y1,
+            bls_comm_pk_y2: y2,
             K,
         }
     }
@@ -280,7 +312,10 @@ impl DeviceBindingPresentationNative {
                 from_arkg1_to_g1(&self.bls_comm_pk_x1),
                 from_arkg1_to_g1(&self.bls_comm_pk_x2),
             ],
-            None,
+            Some([
+                from_arkg1_to_g1(&self.bls_comm_pk_y1),
+                from_arkg1_to_g1(&self.bls_comm_pk_y2),
+            ]),
             arkfq_to_fq(&message).unwrap(),
             self.K,
         );
@@ -374,29 +409,31 @@ impl DeviceBindingNative {
 
         let sigma_converted = ecdsa.convert(&pk, &m, &sigma);
         // sample randomness for the commitments
-        let rho: [ecdsa_pops::halo2curves::bls12381::Fr; 2] = (0..2)
+        let rho_x: [ecdsa_pops::halo2curves::bls12381::Fr; 2] = (0..2)
+            .map(|_| <ecdsa_pops::halo2curves::bls12381::Fr>::random(OsRng))
+            .collect::<Vec<_>>()
+            .try_into()
+            .unwrap();
+        let rho_y: [ecdsa_pops::halo2curves::bls12381::Fr; 2] = (0..2)
             .map(|_| <ecdsa_pops::halo2curves::bls12381::Fr>::random(OsRng))
             .collect::<Vec<_>>()
             .try_into()
             .unwrap();
         println!("everything ready start proofs");
         // create witness
-        let w = RelECDSAWitness::new(pk, sigma_converted.z, rho, None);
+        let w = RelECDSAWitness::new(pk, sigma_converted.z, rho_x, Some(rho_y));
         println!("witness ready");
         // create the commitment to the public key
-        let coms = (0..2)
-            .map(|i| {
-                RelECDSA::<G1Affine, 2>::create_commitment(&pp, &w, i)
-                    .unwrap()
-                    .0
-            })
-            .collect::<Vec<_>>()
-            .try_into()
-            .unwrap();
+        let commitments = (0..2)
+            .map(|i| RelECDSA::<G1Affine, 2>::create_commitment(&pp, &w, i).unwrap())
+            .collect::<Vec<_>>();
+        let coms_x = [commitments[0].0, commitments[1].0];
+        let coms_y = [commitments[0].1.unwrap(), commitments[1].1.unwrap()];
         println!("commitments done");
-        let x = RelECDSAStatement::new(coms, None, m, sigma_converted.K);
+        let x = RelECDSAStatement::new(coms_x, Some(coms_y), m, sigma_converted.K);
 
-        let limbs = fp_to_scalars::<ecdsa_pops::G1Affine, 2>(&w.q().x).unwrap();
+        let limbs_x = fp_to_scalars::<ecdsa_pops::G1Affine, 2>(&w.q().x).unwrap();
+        let limbs_y = fp_to_scalars::<ecdsa_pops::G1Affine, 2>(&w.q().y).unwrap();
 
         let r_prover = RelECDSA::new(pp, x, Some(w));
         println!("elapsed [setup]: {}", (end - start).as_millis());
@@ -410,14 +447,20 @@ impl DeviceBindingNative {
         println!("elapsed [actual proof]: {}", (end - start).as_millis());
         println!("proof finished");
         Ok(Self {
-            proof: proof,
+            proof,
             params: nizk,
-            bls_comm_pk_x1: coms[0],
-            bls_comm_pk_x2: coms[1],
-            bls_scalar_x1: limbs[0],
-            bls_scalar_x2: limbs[1],
-            bls_scalar_x1_blinding: rho[0],
-            bls_scalar_x2_blinding: rho[1],
+            bls_comm_pk_x1: coms_x[0],
+            bls_comm_pk_x2: coms_x[1],
+            bls_comm_pk_y1: coms_y[0],
+            bls_comm_pk_y2: coms_y[1],
+            bls_scalar_x1: limbs_x[0],
+            bls_scalar_x2: limbs_x[1],
+            bls_scalar_x1_blinding: rho_x[0],
+            bls_scalar_x2_blinding: rho_x[1],
+            bls_scalar_y1: limbs_y[0],
+            bls_scalar_y2: limbs_y[1],
+            bls_scalar_y1_blinding: rho_y[0],
+            bls_scalar_y2_blinding: rho_y[1],
             K: sigma_converted.K,
         })
     }
@@ -427,7 +470,9 @@ impl DeviceBindingNative {
             params: self.params.clone(),
             bls_comm_pk_x1: from_g1_to_arkg1(&self.bls_comm_pk_x1),
             bls_comm_pk_x2: from_g1_to_arkg1(&self.bls_comm_pk_x2),
-            K: self.K.clone(),
+            bls_comm_pk_y1: from_g1_to_arkg1(&self.bls_comm_pk_y1),
+            bls_comm_pk_y2: from_g1_to_arkg1(&self.bls_comm_pk_y2),
+            K: self.K,
         }
     }
 }
@@ -478,6 +523,8 @@ impl DeviceBindingSigma {
         let witness = RelECDSAWitness::new(pk, sigma_converted.z, rho_x, Some(rho_y));
         let limbs_x = fp_to_scalars::<G1Affine, 2>(&witness.q().x)
             .map_err(|e| anyhow!("failed to split public key x coordinate: {e:?}"))?;
+        let limbs_y = fp_to_scalars::<G1Affine, 2>(&witness.q().y)
+            .map_err(|e| anyhow!("failed to split public key y coordinate: {e:?}"))?;
         let commitments = (0..2)
             .map(|i| RelECDSA::<G1Affine, 2>::create_commitment(&pp, &witness, i))
             .collect::<Result<Vec<_>, _>>()?;
@@ -507,6 +554,14 @@ impl DeviceBindingSigma {
             bls_scalars_x2: vec![
                 from_blsfr_to_arkblsfr(&limbs_x[1]),
                 from_blsfr_to_arkblsfr(&rho_x[1]),
+            ],
+            bls_scalars_y1: vec![
+                from_blsfr_to_arkblsfr(&limbs_y[0]),
+                from_blsfr_to_arkblsfr(&rho_y[0]),
+            ],
+            bls_scalars_y2: vec![
+                from_blsfr_to_arkblsfr(&limbs_y[1]),
+                from_blsfr_to_arkblsfr(&rho_y[1]),
             ],
             K: sigma_converted.K,
         })
@@ -674,7 +729,10 @@ mod tests {
                 from_arkg1_to_g1(&proof.bls_comm_pk_x1),
                 from_arkg1_to_g1(&proof.bls_comm_pk_x2),
             ],
-            None,
+            Some([
+                from_arkg1_to_g1(&proof.bls_comm_pk_y1),
+                from_arkg1_to_g1(&proof.bls_comm_pk_y2),
+            ]),
             arkfq_to_fq(&message).unwrap(),
             proof.K,
         );
