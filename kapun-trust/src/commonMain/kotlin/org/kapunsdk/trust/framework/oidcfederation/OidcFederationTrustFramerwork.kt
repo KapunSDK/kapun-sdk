@@ -1,5 +1,8 @@
 package org.kapunsdk.trust.framework.oidcfederation
 
+import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.request.get
 import org.kapunsdk.credentials.models.credential.CredentialModel
 import org.kapunsdk.issuance.metadata.data.CredentialIssuerMetadata
 import org.kapunsdk.presentation.request.PresentationRequest
@@ -14,6 +17,7 @@ import org.kapunsdk.util.log.Logger
 import uniffi.kapun_trust_rust.FederationException
 import uniffi.kapun_trust_rust.oidcfTrustChainFromPresentationRequest
 import uniffi.kapun_trust_rust.oidcfTrustChainFromUrl
+import kotlin.io.encoding.Base64
 
 const val OIDC_FEDERATION_TRUST_FRAMEWORK_ID: String = "oidc_federation_framework"
 
@@ -21,6 +25,7 @@ class OidcFederationTrustFramerwork(
 	val documentProvider: DocumentProvider? = null,
 	val oidfTrustAnchorProvider: OidfTrustAnchorProvider = StaticOidfTrustAnchorProvider(),
 	private val lenientTrustChainVerification: () -> Boolean = { false },
+	private val httpClient: HttpClient? = null,
 ) : TrustFramework {
 	override val frameworkId: String
 		get() = OIDC_FEDERATION_TRUST_FRAMEWORK_ID
@@ -59,7 +64,7 @@ class OidcFederationTrustFramerwork(
 			domain = trustInfo.leaf.domain,
 			displayName = trustInfo.leaf.displayName,
 			trustFrameworkId = OIDC_FEDERATION_TRUST_FRAMEWORK_ID,
-			logoUri = trustInfo.leaf.logoUri,
+			logoUri = downloadLogo(trustInfo.leaf.logoUri),
 			isTrusted = isTrusted,
 			isVerified = isVerified,
 			identityTrust = null,
@@ -99,7 +104,7 @@ class OidcFederationTrustFramerwork(
 			domain = trustInfo.leaf.domain,
 			displayName = trustInfo.leaf.displayName,
 			trustFrameworkId = OIDC_FEDERATION_TRUST_FRAMEWORK_ID,
-			logoUri = trustInfo.leaf.logoUri,
+			logoUri = downloadLogo(trustInfo.leaf.logoUri),
 			isTrusted = isTrusted,
 			isVerified = isVerified,
 			identityTrust = null,
@@ -142,6 +147,23 @@ class OidcFederationTrustFramerwork(
 		trustFrameworkId = OIDC_FEDERATION_TRUST_FRAMEWORK_ID,
 		isRemovable = isRemovable,
 	)
+
+	private suspend fun downloadLogo(logoUri: String?): String? {
+		if (logoUri == null || logoUri.startsWith("data:")) {
+			return logoUri
+		}
+		val client = httpClient ?: return logoUri
+
+		return runCatching {
+			val response = client.get(logoUri)
+			val contentType = response.headers[io.ktor.http.HttpHeaders.ContentType]
+				?.substringBefore(';')
+				?.takeIf { it.startsWith("image/") }
+				?: return@runCatching logoUri
+			val data = response.body<ByteArray>()
+			"data:$contentType;base64,${Base64.encode(data)}"
+		}.getOrDefault(logoUri)
+	}
 
 
 	override suspend fun validatePresentationRequest(presentationRequest: PresentationRequest): ValidationInfo {

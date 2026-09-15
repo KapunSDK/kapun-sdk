@@ -171,7 +171,9 @@ open class EaaIssuanceProcess(
                         isTrusted = trustFlow.agentInformation.isTrusted,
                         identityId = identity.id,
                         credentialId = insertedCredentialIds.last(),
-                        trustFlow.agentInformation.trustFrameworkId
+                        frameworkId = trustFlow.agentInformation.trustFrameworkId,
+                        agentDisplayName = trustFlow.agentInformation.displayName,
+                        agentLogoUri = trustFlow.agentInformation.logoUri,
                     )
 
                     val updatedIdentity = identityRepository.getById(identity.id)
@@ -472,7 +474,9 @@ open class EaaIssuanceProcess(
                         isTrusted = trustFlow.agentInformation.isTrusted,
                         identityId = identity.id,
                         credentialId = insertedIds.last(),
-                        trustFlow.agentInformation.trustFrameworkId
+                        frameworkId = trustFlow.agentInformation.trustFrameworkId,
+                        agentDisplayName = trustFlow.agentInformation.displayName,
+                        agentLogoUri = trustFlow.agentInformation.logoUri,
                     )
                 }
 

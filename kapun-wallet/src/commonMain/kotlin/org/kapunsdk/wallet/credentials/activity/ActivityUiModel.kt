@@ -35,6 +35,8 @@ sealed interface ActivityUiModel {
 		@SerialName("activityType") override val type: ActivityType,
 		override val insertedAt: String,
 		val issuanceTrustData: TrustData.Issuance,
+		val agentDisplayName: String? = null,
+		val agentLogoUri: String? = null,
 	) : ActivityUiModel
 
 	@Serializable
@@ -45,5 +47,7 @@ sealed interface ActivityUiModel {
 		override val insertedAt: String,
 		val values: List<LocalizedKeyValue>?,
 		val verificationTrustData: TrustData.Verification,
+		val agentDisplayName: String? = null,
+		val agentLogoUri: String? = null,
 	) : ActivityUiModel
 }

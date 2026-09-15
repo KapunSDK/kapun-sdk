@@ -73,20 +73,24 @@ class ActivityRepository private constructor(
 		insertedAt: Long,
 		identityId: Long,
 		credentialId: Long,
+		agentDisplayName: String? = null,
+		agentLogoUri: String? = null,
 	) = queries.fullInsert(
-		id,
-		type,
-		content,
-		baseUrl,
-		frameworkId,
-		identityJwt,
-		issuanceJwt,
-		verificationJwt,
-		isVerified,
-		isTrusted,
-		insertedAt,
-		identityId,
-		credentialId
+		id = id,
+		type = type,
+		content = content,
+		base_url = baseUrl,
+		frameworkId = frameworkId,
+		agent_display_name = agentDisplayName,
+		agent_logo_uri = agentLogoUri,
+		identity_jwt = identityJwt,
+		issuance_jwt = issuanceJwt,
+		verification_jwt = verificationJwt,
+		is_verified = isVerified,
+		is_trusted = isTrusted,
+		inserted_at = insertedAt,
+		identity_id = identityId,
+		credential_id = credentialId,
 	)
 
 	fun insertIssuance(
@@ -97,7 +101,9 @@ class ActivityRepository private constructor(
 		isTrusted: Boolean,
 		identityId: Long,
 		credentialId: Long,
-		frameworkId: String?
+		frameworkId: String?,
+		agentDisplayName: String? = null,
+		agentLogoUri: String? = null,
 	) = queries.insert(
 		type = ActivityType.ISSUANCE,
 		content = "",
@@ -111,6 +117,8 @@ class ActivityRepository private constructor(
 		identity_id = identityId,
 		credential_id = credentialId,
 		inserted_at = System.now().toEpochMilliseconds(),
+		agent_display_name = agentDisplayName,
+		agent_logo_uri = agentLogoUri,
 	)
 
 	fun insertVerification(
@@ -123,6 +131,8 @@ class ActivityRepository private constructor(
 		credentialId: Long,
 		frameworkId: String?,
 		baseUrl: String = "",
+		agentDisplayName: String? = null,
+		agentLogoUri: String? = null,
 	) = queries.insert(
 		type = ActivityType.PROOF,
 		content = content,
@@ -136,6 +146,8 @@ class ActivityRepository private constructor(
 		identity_id = identityId,
 		credential_id = credentialId,
 		inserted_at = System.now().toEpochMilliseconds(),
+		agent_display_name = agentDisplayName,
+		agent_logo_uri = agentLogoUri,
 	)
 
 	fun getById(id: Long) = queries.getById(id).executeAsOneOrNull()?.toModel(json)
@@ -190,7 +202,9 @@ class ActivityRepository private constructor(
 					verificationJwt = verification_jwt,
 					isVerified = is_verified.toBoolean(),
 					isTrusted = is_trusted.toBoolean()
-				)
+				),
+				agentDisplayName = agent_display_name,
+				agentLogoUri = agent_logo_uri,
 			)
 		} else {
 			ActivityUiModel.Issuance(
@@ -209,7 +223,9 @@ class ActivityRepository private constructor(
 					issuanceJwt = issuance_jwt,
 					isTrusted = is_trusted.toBoolean(),
 					isVerified = is_verified.toBoolean()
-				)
+				),
+				agentDisplayName = agent_display_name,
+				agentLogoUri = agent_logo_uri,
 			)
 		}
 	}

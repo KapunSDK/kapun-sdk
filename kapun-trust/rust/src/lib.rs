@@ -223,7 +223,6 @@ fn to_leaf_info(
     leaf: &EntityStatement,
     resolved_metadata: &std::collections::HashMap<String, transformer::Value>,
 ) -> OidcfLeafInfo {
-    let domain = leaf.sub();
     let metadata = if resolved_metadata.is_empty() {
         leaf.metadata.as_ref()
     } else {
@@ -303,15 +302,21 @@ fn to_leaf_info(
             .map(|s| s.to_string())
     };
 
-    display_name = display_name
-        .or_else(|| oidf_display_name(&federation_entity))
+    display_name = oidf_display_name(&federation_entity)
+        .or(display_name)
         .or_else(|| oidf_display_name(&cred_issuer))
         .or_else(|| oidf_display_name(&cred_verifier));
-    logo_uri = logo_uri
-        .or_else(|| oidf_logo_uri(&federation_entity))
+    logo_uri = oidf_logo_uri(&federation_entity)
+        .or(logo_uri)
         .or_else(|| oidf_logo_uri(&cred_issuer))
         .or_else(|| oidf_logo_uri(&cred_verifier));
 
+    let domain = federation_entity
+        .and_then(|v| v.get("homepage_uri"))
+        .and_then(|v| v.as_str())
+        .filter(|uri| !uri.is_empty())
+        .map(|uri| uri.to_string())
+        .unwrap_or_else(|| leaf.sub());
     let display_name = display_name.unwrap_or_else(|| domain.clone());
 
     OidcfLeafInfo {
