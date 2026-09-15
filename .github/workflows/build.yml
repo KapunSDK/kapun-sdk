@@ -28,11 +28,9 @@ jobs:
       # can execute matrix jobs concurrently; sharing $HOME/.cargo makes them wait on Cargo's
       # package-cache lock.
       CARGO_HOME: ${{ github.workspace }}/.cargo
-      # Use Git CLI for Git dependencies so Git's non-interactive setting is honored. Cargo's
-      # default libgit2 transport does not honor GIT_TERMINAL_PROMPT and can wait for credentials.
+      # Use Git CLI so the credential.helper override below is honored. Cargo's default libgit2
+      # transport does not apply this Git configuration and can wait for credentials.
       CARGO_NET_GIT_FETCH_WITH_CLI: "true"
-      GIT_TERMINAL_PROMPT: "0"
-      GIT_ASKPASS: "/usr/bin/false"
       GIT_CONFIG_COUNT: "4"
       GIT_CONFIG_KEY_0: "http.connectTimeout"
       GIT_CONFIG_VALUE_0: "30"
