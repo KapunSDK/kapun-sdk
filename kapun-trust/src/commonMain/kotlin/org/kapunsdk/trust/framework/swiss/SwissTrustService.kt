@@ -72,7 +72,7 @@ internal class SwissTrustService(
 			}.build()
 
 			val result = httpClient.get(url).bodyAsText()
-			return Json {  }.decodeFromString(result)
+			return Json.Default.decodeFromString(result)
 		}.getOrDefault(emptyList())
 	}
 	suspend fun getDidDocument(did: String): DidVerificationDocument? {

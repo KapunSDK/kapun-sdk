@@ -14,6 +14,8 @@ specific language governing permissions and limitations
 under the License.
  */
 
+@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+
 package org.kapunsdk.trust.framework.swiss.model
 
 import kotlinx.serialization.Serializable
