@@ -13,7 +13,6 @@ plugins {
 kotlin {
 	compilerOptions {
 		freeCompilerArgs.add("-Xexpect-actual-classes")
-		freeCompilerArgs.add("-Xwhen-guards")
 	}
 
 	jvmToolchain(17)
@@ -22,6 +21,8 @@ kotlin {
 		namespace = "org.kapunsdk.crypto"
 		compileSdk = libs.versions.android.compileSdk.get().toInt()
 		minSdk = libs.versions.android.minSdk.get().toInt()
+
+		withHostTest {}
 
 		optimization {
 			consumerKeepRules.publish = true

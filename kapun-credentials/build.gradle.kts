@@ -9,7 +9,6 @@ plugins {
 kotlin {
     compilerOptions {
         freeCompilerArgs.add("-Xexpect-actual-classes")
-        freeCompilerArgs.add("-Xwhen-guards")
     }
     jvmToolchain(17)
     android {
