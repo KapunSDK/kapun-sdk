@@ -121,7 +121,7 @@ jobs:
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
         run: |
           set +e
-          ./gradlew buildBindings ${{ steps.gradle_tasks.outputs.tasks }} -PreleaseBuild=true -PgithubRefName=${{ github.ref_name }} -PRELEASE_SIGNING_ENABLED=true &
+          ./gradlew buildBindings ${{ steps.gradle_tasks.outputs.tasks }} -PreleaseBuild=true -PgithubRefName=${{ github.ref_name }} -PRELEASE_SIGNING_ENABLED=true --console=plain &
           gradle_pid=$!
 
           trap 'kill "$gradle_pid" 2>/dev/null || true' INT TERM
