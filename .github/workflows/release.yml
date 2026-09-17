@@ -27,7 +27,7 @@ jobs:
           - platform: "jvm"
             runner: "macOS"
     name: "Publish to Maven Central"
-    runs-on: ["self-hosted", "${{ matrix.runner }}"]
+    runs-on: ["${{ matrix.runner }}"]
     timeout-minutes: 120
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-${{ matrix.platform }}

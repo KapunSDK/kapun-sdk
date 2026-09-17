@@ -23,7 +23,7 @@ jobs:
             runner: "macOS"
           - platform: "jvm-linux"
             runner: "k8s-runner-heidi"
-    runs-on: ["self-hosted", "${{ matrix.runner }}"]
+    runs-on: ["${{ matrix.runner }}"]
     timeout-minutes: 120
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-${{ matrix.platform }}
