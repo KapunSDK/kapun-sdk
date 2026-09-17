@@ -44,7 +44,7 @@ kapun-x509 = { path = "crates/kapun-x509/kapun-x509" }
 heidi-jwt = { git = "https://github.com/heidiverse/heidi-jwt" }
 serde_with_macros = "3.16.1"
 jsonschema = { version = "0.17", default-features = false }
-openidconnect-federation = { git = "https://github.com/heidiverse/openidconnect-federation.git" }
+openid-federation = { git = "https://github.com/heidiverse/openid-federation.git", branch = "main" }
 rand_core = { version = "0.6.4", features = ["getrandom"] }
 ark-serialize = "0.4.2"
 josekit = { git = "https://github.com/heidiverse/josekit-rs.git", default-features = false, features = [
@@ -69,8 +69,6 @@ ark-std = { version = "^0.4.0", default-features = false }
 bbs_plus = { version = "0.24.0", default-features = false, features = [
     "parallel",
 ] }
-blake2 = { version = "0.10", default-features = false }
-dock_crypto_utils = { version = "0.22.0", default-features = false }
 multibase = { version = "0.9.2" }
 num-bigint = { version = "0.4.6" }
 ureq = "3.3.0"
@@ -90,5 +88,7 @@ rdf-util = { path = "crates/rdf-util" }
 
 # Keep the transferred x509/josekit dependencies on the workspace crypto-provider
 # implementation so provider traits remain identical across the dependency graph.
-[patch."https://github.com/heidiverse/kapun-sdk.git"]
+[patch."https://github.com/KapunSDK/kapun-sdk.git"]
 kapun-crypto-provider = { path = "crates/kapun-crypto-provider" }
+zkp-util = { path = "crates/zkp-util" }
+rdf-util = { path = "crates/rdf-util" }

@@ -207,7 +207,7 @@ abstract class IssuanceProcess(
 		val docType = when (credentialType) {
 			CredentialType.SdJwt -> SdJwt.parse(credentialPayload).getMetadata().vct
 			CredentialType.Mdoc -> MdocUtils.getDocType(credentialPayload)
-			CredentialType.BbsTermwise -> return null
+			CredentialType.BbsTermwise -> Bbs.parse(credentialPayload).body()["@id"].asString() ?: return null
 			CredentialType.W3C_VCDM -> W3C.parse(credentialPayload).docType
             CredentialType.OpenBadge303 -> W3C.OpenBadge303
                 .parse(Base64.UrlSafe.decode(credentialPayload)).docType

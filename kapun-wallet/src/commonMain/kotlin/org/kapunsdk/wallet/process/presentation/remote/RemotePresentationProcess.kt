@@ -547,6 +547,8 @@ class RemotePresentationProcess(
 							cred.id,
 							trustFlow.agentInformation.trustFrameworkId,
 							baseUrl = trustFlow.agentInformation.domain,
+							agentDisplayName = trustFlow.agentInformation.displayName,
+							agentLogoUri = trustFlow.agentInformation.logoUri,
 						)
 					}
 					return RemotePresentationProcessStep.DcApiSuccess(
@@ -587,7 +589,9 @@ class RemotePresentationProcess(
 							cred.identityId,
 							cred.id,
 							trustFlow.agentInformation.trustFrameworkId,
-							baseUrl = trustFlow.agentInformation.domain
+							baseUrl = trustFlow.agentInformation.domain,
+							agentDisplayName = trustFlow.agentInformation.displayName,
+							agentLogoUri = trustFlow.agentInformation.logoUri,
 						)
 					}
 

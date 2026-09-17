@@ -1,7 +1,7 @@
 use heidi_jwt::jwt::GeneralizedBody;
 use oidcf::models::transformer;
 use oidcf::models::{EntityConfig, EntityStatement};
-use openidconnect_federation as oidcf;
+use openid_federation as oidcf;
 use std::fmt::Display;
 
 #[doc(hidden)]
@@ -56,7 +56,10 @@ pub struct OidcfLeafInfo {
 }
 
 #[uniffi::export]
-pub fn oidcf_trust_chain_from_url(url: &str) -> Result<OidcfTrustChainInfo, FederationError> {
+pub fn oidcf_trust_chain_from_url(
+    url: &str,
+    lenient_leaf_entity_config: bool,
+) -> Result<OidcfTrustChainInfo, FederationError> {
     let wrap_fetch_error = |e: oidcf::models::errors::FederationError| {
         FederationError::FetchingFailed(anyhow::anyhow!(e))
     };
@@ -64,13 +67,14 @@ pub fn oidcf_trust_chain_from_url(url: &str) -> Result<OidcfTrustChainInfo, Fede
     let mut trust_chain =
         oidcf::DefaultFederationRelation::new_from_url(url).map_err(wrap_fetch_error)?;
 
-    validate_oidf_trust_chain(&mut trust_chain)?;
-    to_oidf_trust_chain_info(trust_chain)
+    validate_oidf_trust_chain(&mut trust_chain, lenient_leaf_entity_config)?;
+    to_oidf_trust_chain_info(trust_chain, lenient_leaf_entity_config)
 }
 
 #[uniffi::export]
 pub fn oidcf_trust_chain_from_presentation_request(
     presentation_request_jwt: String,
+    lenient_leaf_entity_config: bool,
 ) -> Result<OidcfTrustChainInfo, FederationError> {
     let wrap_parse_error = |e: heidi_jwt::models::errors::JwtError| {
         FederationError::JwtParsingFailed(anyhow::anyhow!(e))
@@ -111,7 +115,7 @@ pub fn oidcf_trust_chain_from_presentation_request(
         )));
     };
 
-    validate_oidf_trust_chain(&mut trust_chain)?;
+    validate_oidf_trust_chain(&mut trust_chain, lenient_leaf_entity_config)?;
 
     let leaf = trust_chain
         .trust_entities
@@ -124,11 +128,12 @@ pub fn oidcf_trust_chain_from_presentation_request(
     jwt.verify_signature(&leaf.jwks())
         .map_err(wrap_validation_error)?;
 
-    to_oidf_trust_chain_info(trust_chain)
+    to_oidf_trust_chain_info(trust_chain, lenient_leaf_entity_config)
 }
 
 fn validate_oidf_trust_chain(
     trust_chain: &mut oidcf::DefaultFederationRelation,
+    lenient_leaf_entity_config: bool,
 ) -> Result<(), FederationError> {
     let wrap_validation_error = |e: oidcf::models::errors::FederationError| {
         FederationError::ValidationFailed(anyhow::anyhow!(e))
@@ -136,13 +141,16 @@ fn validate_oidf_trust_chain(
 
     trust_chain.build_trust().map_err(wrap_validation_error)?;
     trust_chain
-        .verify()
+        .verify_with_options(oidcf::models::trust_chain::VerificationOptions {
+            lenient_leaf_entity_config,
+        })
         .map_err(|e| wrap_validation_error(e.first().unwrap().clone()))?;
     Ok(())
 }
 
 fn to_oidf_trust_chain_info(
     mut trust_chain: oidcf::DefaultFederationRelation,
+    lenient_leaf_entity_config: bool,
 ) -> Result<OidcfTrustChainInfo, FederationError> {
     let wrap_validation_error = |e: oidcf::models::errors::FederationError| {
         FederationError::ValidationFailed(anyhow::anyhow!(e))
@@ -150,8 +158,15 @@ fn to_oidf_trust_chain_info(
 
     trust_chain.build_trust().map_err(wrap_validation_error)?;
     trust_chain
-        .verify()
+        .verify_with_options(oidcf::models::trust_chain::VerificationOptions {
+            lenient_leaf_entity_config,
+        })
         .map_err(|e| wrap_validation_error(e.first().unwrap().clone()))?;
+
+    // Prefer metadata resolved through the federation chain, which includes
+    // metadata policies, while retaining the leaf metadata as a fallback for
+    // chains that do not expose a resolvable path.
+    let resolved_metadata = trust_chain.resolve_metadata(None);
 
     let trust_anchor_keys: Vec<_> = trust_chain
         .trust_entities
@@ -181,7 +196,7 @@ fn to_oidf_trust_chain_info(
 
     let leaf = if let Some(EntityConfig::Leaf(leaf)) = trust_chain.leaf.entity_config {
         let pld = leaf.payload_unverified();
-        to_leaf_info(pld.insecure())
+        to_leaf_info(pld.insecure(), &resolved_metadata)
     } else {
         return Err(FederationError::ValidationFailed(anyhow::anyhow!(
             "no leaf"
@@ -204,13 +219,17 @@ fn as_vec_string(v: &serde_json::Value) -> Option<Vec<String>> {
     })
 }
 
-fn to_leaf_info(leaf: &EntityStatement) -> OidcfLeafInfo {
-    let domain = leaf.sub();
+fn to_leaf_info(
+    leaf: &EntityStatement,
+    resolved_metadata: &std::collections::HashMap<String, transformer::Value>,
+) -> OidcfLeafInfo {
+    let metadata = if resolved_metadata.is_empty() {
+        leaf.metadata.as_ref()
+    } else {
+        Some(resolved_metadata)
+    };
 
-    let cred_issuer = leaf
-        .metadata
-        .as_ref()
-        .and_then(|v| v.get("openid_credential_issuer"));
+    let cred_issuer = metadata.and_then(|v| v.get("openid_credential_issuer"));
     let credential_configurations_supported = cred_issuer
         .and_then(|v| v.get("credential_configurations_supported"))
         .and_then(|v| v.as_object())
@@ -244,10 +263,7 @@ fn to_leaf_info(leaf: &EntityStatement) -> OidcfLeafInfo {
     //
     // - openid_credential_verifier.client_name
     // - openid_credential_verifier.logo_uri
-    let cred_verifier = leaf
-        .metadata
-        .as_ref()
-        .and_then(|v| v.get("openid_credential_verifier"));
+    let cred_verifier = metadata.and_then(|v| v.get("openid_credential_verifier"));
 
     display_name = display_name.or_else(|| {
         cred_verifier
@@ -268,10 +284,7 @@ fn to_leaf_info(leaf: &EntityStatement) -> OidcfLeafInfo {
     //  - *.display_name
     //  - *.organization_name
     //  - *.logo_uri
-    let federation_entity = leaf
-        .metadata
-        .as_ref()
-        .and_then(|v| v.get("federation_entity"));
+    let federation_entity = metadata.and_then(|v| v.get("federation_entity"));
 
     let oidf_display_name = |obj: &Option<&transformer::Value>| {
         obj.and_then(|v| v.get("display_name"))
@@ -289,16 +302,22 @@ fn to_leaf_info(leaf: &EntityStatement) -> OidcfLeafInfo {
             .map(|s| s.to_string())
     };
 
-    display_name = display_name
-        .or_else(|| oidf_display_name(&federation_entity))
+    display_name = oidf_display_name(&federation_entity)
+        .or(display_name)
         .or_else(|| oidf_display_name(&cred_issuer))
         .or_else(|| oidf_display_name(&cred_verifier));
-    logo_uri = logo_uri
-        .or_else(|| oidf_logo_uri(&federation_entity))
+    logo_uri = oidf_logo_uri(&federation_entity)
+        .or(logo_uri)
         .or_else(|| oidf_logo_uri(&cred_issuer))
         .or_else(|| oidf_logo_uri(&cred_verifier));
 
-    let display_name = display_name.unwrap_or("".to_string());
+    let domain = federation_entity
+        .and_then(|v| v.get("homepage_uri"))
+        .and_then(|v| v.as_str())
+        .filter(|uri| !uri.is_empty())
+        .map(|uri| uri.to_string())
+        .unwrap_or_else(|| leaf.sub());
+    let display_name = display_name.unwrap_or_else(|| domain.clone());
 
     OidcfLeafInfo {
         domain,

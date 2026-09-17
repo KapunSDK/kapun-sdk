@@ -30,6 +30,7 @@ internal class CredentialConfigurationSerializer :
 		private const val FORMAT_MDOC = "mso_mdoc"
 		private const val FORMAT_SD_JWT = "dc+sd-jwt"
 		private const val FORMAT_LEGACY_SD_JWT = "vc+sd-jwt"
+		private const val FORMAT_ZKP_VC = "zkp_vc"
 		private const val FORMAT_W3C_VCDM = "vc+sd-jwt"
 	}
 
@@ -44,6 +45,7 @@ internal class CredentialConfigurationSerializer :
 		return when (format) {
 			FORMAT_MDOC -> CredentialConfiguration.Mdoc.serializer()
 			FORMAT_SD_JWT, FORMAT_LEGACY_SD_JWT -> CredentialConfiguration.SdJwt.serializer()
+			FORMAT_ZKP_VC -> CredentialConfiguration.Bbs.serializer()
 			else -> CredentialConfiguration.Unknown.serializer()
 		}
 	}

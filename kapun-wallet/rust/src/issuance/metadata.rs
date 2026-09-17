@@ -71,7 +71,7 @@ impl MetadataFetcher {
     ) -> Result<AuthorizationServerMetadata, ApiError> {
         // try openid-federation
         //
-        let res_oidf = openidconnect_federation::DefaultFederationRelation::new_from_url(
+        let res_oidf = openid_federation::DefaultFederationRelation::new_from_url(
             credential_issuer_url.as_str(),
         );
         if let Ok(mut res_oidf) = res_oidf {
@@ -167,7 +167,7 @@ impl MetadataFetcher {
         credential_issuer_url: Url,
     ) -> Result<CredentialIssuerMetadata, ApiError> {
         // try openid-federation
-        let res_oidf = openidconnect_federation::DefaultFederationRelation::new_from_url(
+        let res_oidf = openid_federation::DefaultFederationRelation::new_from_url(
             credential_issuer_url.as_str(),
         );
         if let Ok(mut res_oidf) = res_oidf {

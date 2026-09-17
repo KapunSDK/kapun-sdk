@@ -78,7 +78,7 @@ kapun-x509.workspace = true
 serde_with_macros.workspace = true
 jsonschema.workspace = true
 is_empty = "0.3.0"
-openidconnect-federation.workspace = true
+openid-federation.workspace = true
 
 [target.'cfg(any(target_family = "wasm"))'.dependencies]
 wasm-bindgen = "0.2.93"

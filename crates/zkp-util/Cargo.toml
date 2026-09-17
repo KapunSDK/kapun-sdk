@@ -13,15 +13,9 @@ ark-serialize = { workspace = true }
 ark-std = { workspace = true }
 base64 = { workspace = true }
 bbs_plus = { workspace = true }
-blake2 = { workspace = true }
-bulletproofs_plus_plus = { version = "0.8.0", default-features = false }
 chrono = { workspace = true }
 ciborium = { version = "0.2" }
-dock_crypto_utils = { workspace = true }
-equality_across_groups = { version = "0.1.0", default-features = false, features = [
-    "parallel",
-] }
-kvac = { version = "0.7.0", default-features = false }
+kvac = { version = "0.7.0", default-features = false, features = ["parallel"] }
 legogroth16 = { version = "0.16.0" }
 multibase = { workspace = true }
 num-bigint = { version = "0.4.6" }

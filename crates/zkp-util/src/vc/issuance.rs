@@ -26,8 +26,8 @@ use rdf_util::{
 };
 
 use crate::device_binding::{
-    DEVICE_BINDING_KEY, DEVICE_BINDING_KEY_X, DEVICE_BINDING_KEY_X_1, DEVICE_BINDING_KEY_X_2,
-    DEVICE_BINDING_KEY_Y,
+    DEVICE_BINDING_KEY, DEVICE_BINDING_KEY_X_1, DEVICE_BINDING_KEY_X_2, DEVICE_BINDING_KEY_Y_1,
+    DEVICE_BINDING_KEY_Y_2,
 };
 
 #[allow(clippy::too_many_arguments)]
@@ -41,6 +41,7 @@ pub fn issue<R: RngCore>(
     issuance_date: Option<DateTime<Utc>>,
     created_date: Option<DateTime<Utc>>,
     expiration_date: Option<DateTime<Utc>>,
+    // P-256 coordinates split into field-safe limbs: (x_1, x_2, y_1, y_2).
     device_binding: Option<(String, String, String, String)>,
     vc_type: Option<&str>,
 ) -> anyhow::Result<VerifiableCredential> {
@@ -99,17 +100,9 @@ pub fn issue<R: RngCore>(
     data["https://www.w3.org/2018/credentials#credentialSubject"] =
         RdfValue::Object(claims, claims_id);
 
-    if let Some((x, y, x_1, x_2)) = device_binding {
+    if let Some((x_1, x_2, y_1, y_2)) = device_binding {
         data[DEVICE_BINDING_KEY] = RdfValue::Object(
             BTreeMap::from([
-                (
-                    DEVICE_BINDING_KEY_X.into(),
-                    RdfValue::Typed(x, BASE_64_BYTES_BE.into()),
-                ),
-                (
-                    DEVICE_BINDING_KEY_Y.into(),
-                    RdfValue::Typed(y, BASE_64_BYTES_BE.into()),
-                ),
                 (
                     DEVICE_BINDING_KEY_X_1.into(),
                     RdfValue::Typed(x_1, BASE_64_BYTES_BE.into()),
@@ -117,6 +110,14 @@ pub fn issue<R: RngCore>(
                 (
                     DEVICE_BINDING_KEY_X_2.into(),
                     RdfValue::Typed(x_2, BASE_64_BYTES_BE.into()),
+                ),
+                (
+                    DEVICE_BINDING_KEY_Y_1.into(),
+                    RdfValue::Typed(y_1, BASE_64_BYTES_BE.into()),
+                ),
+                (
+                    DEVICE_BINDING_KEY_Y_2.into(),
+                    RdfValue::Typed(y_2, BASE_64_BYTES_BE.into()),
                 ),
             ]),
             ObjectId::None,

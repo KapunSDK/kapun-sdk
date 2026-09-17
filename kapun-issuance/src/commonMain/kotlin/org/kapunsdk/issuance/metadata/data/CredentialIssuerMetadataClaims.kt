@@ -235,6 +235,36 @@ sealed interface CredentialConfiguration {
 	) : CredentialConfiguration
 
 	@Serializable
+	data class Bbs(
+		@SerialName("format")
+		override val format: String,
+
+		@SerialName("scope")
+		override val scope: String? = null,
+
+		@SerialName("cryptographic_binding_methods_supported")
+		override val cryptographicBindingMethodsSupported: List<String>? = null,
+
+		@SerialName("credential_signing_alg_values_supported")
+		override val credentialSigningAlgValuesSupported: List<StringOrLong>? = null,
+
+		@SerialName("proof_types_supported")
+		override val proofTypesSupported: Map<String, ProofType>? = null,
+
+		@SerialName("display")
+		override val display: List<Display>? = null,
+
+		@SerialName("credential_metadata")
+		override val credentialMetadata: CredentialMetadata? = null,
+
+		@SerialName("vct")
+		val vct: String? = null,
+
+		@SerialName("claims")
+		val claims: JsonElement? = null,
+	) : CredentialConfiguration
+
+	@Serializable
 	data class SdJwtVcdm(
 		@SerialName("format")
 		override val format: String,

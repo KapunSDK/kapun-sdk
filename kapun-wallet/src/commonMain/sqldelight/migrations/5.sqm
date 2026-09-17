@@ -1,0 +1,8 @@
+-- Migration from DB version 5 to version 6
+CREATE TABLE trustAnchorEntity (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    trust_framework_id TEXT NOT NULL,
+    key TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    UNIQUE (trust_framework_id, key, subject)
+);

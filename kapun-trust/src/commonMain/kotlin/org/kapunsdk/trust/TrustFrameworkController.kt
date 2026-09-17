@@ -21,6 +21,7 @@ import org.kapunsdk.presentation.request.PresentationRequest
 import org.kapunsdk.trust.framework.TrustFramework
 import org.kapunsdk.trust.model.AgentInformation
 import org.kapunsdk.trust.model.AgentType
+import org.kapunsdk.trust.model.TrustAnchorInfo
 import org.kapunsdk.util.log.Logger
 
 class TrustFrameworkController(
@@ -48,6 +49,18 @@ class TrustFrameworkController(
 		return startFlow { framework ->
 			framework.getVerifierInformation(requestUri, presentationRequest, originalRequest)
 		} ?: createUntrustedFlow(requestUri, AgentType.VERIFIER)
+	}
+
+	fun saveTrustAnchor(trustAnchor: TrustAnchorInfo) {
+		frameworks.firstOrNull { it.frameworkId == trustAnchor.trustFrameworkId }
+			?.saveTrustAnchor(trustAnchor)
+	}
+
+	fun getTrustAnchors(): List<TrustAnchorInfo> = frameworks.flatMap { it.getTrustAnchors() }
+
+	fun removeTrustAnchor(trustAnchor: TrustAnchorInfo) {
+		frameworks.firstOrNull { it.frameworkId == trustAnchor.trustFrameworkId }
+			?.removeTrustAnchor(trustAnchor)
 	}
 
 	private suspend fun startFlow(agentProvider: suspend (org.kapunsdk.trust.framework.TrustFramework) -> AgentInformation?): TrustFlow? {

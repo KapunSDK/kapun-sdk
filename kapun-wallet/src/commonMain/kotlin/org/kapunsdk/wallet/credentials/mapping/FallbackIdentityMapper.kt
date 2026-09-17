@@ -27,7 +27,7 @@ import org.kapunsdk.util.extensions.jsonPrimitiveOrNull
 import org.kapunsdk.visualization.layout.LayoutData
 import org.kapunsdk.visualization.layout.LayoutSection
 import org.kapunsdk.visualization.layout.LayoutSectionProperty
-import org.kapunsdk.visualization.layout.deferredCard
+import org.kapunsdk.visualization.oca.model.content.TextShade
 import org.kapunsdk.visualization.oca.processing.AttributeValue
 import org.kapunsdk.wallet.credentials.activity.ActivityUiModel
 import org.kapunsdk.wallet.credentials.identity.IdentityUiModel
@@ -120,7 +120,16 @@ class FallbackIdentityMapper(
 		return IdentityUiModel.IdentityUiCredentialModel(
 			id = identity.id,
 			name = identity.name,
-			card = deferredCard(identity.name),
+			card = LayoutData.Card(
+				credentialName = identity.name,
+				issuerName = issuerName,
+				title = title,
+				subtitle = subtitle,
+				textColor = TextShade.DARK,
+				cardColor = 0xFFEFEFEF,
+				backgroundImage = null,
+				overlays = null,
+			),
 			title = title,
 			subtitle = subtitle,
 			signature = Signature(validationState, iss),

@@ -20,6 +20,7 @@ import org.kapunsdk.credentials.models.credential.CredentialModel
 import org.kapunsdk.issuance.metadata.data.CredentialIssuerMetadata
 import org.kapunsdk.presentation.request.PresentationRequest
 import org.kapunsdk.trust.model.AgentInformation
+import org.kapunsdk.trust.model.TrustAnchorInfo
 import uniffi.kapun_crypto_rust.getX509FromJwt
 import uniffi.kapun_crypto_rust.validateJwtWithPubKey
 
@@ -46,6 +47,15 @@ interface TrustFramework {
 		presentationRequest: PresentationRequest,
 		includeUsedCredentials: Boolean,
 	): List<CredentialModel>
+
+	/** Saves a trust anchor after explicit user approval. Trust frameworks may ignore this. */
+	fun saveTrustAnchor(trustAnchor: TrustAnchorInfo) = Unit
+
+	/** Returns the configured trust anchors exposed by this framework. */
+	fun getTrustAnchors(): List<TrustAnchorInfo> = emptyList()
+
+	/** Removes a user-managed trust anchor. Trust frameworks may ignore this. */
+	fun removeTrustAnchor(trustAnchor: TrustAnchorInfo) = Unit
 
 
     fun isMetadataSignatureTrustedX509(

@@ -1,0 +1,3 @@
+-- Migration from DB version 6 to version 7
+ALTER TABLE activityEntity ADD COLUMN agent_display_name TEXT DEFAULT NULL;
+ALTER TABLE activityEntity ADD COLUMN agent_logo_uri TEXT DEFAULT NULL;

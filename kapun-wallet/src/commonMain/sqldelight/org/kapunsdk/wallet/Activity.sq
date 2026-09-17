@@ -6,6 +6,8 @@ CREATE TABLE activityEntity (
     content TEXT NOT NULL,
     frameworkId TEXT DEFAULT NULL,
     base_url TEXT NOT NULL,
+    agent_display_name TEXT DEFAULT NULL,
+    agent_logo_uri TEXT DEFAULT NULL,
     identity_jwt TEXT,
     issuance_jwt TEXT,
     verification_jwt TEXT,
@@ -19,12 +21,12 @@ CREATE TABLE activityEntity (
 );
 
 insert:
-INSERT INTO activityEntity(type, content, base_url, frameworkId, identity_jwt, issuance_jwt, verification_jwt, is_verified, is_trusted, inserted_at, identity_id, credential_id)
-VALUES (?,?, ?,?,?, ?,?,?,?,?, ?, ?);
+INSERT INTO activityEntity(type, content, base_url, frameworkId, agent_display_name, agent_logo_uri, identity_jwt, issuance_jwt, verification_jwt, is_verified, is_trusted, inserted_at, identity_id, credential_id)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 fullInsert:
-INSERT INTO activityEntity(id, type, content, base_url, frameworkId, identity_jwt, issuance_jwt, verification_jwt, is_verified, is_trusted, inserted_at, identity_id, credential_id)
-VALUES (?, ?, ?, ?,?,?, ?,?,?,?, ?, ?, ?);
+INSERT INTO activityEntity(id, type, content, base_url, frameworkId, agent_display_name, agent_logo_uri, identity_jwt, issuance_jwt, verification_jwt, is_verified, is_trusted, inserted_at, identity_id, credential_id)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 getById:
 SELECT * FROM activityEntity WHERE id = ?;

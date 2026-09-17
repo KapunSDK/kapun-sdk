@@ -159,7 +159,9 @@ class EaaRefreshProcess(
 					isTrusted = agentInformation?.isTrusted ?: false,
 					identityId = identity.id,
 					frameworkId = agentInformation?.trustFrameworkId,
-					credentialId = insertedCredentialIds.last()
+					credentialId = insertedCredentialIds.last(),
+					agentDisplayName = agentInformation?.displayName,
+					agentLogoUri = agentInformation?.logoUri
 				)
 			} else {
 				Logger.error("No refreshed credentials")
