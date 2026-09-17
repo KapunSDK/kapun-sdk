@@ -14,8 +14,16 @@ jobs:
       fail-fast: false
       max-parallel: 4
       matrix:
-        platform: ["kmp", "android", "ios", "jvm"]
-    runs-on: ["self-hosted", "macOS"]
+        include:
+          - platform: "android"
+            runner: "Linux"
+          - platform: "ios"
+            runner: "macOS"
+          - platform: "jvm"
+            runner: "macOS"
+          - platform: "jvm-linux"
+            runner: "Linux"
+    runs-on: ["self-hosted", "${{ matrix.runner }}"]
     timeout-minutes: 120
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-${{ matrix.platform }}
@@ -44,10 +52,9 @@ jobs:
         run: |
           targets=()
           case "${{ matrix.platform }}" in
-            kmp) targets+=("KotlinMultiplatform") ;;
             android) targets+=("Android") ;;
-            ios) targets+=("IosArm64" "IosSimulatorArm64") ;;
-            jvm) targets+=("Jvm") ;;
+            ios) targets+=("KotlinMultiplatform" "IosArm64" "IosSimulatorArm64") ;;
+            jvm|jvm-linux) targets+=("Jvm") ;;
           esac
 
           tasks=""
@@ -73,7 +80,7 @@ jobs:
           cache-key: rust-registry-v1
 
       - name: Install Android SDK components
-        if: matrix.platform == 'android' || matrix.platform == 'kmp'
+        if: matrix.platform == 'android'
         run: |
           yes | sdkmanager --licenses
           yes | sdkmanager --install "ndk;28.2.13676358"
@@ -81,6 +88,7 @@ jobs:
       - name: Ensure gradlew is executable
         run: chmod +x gradlew
       - name: Export iOS deployment target
+        if: matrix.platform == 'ios'
         run: |
           echo "IPHONEOS_DEPLOYMENT_TARGET=$(grep '^IPHONEOS_DEPLOYMENT_TARGET=' gradle.properties | cut -d '=' -f2)" >> "$GITHUB_ENV"
 
