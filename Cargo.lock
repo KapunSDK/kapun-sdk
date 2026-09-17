@@ -4697,7 +4697,6 @@ version = "0.3.0"
 source = "git+https://github.com/heidiverse/possum.git#0909892e9448e0500475d8c5827745c9697a2a5b"
 dependencies = [
  "chrono",
- "jsonlogic",
  "peg",
  "serde_json",
 ]
@@ -4945,15 +4944,6 @@ dependencies = [
  "smallstr",
  "smallvec",
  "utf8-decode",
-]
-
-[[package]]
-name = "jsonlogic"
-version = "0.5.4"
-source = "git+https://github.com/ubamrein/jsonlogic_rs.git#671eb2ec84259dba92e26a71f52d0f9959465cc6"
-dependencies = [
- "chrono",
- "serde_json",
 ]
 
 [[package]]
@@ -5244,7 +5234,6 @@ dependencies = [
  "chrono",
  "ciborium",
  "flate2",
- "jlc",
  "libc",
  "openid-federation",
  "p256 0.13.2",

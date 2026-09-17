@@ -12,7 +12,7 @@ uniffi.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 chrono.workspace = true
-jlc = { git = "https://github.com/heidiverse/possum.git", optional = true }
+jlc = { git = "https://github.com/heidiverse/possum.git", default-features = false, optional = true }
 kapun-util-rust = { path = "../../kapun-util/rust" }
 kapun-credential-core-rust = { path = "../../kapun-credential-core/rust", default-features = false }
 
