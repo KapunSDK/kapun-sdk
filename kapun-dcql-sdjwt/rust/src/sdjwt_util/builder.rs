@@ -38,8 +38,55 @@ use crate::{
 use kapun_credential_core_rust::{
     claims_pointer::Selector,
     generate_nonce,
-    models::{Pointer, PointerPart, SpecVersion},
+    models::{Pointer, PointerPart},
 };
+
+// This builder implements the OpenID4VP 1.0 SD-JWT transaction-data hash profile.
+// Callers must validate the type-specific schema, select an eligible credential, and
+// obtain consent before using this low-level API. Other profiles need their own binding.
+fn validate_transaction_data(data: &[String]) -> Result<(), BuilderError> {
+    let invalid = |message: &str| BuilderError::InvalidTransactionData(message.into());
+    if data.is_empty() {
+        return Err(invalid("Transaction data must not be empty"));
+    }
+    for encoded in data {
+        let bytes = BASE64_URL_SAFE_NO_PAD
+            .decode(encoded)
+            .map_err(|_| invalid("Transaction data must be unpadded base64url"))?;
+        let value: serde_json::Value = serde_json::from_slice(&bytes)
+            .map_err(|_| invalid("Transaction data must contain a JSON object"))?;
+        let object = value
+            .as_object()
+            .ok_or_else(|| invalid("Transaction data must be an object"))?;
+        if object
+            .get("type")
+            .and_then(|v| v.as_str())
+            .is_none_or(str::is_empty)
+        {
+            return Err(invalid("Transaction data requires a type"));
+        }
+        let ids = object
+            .get("credential_ids")
+            .and_then(|v| v.as_array())
+            .ok_or_else(|| invalid("Transaction data requires credential_ids"))?;
+        if ids.is_empty() || ids.iter().any(|v| v.as_str().is_none_or(str::is_empty)) {
+            return Err(invalid("credential_ids must contain non-empty strings"));
+        }
+        if let Some(algorithms) = object.get("transaction_data_hashes_alg") {
+            let algorithms = algorithms
+                .as_array()
+                .ok_or_else(|| invalid("Invalid hash algorithm list"))?;
+            if algorithms
+                .iter()
+                .any(|v| v.as_str().is_none_or(str::is_empty))
+                || !algorithms.iter().any(|v| v.as_str() == Some("sha-256"))
+            {
+                return Err(invalid("Requested hash algorithms do not permit sha-256"));
+            }
+        }
+    }
+    Ok(())
+}
 
 const UNDISCLOSABLE_CLAIMS: [&str; 5] = ["iss", "iat", "exp", "nbf", "vct"];
 
@@ -51,6 +98,7 @@ pub enum BuilderError {
     Unknown,
     AlreadyBuilt,
     InvalidDisclosure,
+    InvalidTransactionData(String),
 }
 
 impl Display for BuilderError {
@@ -69,7 +117,7 @@ pub struct BuilderImpl {
     disclosures: Vec<String>,
     nonce: Option<String>,
     aud: Option<String>,
-    transaction_data: Option<(Vec<String>, SpecVersion)>,
+    transaction_data: Option<Vec<String>>,
     #[cfg(feature = "experimental")]
     zk_proofs: Vec<ZkProof>,
 
@@ -192,9 +240,9 @@ impl BuilderImpl {
     pub fn with_transaction_data(
         &mut self,
         transaction_data: Vec<String>,
-        spec_version: SpecVersion,
     ) -> Result<&mut Self, BuilderError> {
-        self.transaction_data = Some((transaction_data, spec_version));
+        validate_transaction_data(&transaction_data)?;
+        self.transaction_data = Some(transaction_data);
         Ok(self)
     }
 
@@ -202,6 +250,17 @@ impl BuilderImpl {
         &mut self,
         signer: Option<Arc<dyn SignatureCreator>>,
     ) -> Result<String, BuilderError> {
+        if self.transaction_data.is_some()
+            && (self
+                .claims
+                .get("cnf")
+                .is_none_or(|cnf| matches!(cnf, Value::Null))
+                || signer.is_none())
+        {
+            return Err(BuilderError::InvalidTransactionData(
+                "Transaction data requires cryptographic holder binding".into(),
+            ));
+        }
         let mut presentation = self.original_jwt.clone();
 
         if !self.disclosures.is_empty() {
@@ -260,26 +319,13 @@ impl BuilderImpl {
                             claims["zk_proofs"] = serde_json::json!(self.zk_proofs);
                         }
 
-                        if let Some((transaction_data, spec_version)) = &self.transaction_data {
-                            match spec_version {
-                                SpecVersion::Oid4VpDraft23 => {
-                                    // Note: the Authorization Request can contain a list of hash algorithms.
-                                    // SHA256 must always be supported, so we can be lazy and implement nothing else.
-                                    let mut hasher = Sha256::new();
-
-                                    let hashes = transaction_data
-                                        .iter()
-                                        .map(|td| base64_hash(&mut hasher, td))
-                                        .collect::<Vec<_>>();
-
-                                    claims["transaction_data_hashes"] = serde_json::json!(hashes);
-
-                                    // Spec: REQUIRED when this parameter was present in the transaction_data request
-                                    // parameter --> lazy: include it always.
-                                    claims["transaction_data_hashes_alg"] =
-                                        serde_json::json!("sha-256");
-                                }
-                            }
+                        if let Some(transaction_data) = &self.transaction_data {
+                            let hashes = transaction_data
+                                .iter()
+                                .map(|td| base64_hash(&mut Sha256::new(), td))
+                                .collect::<Vec<_>>();
+                            claims["transaction_data_hashes"] = serde_json::json!(hashes);
+                            claims["transaction_data_hashes_alg"] = serde_json::json!("sha-256");
                         }
 
                         BASE64_URL_SAFE_NO_PAD.encode(serde_json::to_vec(&claims).unwrap())
@@ -444,16 +490,12 @@ impl SdJwtBuilder {
         Ok(())
     }
 
-    pub fn with_transaction_data(
-        &self,
-        transaction_data: Vec<String>,
-        spec_version: SpecVersion,
-    ) -> Result<(), BuilderError> {
+    pub fn with_transaction_data(&self, transaction_data: Vec<String>) -> Result<(), BuilderError> {
         let Ok(mut this) = self.inner.lock() else {
             return Err(BuilderError::Lock);
         };
 
-        this.with_transaction_data(transaction_data, spec_version)?;
+        this.with_transaction_data(transaction_data)?;
 
         Ok(())
     }
@@ -475,5 +517,129 @@ impl SdJwtBuilder {
     pub fn is_w3c(&self) -> bool {
         let this = self.inner.lock().unwrap();
         this.is_w3c
+    }
+}
+
+#[cfg(test)]
+mod transaction_data_tests {
+    use super::*;
+    use crate::SigningError;
+    use serde_json::json;
+
+    struct TestSigner;
+    impl SignatureCreator for TestSigner {
+        fn alg(&self) -> String {
+            "ES256".into()
+        }
+        fn sign(&self, _: Vec<u8>) -> Result<Vec<u8>, SigningError> {
+            Ok(vec![1, 2, 3])
+        }
+    }
+
+    fn builder(bound: bool) -> SdJwtBuilder {
+        let claims = if bound {
+            json!({"cnf": {"jwk": {}}})
+        } else {
+            json!({})
+        };
+        SdJwtBuilder::from_parts(
+            Value::from_serialize(&claims).unwrap(),
+            "header.claims.signature".into(),
+            HashMap::new(),
+            HashMap::new(),
+        )
+    }
+    fn data(algorithms: Option<serde_json::Value>) -> String {
+        let mut data = json!({"type":"https://example.com/transaction", "credential_ids":["pid"]});
+        if let Some(algorithms) = algorithms {
+            data["transaction_data_hashes_alg"] = algorithms;
+        }
+        BASE64_URL_SAFE_NO_PAD.encode(serde_json::to_vec(&data).unwrap())
+    }
+
+    #[test]
+    fn hashes_original_encoded_strings_in_key_binding_jwt() {
+        let data = vec![data(None), data(Some(json!(["sha-512", "sha-256"])))];
+        let builder = builder(true);
+        builder.with_nonce("nonce").unwrap();
+        builder.with_audience("audience").unwrap();
+        builder.with_transaction_data(data.clone()).unwrap();
+        let presentation = builder.build(Some(Arc::new(TestSigner))).unwrap();
+        let kb = presentation.rsplit('~').next().unwrap();
+        let claims: serde_json::Value = serde_json::from_slice(
+            &BASE64_URL_SAFE_NO_PAD
+                .decode(kb.split('.').nth(1).unwrap())
+                .unwrap(),
+        )
+        .unwrap();
+        let expected: Vec<_> = data
+            .iter()
+            .map(|encoded| BASE64_URL_SAFE_NO_PAD.encode(Sha256::digest(encoded.as_bytes())))
+            .collect();
+        assert_eq!(claims["transaction_data_hashes"], json!(expected));
+        assert_eq!(claims["transaction_data_hashes_alg"], "sha-256");
+        assert!(claims.get("transaction_data").is_none());
+    }
+
+    // OpenID4VP 1.0 Final §5.1 example, compact JSON, hashed per §B.3.3.1.
+    // https://openid.net/specs/openid-4-verifiable-presentations-1_0-final.html#section-5.1
+    #[test]
+    fn final_spec_example_has_known_transaction_hash() {
+        let encoded =
+            "eyJ0eXBlIjoiZXhhbXBsZV90eXBlIiwiY3JlZGVudGlhbF9pZHMiOlsiaWRfY2FyZF9jcmVkZW50aWFsIl19";
+        let builder = builder(true);
+        builder.with_nonce("nonce").unwrap();
+        builder.with_audience("audience").unwrap();
+        builder.with_transaction_data(vec![encoded.into()]).unwrap();
+        let presentation = builder.build(Some(Arc::new(TestSigner))).unwrap();
+        let kb = presentation.rsplit('~').next().unwrap();
+        let claims: serde_json::Value = serde_json::from_slice(
+            &BASE64_URL_SAFE_NO_PAD
+                .decode(kb.split('.').nth(1).unwrap())
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            claims["transaction_data_hashes"],
+            json!(["lTp84kYtj5cZfVVmkrjZg-TZnQSfDoGWfNN9YKZo14M"])
+        );
+    }
+
+    #[test]
+    fn rejects_malformed_data_and_unsupported_hash_negotiation() {
+        let invalid = vec![
+            vec![],
+            vec!["!".into()],
+            vec![BASE64_URL_SAFE_NO_PAD.encode(b"{}")],
+            vec![data(Some(json!([])))],
+            vec![data(Some(json!(["sha-512"])))],
+            vec![data(Some(json!("sha-256")))],
+            vec![data(Some(json!(null)))],
+            vec![data(Some(json!(["sha-256", 1])))],
+            vec![BASE64_URL_SAFE_NO_PAD.encode(br#"{"type":"example","credential_ids":[]}"#)],
+        ];
+        for data in invalid {
+            assert!(matches!(
+                builder(true).with_transaction_data(data),
+                Err(BuilderError::InvalidTransactionData(_))
+            ));
+        }
+    }
+
+    #[test]
+    fn requires_holder_binding_and_a_signer() {
+        let unbound = builder(false);
+        unbound.with_transaction_data(vec![data(None)]).unwrap();
+        assert!(matches!(
+            unbound.build(Some(Arc::new(TestSigner))),
+            Err(BuilderError::InvalidTransactionData(_))
+        ));
+        let bound = builder(true);
+        bound.with_transaction_data(vec![data(None)]).unwrap();
+        assert!(matches!(
+            bound.build(None),
+            Err(BuilderError::InvalidTransactionData(_))
+        ));
+        assert!(builder(false).build(None).is_ok());
     }
 }

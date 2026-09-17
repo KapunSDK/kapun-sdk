@@ -16,19 +16,28 @@ under the License.
 
 package org.kapunsdk.presentation.request.model
 
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
 
+/** A validated OpenID4VP transaction using the SD-JWT SHA-256 hash profile. */
 @Serializable
 data class TransactionData(
     val type: String,
-    val signatureQualifier: String?,
-    val credentialID: String?,
-    val documentDigests: List<DocumentDigest>?,
-    val processID: String?,
-    val QC_terms_conditions_uri: String?,
-    @SerialName("QC_hash")
-    val qcHash: String?,
-    @SerialName("QC_hashAlgorithmOID")
-    val qcHashAlgorithmOid: String?
+    val credentialIds: List<String>,
+    val payload: JsonObject,
 )
+
+/**
+ * Explicit opt-in to a transaction type's SD-JWT hash profile. The validator must
+ * check all type-specific values and required fields. The caller must render the
+ * transaction and obtain consent before presenting it. CSC custom bindings are
+ * not implicitly supported by this profile.
+ */
+class TransactionDataProfile(
+    val allowedFields: Set<String>,
+    val validate: (JsonObject) -> Unit,
+)
+
+class InvalidTransactionDataException(message: String) : IllegalArgumentException(message) {
+    val code: String = "invalid_transaction_data"
+}

@@ -16,6 +16,7 @@ under the License.
 
 package org.kapunsdk.presentation.request
 
+import org.kapunsdk.presentation.request.model.TransactionDataProfile
 import org.kapunsdk.presentation.request.model.OID4VPVersion
 import org.kapunsdk.util.extensions.*
 import org.kapunsdk.util.extensions.get
@@ -105,14 +106,14 @@ data class PresentationRequest @OptIn(ExperimentalSerializationApi::class) const
 		/**
 		 * For backward compatibility, calls detectVersionAndParse and returns just the PresentationRequest
 		 */
-		fun fromValue(value: Value): PresentationRequest? {
-			return detectProtocolVersionAndParse(value)?.request
+		fun fromValue(value: Value, transactionDataProfiles: Map<String, TransactionDataProfile> = emptyMap()): PresentationRequest? {
+			return detectProtocolVersionAndParse(value, transactionDataProfiles)?.request
 		}
 
 		/**
 		 * Detects the OID4VP version from the Value object and returns both the version and the parsed PresentationRequest
 		 */
-		fun detectProtocolVersionAndParse(value: Value): VersionedPresentationRequest? {
+		fun detectProtocolVersionAndParse(value: Value, transactionDataProfiles: Map<String, TransactionDataProfile> = emptyMap()): VersionedPresentationRequest? {
 			// Detect version in priority order: 21, 26, 24
 			val clientIdScheme = value["client_id_scheme"].takeIf { it != Value.Null }?.asString()
 
@@ -196,7 +197,7 @@ data class PresentationRequest @OptIn(ExperimentalSerializationApi::class) const
 					presentationDefinition
 				},
 				dcqlQuery = dcqlQuery,
-				transactionData = TransactionDataWrapper.fromValue(value),
+				transactionData = TransactionDataWrapper.fromValue(value, transactionDataProfiles),
 				clientMetadata = value["client_metadata"].transform(),
 				verifierAttestations = value["verifier_attestations"].transform(),
 				verifierInfo = value["verifier_info"].transform(),

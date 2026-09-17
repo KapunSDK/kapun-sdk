@@ -17,46 +17,129 @@ under the License.
 package org.kapunsdk.presentation.request
 
 import org.kapunsdk.wallet.process.presentation.models.TransactionDataWrapper
-import uniffi.kapun_credential_core_rust.SpecVersion
+import org.kapunsdk.presentation.request.model.InvalidTransactionDataException
+import org.kapunsdk.presentation.request.model.TransactionDataProfile
+import org.kapunsdk.util.extensions.json
+import kotlinx.serialization.json.*
 import uniffi.kapun_util_rust.Value
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertIs
-import kotlin.test.assertNull
+import kotlin.test.*
 
 @OptIn(ExperimentalEncodingApi::class)
 class TransactionDataWrapperTest {
-    private fun transactionData(type: String): Value.String {
-        val payload = """{"type":"$type","signatureQualifier":null,"credentialID":null,"documentDigests":null,"processID":null,"QC_terms_conditions_uri":null,"QC_hash":null,"QC_hashAlgorithmOID":null}"""
-        return Value.String(Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT).encode(payload.encodeToByteArray()))
+    private val type = "https://example.com/transaction"
+    private val profiles = mapOf(type to TransactionDataProfile(setOf("amount")) { payload ->
+        require((payload["amount"] as? JsonPrimitive)?.intOrNull?.let { it > 0 } == true)
+    })
+
+    private fun payload(ids: List<String> = listOf("first"), algorithms: JsonElement? = null) = buildJsonObject {
+        put("type", type)
+        put("credential_ids", JsonArray(ids.map(::JsonPrimitive)))
+        put("amount", 10)
+        if (algorithms != null) put("transaction_data_hashes_alg", algorithms)
     }
 
-    private fun descriptorData() = Value.Object(mapOf(
-        "input_descriptors" to Value.Array(listOf(Value.Object(mapOf(
-            "id" to Value.String("credential"),
-            "transaction_data" to Value.Array(listOf(transactionData("nested"))),
-        )))),
-    ))
+    private fun encode(payload: JsonElement): String =
+        Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT).encode(payload.toString().encodeToByteArray())
 
+    private fun request(entries: List<String>, query: String = """
+        {"credentials":[{"id":"first","format":"dc+sd-jwt"},{"id":"second","format":"dc+sd-jwt"}]}
+    """): Value = json.decodeFromString(buildJsonObject {
+        put("dcql_query", Json.parseToJsonElement(query))
+        put("transaction_data", JsonArray(entries.map(::JsonPrimitive)))
+    }.toString())
+
+    private fun parse(value: Value) = assertNotNull(TransactionDataWrapper.fromValue(value, profiles))
+
+    // OpenID4VP 1.0 Final §5.1 (comments removed from the illustrative JSON).
+    // https://openid.net/specs/openid-4-verifiable-presentations-1_0-final.html#section-5.1
     @Test
-    fun ignoresTransactionDataInsideInputDescriptors() {
-        val request = Value.Object(mapOf("presentation_definition" to descriptorData()))
-        assertNull(TransactionDataWrapper.fromValue(request))
+    fun parsesFinalSpecificationExampleWithAnExplicitProfile() {
+        val encoded = "eyJ0eXBlIjoiZXhhbXBsZV90eXBlIiwiY3JlZGVudGlhbF9pZHMiOlsiaWRfY2FyZF9jcmVkZW50aWFsIl19"
+        val request = request(listOf(encoded), """{"credentials":[{"id":"id_card_credential","format":"dc+sd-jwt"}]}""")
+        val parsed = assertNotNull(TransactionDataWrapper.fromValue(request,
+            mapOf("example_type" to TransactionDataProfile(emptySet()) {})))
+        assertEquals(mapOf("id_card_credential" to listOf(encoded)),
+            parsed.selectForCredentials(setOf("id_card_credential")))
     }
 
     @Test
-    fun parsesTopLevelTransactionDataEvenWhenInputDescriptorsContainData() {
-        val encoded = transactionData("qes_authorization")
-        val request = Value.Object(mapOf(
-            "presentation_definition" to descriptorData(),
-            "transaction_data" to Value.Array(listOf(encoded)),
-        ))
-        val parsed = assertIs<TransactionDataWrapper.OpenId4Vp>(TransactionDataWrapper.fromValue(request))
-        assertEquals("qes_authorization", parsed.value.single().second.type)
-        assertEquals(encoded, Value.String(parsed.value.single().first))
-        assertEquals(SpecVersion.OID4_VP_DRAFT23, parsed.specVersion())
-        assertEquals(parsed.value, parsed.getForCredential("credential"))
+    fun preservesEncodedInputAndSelectsExactlyOneEligibleCredential() {
+        val first = encode(payload(listOf("first", "second")))
+        val second = encode(payload(listOf("second")))
+        val parsed = parse(request(listOf(first, second)))
+        assertEquals(mapOf("first" to listOf(first), "second" to listOf(second)),
+            parsed.selectForCredentials(setOf("first", "second")))
+        assertEquals(mapOf("second" to listOf(first, second)), parsed.selectForCredentials(setOf("second")))
+        assertFailsWith<InvalidTransactionDataException> { parsed.selectForCredentials(setOf("unrelated")) }
+    }
+
+    @Test
+    fun allowsOneCredentialFromAQueryThatPermitsMultiple() {
+        val encoded = encode(payload())
+        val parsed = parse(request(listOf(encoded),
+            """{"credentials":[{"id":"first","format":"dc+sd-jwt","multiple":true}]}"""))
+        assertEquals(mapOf("first" to listOf(encoded)), parsed.selectForCredentials(setOf("first")))
+    }
+
+    @Test
+    fun rejectsUnknownTypesByDefaultIncludingRetiredProfiles() {
+        for (name in listOf(type, "qes_authorization", "qcert_creation_acceptance")) {
+            val objectValue = JsonObject(payload() + ("type" to JsonPrimitive(name)))
+            val error = assertFailsWith<InvalidTransactionDataException> {
+                TransactionDataWrapper.fromValue(request(listOf(encode(objectValue))))
+            }
+            assertEquals("invalid_transaction_data", error.code)
+        }
+    }
+
+    @Test
+    fun rejectsMalformedEntriesInsteadOfDroppingThem() {
+        for (bad in listOf("!", "e30=", encode(JsonArray(emptyList())), encode(JsonObject(emptyMap())))) {
+            assertFailsWith<InvalidTransactionDataException> { parse(request(listOf(encode(payload()), bad))) }
+        }
+        for (bad in listOf("null", "[]", "{}", "[null]", "[123]")) {
+            val value = json.decodeFromString<Value>("""{"transaction_data":$bad}""")
+            assertFailsWith<InvalidTransactionDataException> { parse(value) }
+        }
+    }
+
+    @Test
+    fun rejectsUnknownFieldsAndInvalidProfileValues() {
+        for (bad in listOf(
+            JsonObject(payload() + ("unknown" to JsonPrimitive(true))),
+            JsonObject(payload() + ("amount" to JsonPrimitive(-1))),
+            JsonObject(payload() - "amount"),
+        )) assertFailsWith<InvalidTransactionDataException> { parse(request(listOf(encode(bad)))) }
+    }
+
+    @Test
+    fun validatesCredentialReferencesAndHolderBinding() {
+        for (ids in listOf(emptyList(), listOf("missing"))) {
+            assertFailsWith<InvalidTransactionDataException> { parse(request(listOf(encode(payload(ids))))) }
+        }
+        for (query in listOf(
+            """{"credentials":[{"id":"first","format":"dc+sd-jwt","require_cryptographic_holder_binding":false}]}""",
+            """{"credentials":[{"id":"first","format":"mso_mdoc"}]}""",
+            """{"credentials":[{"id":"first","format":"dc+sd-jwt","require_cryptographic_holder_binding":"true"}]}""",
+        )) assertFailsWith<InvalidTransactionDataException> { parse(request(listOf(encode(payload())), query)) }
+    }
+
+    @Test
+    fun acceptsOnlyHashAlgorithmListsThatPermitSha256() {
+        parse(request(listOf(encode(payload()))))
+        parse(request(listOf(encode(payload(algorithms = JsonArray(listOf(JsonPrimitive("sha-512"), JsonPrimitive("sha-256"))))))))
+        for (bad in listOf(JsonArray(emptyList()), JsonArray(listOf(JsonPrimitive("sha-512"))), JsonPrimitive("sha-256"), JsonNull)) {
+            assertFailsWith<InvalidTransactionDataException> { parse(request(listOf(encode(payload(algorithms = bad))))) }
+        }
+    }
+
+    @Test
+    fun requestParserPropagatesInvalidTransactionData() {
+        val request = request(listOf(encode(payload())))
+        assertFailsWith<InvalidTransactionDataException> { PresentationRequest.fromValue(request) }
+        assertNotNull(PresentationRequest.fromValue(request, profiles)?.transactionData)
+        assertNull(TransactionDataWrapper.fromValue(Value.Object(emptyMap())))
     }
 }

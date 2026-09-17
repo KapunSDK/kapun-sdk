@@ -56,10 +56,6 @@ impl<T> From<Option<T>> for PointerPart {
     }
 }
 
-#[derive(uniffi::Enum, Copy, Clone, Debug)]
-pub enum SpecVersion {
-    Oid4VpDraft23, // OpenID for Verifiable Presentations - draft 23: Transaction data is hashed in key-binding JWT
-}
 
 pub const fn default_required() -> bool {
     true

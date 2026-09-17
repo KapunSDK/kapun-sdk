@@ -16,6 +16,7 @@ under the License.
 
 package org.kapunsdk.wallet.process.presentation.remote
 
+import org.kapunsdk.presentation.request.model.InvalidTransactionDataException
 import org.kapunsdk.credentials.models.credential.CredentialType
 import org.kapunsdk.credentials.models.metadata.KeyMaterial
 import org.kapunsdk.toReadableString
@@ -114,7 +115,9 @@ class RemotePresentationProcess(
 					)
 			}
 			RemotePresentationProcessStep.ConnectionDetails(trustFlow.agentInformation)
-		} catch (e: ApiException) {
+		} catch (e: InvalidTransactionDataException) {
+            return RemotePresentationProcessStep.Error(errorMessage = e.message ?: e.code, errorCode = e.code, cause = e)
+        } catch (e: ApiException) {
 			val info = e.asErrorState()
 
 			if ((e is ApiException.Generic)
@@ -133,17 +136,7 @@ class RemotePresentationProcess(
 		}
 	}
 
-	suspend fun continueAfterConnectionTrust(): ProcessStep {
-		return if (presentationProcess.isQes()) {
-			RemotePresentationProcessStep.QesProcessStep.Preview(trustFlow.agentInformation)
-		} else {
-			continueWithCredentialSelection()
-		}
-	}
-
-	suspend fun continueAfterCreationAcceptance(): ProcessStep {
-		return RemotePresentationProcessStep.QesProcessStep.SignDocument(trustFlow.agentInformation, presentationProcess.getQesAuthorizationDocuments())
-	}
+	suspend fun continueAfterConnectionTrust(): ProcessStep = continueWithCredentialSelection()
 
     suspend fun continueWithCredentialSelection(allowUsedCredentials: Boolean = false): RemotePresentationProcessStep {
         try {
@@ -497,19 +490,7 @@ class RemotePresentationProcess(
 		}
 	}
 
-	private suspend fun finalizeWithSelectedCredential(): ProcessStep {
-		return if (presentationProcess.isQes()) {
-			val creationDocuments = presentationProcess.getQesCreationAcceptanceDocuments()
-			Logger.debug("creationDocuments: $creationDocuments")
-			if (creationDocuments.isEmpty()) {
-				RemotePresentationProcessStep.QesProcessStep.SignDocument(trustFlow.agentInformation, presentationProcess.getQesAuthorizationDocuments())
-			} else {
-				RemotePresentationProcessStep.QesProcessStep.CreationAcceptance(trustFlow.agentInformation, creationDocuments)
-			}
-		} else {
-			finalize()
-		}
-	}
+	private suspend fun finalizeWithSelectedCredential(): ProcessStep = finalize()
 
     suspend fun finalize(): RemotePresentationProcessStep {
 		try {
@@ -601,7 +582,6 @@ class RemotePresentationProcess(
 						presentationScope = presentationScope,
 						authSession = authSession,
 						pdiSession = result.presentationDuringIssuanceSession,
-						isQes = presentationProcess.isQes(),
 					)
 				}
 				is PresentationWorkflow.Error -> {

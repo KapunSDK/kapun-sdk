@@ -228,12 +228,22 @@ pub async fn get_dif_pex_vp_token(
     Ok(submission)
 }
 
+// This legacy PEX flow has no transaction-type validator or transaction consent UI.
+// OpenID4VP 1.0 §8.4 requires an error instead of an unbound presentation.
+fn reject_unsupported_transaction_data(request: &Value) -> Result<(), ApiError> {
+    if request.get("transaction_data").is_some() {
+        return Err(anyhow::anyhow!("invalid_transaction_data: transaction data is unsupported by this presentation flow").into());
+    }
+    Ok(())
+}
+
 pub fn create_submission(
     authorization_request: Value,
     credential: PresentableCredential,
     secure_subject: Arc<SecureSubject>,
     mdoc_generated_nonce: String,
 ) -> Result<String, ApiError> {
+    reject_unsupported_transaction_data(&authorization_request)?;
     log_warn!("PEX", "before nonce");
     let nonce = authorization_request
         .get("nonce")
@@ -622,4 +632,13 @@ fn is_cryptographic_holder_binding_required(authorization_request: &Value) -> bo
 
     // Default to requiring cryptographic holder binding if not specified
     true
+}
+
+#[test]
+fn legacy_flow_rejects_top_level_transaction_data_instead_of_ignoring_it() {
+    for data in [serde_json::json!(null), serde_json::json!([]), serde_json::json!(["encoded"])] {
+        let request = Value::from_serialize(&serde_json::json!({"transaction_data": data})).unwrap();
+        assert!(reject_unsupported_transaction_data(&request).is_err());
+    }
+    assert!(reject_unsupported_transaction_data(&Value::from_serialize(&serde_json::json!({})).unwrap()).is_ok());
 }

@@ -16,8 +16,6 @@ under the License.
 
 package org.kapunsdk.wallet.process.presentation.remote
 
-import org.kapunsdk.presentation.request.model.DocumentDigest
-import org.kapunsdk.presentation.request.model.TransactionData
 import org.kapunsdk.trust.framework.ValidationInfo
 import org.kapunsdk.trust.model.AgentInformation
 import org.kapunsdk.wallet.credentials.presentation.CredentialSelectionUiModel
@@ -39,22 +37,6 @@ sealed interface RemotePresentationProcessStep : ProcessStep {
 	data class ConnectionDetails(
 		val agentInformation: AgentInformation,
 	) : RemotePresentationProcessStep
-
-	sealed interface QesProcessStep : ProcessStep {
-		data class Preview(
-			val agentInformation: AgentInformation,
-		) : QesProcessStep
-
-		data class CreationAcceptance(
-			val agentInformation: AgentInformation,
-			val documents: List<TransactionData>
-		) : QesProcessStep
-
-		data class SignDocument(
-			val agentInformation: AgentInformation,
-			val documents: List<DocumentDigest>
-		) : QesProcessStep
-	}
 
 	data class CredentialSelection(
 		override val presentationModel: PresentationUiModel,
@@ -91,7 +73,6 @@ sealed interface RemotePresentationProcessStep : ProcessStep {
 		val presentationScope: String? = null,
 		val authSession: String? = null,
 		val pdiSession: String? = null,
-		val isQes: Boolean = false,
 	) : RemotePresentationProcessStep
 
 }
