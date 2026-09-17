@@ -8467,7 +8467,7 @@ dependencies = [
 [[package]]
 name = "sdjwt"
 version = "0.7.3"
-source = "git+https://github.com/heidiverse/sd-jwt.git?branch=feature%2Fqes#807cdec0df3bdaf7d5d0a4480c7ce48f3357a4d9"
+source = "git+https://github.com/heidiverse/sd-jwt.git?branch=main#1bb4566f9f13648fea15fdf5bac429f29f787ede"
 dependencies = [
  "base64 0.21.7",
  "chrono",

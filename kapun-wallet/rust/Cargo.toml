@@ -18,7 +18,7 @@ rand_core.workspace = true
 reqwest = { features = ["cookies"], default-features = false,  optional = true, workspace = true }
 reqwest-middleware = { version = "0.2", optional = true }
 reqwest-retry = { version = "0.3", optional = true }
-sdjwt = { version = "0.7.3", git = "https://github.com/heidiverse/sd-jwt.git", branch = "feature/qes" }
+sdjwt = { version = "0.7.3", git = "https://github.com/heidiverse/sd-jwt.git", branch = "main" }
 #sdjwt = {  path = "../../../sd-jwt" }
 serde_json.workspace = true
 sha2.workspace = true

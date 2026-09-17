@@ -262,10 +262,6 @@ impl BuilderImpl {
 
                         if let Some((transaction_data, spec_version)) = &self.transaction_data {
                             match spec_version {
-                                SpecVersion::PotentialUc5 => {
-                                    claims["transaction_data"] =
-                                        serde_json::json!(transaction_data);
-                                }
                                 SpecVersion::Oid4VpDraft23 => {
                                     // Note: the Authorization Request can contain a list of hash algorithms.
                                     // SHA256 must always be supported, so we can be lazy and implement nothing else.

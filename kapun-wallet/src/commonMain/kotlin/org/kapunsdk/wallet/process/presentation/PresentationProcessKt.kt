@@ -555,17 +555,6 @@ class PresentationProcessKt private constructor(
 
     fun getQesAuthorizationDocuments(): List<DocumentDigest> {
         return when (authRequest?.transactionData) {
-            is TransactionDataWrapper.UC5 -> {
-                stateData.keys.mapNotNull {
-                    (authRequest.transactionData as TransactionDataWrapper.UC5).value
-                        ?.get(it)
-                        ?.map { it.second }
-                        ?.filter {
-                            it.type == TransactionType.QES_AUTHORIZATION.serialName
-                        }
-                }.flatten().mapNotNull { it.documentDigests }.flatten()
-            }
-
             is TransactionDataWrapper.OpenId4Vp -> {
                 (authRequest.transactionData as TransactionDataWrapper.OpenId4Vp).value
                     ?.map { it.second }
@@ -580,17 +569,6 @@ class PresentationProcessKt private constructor(
 
     fun getQesCreationAcceptanceDocuments(): List<TransactionData> {
         return when (authRequest?.transactionData) {
-            is TransactionDataWrapper.UC5 -> {
-                stateData.keys.mapNotNull {
-                    (authRequest.transactionData as TransactionDataWrapper.UC5).value
-                        ?.get(it)
-                        ?.map { it.second }
-                        ?.filter {
-                            it.type == TransactionType.QCERT_CREATION_ACCEPTANCE.serialName
-                        }
-                }.flatten()
-            }
-
             is TransactionDataWrapper.OpenId4Vp -> {
                 (authRequest.transactionData as TransactionDataWrapper.OpenId4Vp).value
                     ?.map { it.second }
