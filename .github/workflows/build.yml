@@ -16,13 +16,13 @@ jobs:
       matrix:
         include:
           - platform: "android"
-            runner: "Linux"
+            runner: "k8s-runner-heidi"
           - platform: "ios"
             runner: "macOS"
           - platform: "jvm"
             runner: "macOS"
           - platform: "jvm-linux"
-            runner: "Linux"
+            runner: "k8s-runner-heidi"
     runs-on: ["self-hosted", "${{ matrix.runner }}"]
     timeout-minutes: 120
     concurrency:

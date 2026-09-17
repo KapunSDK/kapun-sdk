@@ -21,7 +21,7 @@ jobs:
       matrix:
         include:
           - platform: "android"
-            runner: "Linux"
+            runner: "k8s-runner-heidi"
           - platform: "ios"
             runner: "macOS"
           - platform: "jvm"
