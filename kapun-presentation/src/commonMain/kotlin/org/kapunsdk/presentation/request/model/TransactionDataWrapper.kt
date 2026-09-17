@@ -47,7 +47,7 @@ sealed class TransactionDataWrapper {
             if (entries.isEmpty()) invalid("transaction_data must not be empty")
             val queryValue = value["dcql_query"].let { query ->
                 query.asString()?.let { encoded ->
-                    try { json.decodeFromString<Value>(encoded) }
+                    try { Value.fromJsonElement(Json.parseToJsonElement(encoded)) }
                     catch (_: Exception) { invalid("Invalid DCQL query") }
                 } ?: query
             }

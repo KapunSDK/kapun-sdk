@@ -19,7 +19,7 @@ package org.kapunsdk.presentation.request
 import org.kapunsdk.wallet.process.presentation.models.TransactionDataWrapper
 import org.kapunsdk.presentation.request.model.InvalidTransactionDataException
 import org.kapunsdk.presentation.request.model.TransactionDataProfile
-import org.kapunsdk.util.extensions.json
+import org.kapunsdk.util.extensions.fromJsonElement
 import kotlinx.serialization.json.*
 import uniffi.kapun_util_rust.Value
 import kotlin.io.encoding.Base64
@@ -45,10 +45,10 @@ class TransactionDataWrapperTest {
 
     private fun request(entries: List<String>, query: String = """
         {"credentials":[{"id":"first","format":"dc+sd-jwt"},{"id":"second","format":"dc+sd-jwt"}]}
-    """): Value = json.decodeFromString(buildJsonObject {
+    """): Value = Value.fromJsonElement(buildJsonObject {
         put("dcql_query", Json.parseToJsonElement(query))
         put("transaction_data", JsonArray(entries.map(::JsonPrimitive)))
-    }.toString())
+    })
 
     private fun parse(value: Value) = assertNotNull(TransactionDataWrapper.fromValue(value, profiles))
 
@@ -100,7 +100,7 @@ class TransactionDataWrapperTest {
             assertFailsWith<InvalidTransactionDataException> { parse(request(listOf(encode(payload()), bad))) }
         }
         for (bad in listOf("null", "[]", "{}", "[null]", "[123]")) {
-            val value = json.decodeFromString<Value>("""{"transaction_data":$bad}""")
+            val value = Value.fromJsonElement(Json.parseToJsonElement("""{"transaction_data":$bad}"""))
             assertFailsWith<InvalidTransactionDataException> { parse(value) }
         }
     }

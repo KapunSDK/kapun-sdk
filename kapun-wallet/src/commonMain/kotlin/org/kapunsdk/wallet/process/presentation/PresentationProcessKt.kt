@@ -35,6 +35,7 @@ import org.kapunsdk.SdJwtParser
 import org.kapunsdk.W3CParser
 import org.kapunsdk.presentation.request.model.OID4VPVersion
 import org.kapunsdk.presentation.request.PresentationRequest
+import org.kapunsdk.wallet.process.presentation.models.TransactionDataWrapper
 import org.kapunsdk.presentation.request.VersionedPresentationRequest
 import org.kapunsdk.proximity.documents.DocumentRequest
 import org.kapunsdk.util.extensions.*
