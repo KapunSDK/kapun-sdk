@@ -17,13 +17,24 @@ jobs:
         include:
           - platform: "android"
             runner: "k8s-runner-heidi"
+            container: "cimg/android:2026.08-ndk"
           - platform: "ios"
             runner: "macOS"
+            container: null
           - platform: "jvm"
             runner: "macOS"
+            container: null
           - platform: "jvm-linux"
             runner: "k8s-runner-heidi"
+            container: "cimg/base:2026.09"
     runs-on: ["${{ matrix.runner }}"]
+    # Job containers are supported only on Linux. The macOS matrix entries use null above and
+    # continue to run directly on the macOS runner.
+    container: ${{ matrix.container }}
+    defaults:
+      run:
+        # GitHub uses sh as the default shell inside a job container; the workflow uses Bash arrays.
+        shell: bash
     timeout-minutes: 120
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-${{ matrix.platform }}
