@@ -33,11 +33,9 @@ import org.kapunsdk.MdocParser
 import org.kapunsdk.OpenBadgeParser
 import org.kapunsdk.SdJwtParser
 import org.kapunsdk.W3CParser
-import org.kapunsdk.presentation.request.model.DocumentDigest
 import org.kapunsdk.presentation.request.model.OID4VPVersion
-import org.kapunsdk.presentation.request.model.TransactionData
-import org.kapunsdk.presentation.request.model.TransactionType
 import org.kapunsdk.presentation.request.PresentationRequest
+import org.kapunsdk.wallet.process.presentation.models.TransactionDataWrapper
 import org.kapunsdk.presentation.request.VersionedPresentationRequest
 import org.kapunsdk.proximity.documents.DocumentRequest
 import org.kapunsdk.util.extensions.*
@@ -64,7 +62,6 @@ import uniffi.kapun_crypto_rust.sha256Rs
 import uniffi.kapun_dcql_rust.Credential
 import uniffi.kapun_dcql_rust.DcqlQuery
 import uniffi.kapun_util_rust.Value
-import org.kapunsdk.wallet.process.presentation.models.TransactionDataWrapper
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonNames
 import org.kapunsdk.trustedAuthority.AkiAuthorityMatcher
@@ -549,60 +546,6 @@ class PresentationProcessKt private constructor(
         return this.authRequest?.dcqlQuery != null
     }
 
-    fun isQes(): Boolean {
-        return getQesAuthorizationDocuments().isNotEmpty() || getQesCreationAcceptanceDocuments().isNotEmpty()
-    }
-
-    fun getQesAuthorizationDocuments(): List<DocumentDigest> {
-        return when (authRequest?.transactionData) {
-            is TransactionDataWrapper.UC5 -> {
-                stateData.keys.mapNotNull {
-                    (authRequest.transactionData as TransactionDataWrapper.UC5).value
-                        ?.get(it)
-                        ?.map { it.second }
-                        ?.filter {
-                            it.type == TransactionType.QES_AUTHORIZATION.serialName
-                        }
-                }.flatten().mapNotNull { it.documentDigests }.flatten()
-            }
-
-            is TransactionDataWrapper.OpenId4Vp -> {
-                (authRequest.transactionData as TransactionDataWrapper.OpenId4Vp).value
-                    ?.map { it.second }
-                    ?.filter {
-                        it.type == TransactionType.QES_AUTHORIZATION.serialName
-                    }?.mapNotNull { it.documentDigests }?.flatten() ?: emptyList()
-            }
-
-            null -> emptyList()
-        }
-    }
-
-    fun getQesCreationAcceptanceDocuments(): List<TransactionData> {
-        return when (authRequest?.transactionData) {
-            is TransactionDataWrapper.UC5 -> {
-                stateData.keys.mapNotNull {
-                    (authRequest.transactionData as TransactionDataWrapper.UC5).value
-                        ?.get(it)
-                        ?.map { it.second }
-                        ?.filter {
-                            it.type == TransactionType.QCERT_CREATION_ACCEPTANCE.serialName
-                        }
-                }.flatten()
-            }
-
-            is TransactionDataWrapper.OpenId4Vp -> {
-                (authRequest.transactionData as TransactionDataWrapper.OpenId4Vp).value
-                    ?.map { it.second }
-                    ?.filter {
-                        it.type == TransactionType.QCERT_CREATION_ACCEPTANCE.serialName
-                    } ?: emptyList()
-            }
-
-            null -> emptyList()
-        }
-    }
-
     fun getUsedCredentials(): List<Value> {
         val creds = mutableListOf<Value>()
         for (rep in this.stateData) {
@@ -777,10 +720,6 @@ class PresentationProcessKt private constructor(
                         val credentialMetadata = c.decodeMetadata()
                             ?: return PresentationWorkflow.Error("Failed to decode credential metadata")
 
-                        val transactionData =
-                            authRequest.transactionData?.getForCredential(credentialQuery.id)
-                                ?.map { it.first }
-
                         val nativeSigner = signingProvider.getNativeSigner(
                             keyMaterial = credentialMetadata.keyMaterial,
                             pin = pin,
@@ -793,8 +732,7 @@ class PresentationProcessKt private constructor(
                             CredentialType.SdJwt -> SdJwt.parse(c.payload).getVpToken(
                                 credentialQuery,
                                 audience,
-                                transactionData,
-                                authRequest.transactionData?.specVersion(),
+                                null,
                                 nonce,
                                 nativeSigner?.let { Signer(nativeSigner) }
                             )
@@ -856,8 +794,7 @@ class PresentationProcessKt private constructor(
                             CredentialType.W3C_VCDM -> W3C.parse(c.payload).getVpToken(
                                 credentialQuery,
                                 audience,
-                                transactionData,
-                                authRequest.transactionData?.specVersion(),
+                                null,
                                 nonce,
                                 nativeSigner?.let { Signer(nativeSigner) }
                             )
@@ -932,15 +869,12 @@ class PresentationProcessKt private constructor(
                                 ?: PresentationWorkflow.Error("Could not generate token")) as String
                         } else {
                             val sdjwt = SdJwt.parse(presentableCredential.credential.payload)
-                            val transactionData =
-                                authRequest!!.transactionData?.getForCredential(presentableCredential.responseId)
-                                    ?.map { it.first }
+
                             sdjwt.getVpToken(
                                 authRequestObject,
                                 presentableCredential.responseId,
                                 audience,
-                                transactionData,
-                                authRequest.transactionData?.specVersion(),
+                                null,
                                 nonce,
                                 Signer(nativeSigner)
                             ).getOrThrow()

@@ -149,11 +149,7 @@ class RemotePresentationProcessHandler(
 				is RemotePresentationProcessStep.Error -> TODO("How to handle event for error step?")
 				is RemotePresentationProcessStep.Success, is RemotePresentationProcessStep.DcApiSuccess -> null
 			}
-			current is RemotePresentationProcessStep.QesProcessStep -> when (current) {
-				is RemotePresentationProcessStep.QesProcessStep.Preview -> currentProcess?.continueWithCredentialSelection()
-				is RemotePresentationProcessStep.QesProcessStep.CreationAcceptance -> currentProcess?.continueAfterCreationAcceptance()
-				is RemotePresentationProcessStep.QesProcessStep.SignDocument -> currentProcess?.finalize()
-			}
+
 
 			else -> null
 		}

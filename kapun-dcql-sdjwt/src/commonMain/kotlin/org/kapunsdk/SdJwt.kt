@@ -25,7 +25,6 @@ import org.kapunsdk.util.extensions.asString
 import org.kapunsdk.util.extensions.get
 import uniffi.kapun_credential_core_rust.PointerPart
 import uniffi.kapun_credential_core_rust.SignatureCreator
-import uniffi.kapun_credential_core_rust.SpecVersion
 import uniffi.kapun_dcql_rust.ClaimsQuery
 import uniffi.kapun_dcql_rust.CredentialQuery
 import uniffi.kapun_util_rust.Value
@@ -34,15 +33,14 @@ fun SdJwt.getVpToken(authRequestObject: Value,
                      inputDescriptorId: String,
                      audience: String,
                      transactionData: List<String>?,
-                     specVersion: SpecVersion?,
                      nonce: String,
                      signer: SignatureCreator,
                      overrideDisclosures: List<List<PointerPart>>? = null) : Result<String> {
     val builder = this.presentation()
     builder.withAudience(audience)
     builder.withNonce(nonce)
-    if (transactionData != null && specVersion != null) {
-        builder.withTransactionData(transactionData, specVersion);
+    if (transactionData != null) {
+        builder.withTransactionData(transactionData);
     }
     // useful for tests
     overrideDisclosures?.let {
@@ -91,7 +89,6 @@ fun SdJwt.getVpToken(
     query: CredentialQuery,
     audience: String,
     transactionData: List<String>?,
-    specVersion: SpecVersion?,
     nonce: String,
     signer: SignatureCreator?,
     overrideDisclosures: List<List<PointerPart>>? = null
@@ -105,7 +102,6 @@ fun SdJwt.getVpToken(
         query,
         audience,
         transactionData,
-        specVersion,
         nonce,
         signer,
         overrideDisclosures

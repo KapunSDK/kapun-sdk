@@ -56,11 +56,6 @@ impl<T> From<Option<T>> for PointerPart {
     }
 }
 
-#[derive(uniffi::Enum, Copy, Clone, Debug)]
-pub enum SpecVersion {
-    PotentialUc5, // Specification for LSP POTENTIAL Usecase 5 (QES) - final draft v2: Transaction data included verbatim in key-binding JWT
-    Oid4VpDraft23, // OpenID for Verifiable Presentations - draft 23: Transaction data is hashed in key-binding JWT
-}
 
 pub const fn default_required() -> bool {
     true

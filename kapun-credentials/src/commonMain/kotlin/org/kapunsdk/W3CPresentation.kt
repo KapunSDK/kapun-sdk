@@ -34,7 +34,6 @@ fun W3C.getVpToken(
     query: CredentialQuery,
     audience: String,
     transactionData: List<String>?,
-    specVersion: SpecVersion?,
     nonce: String,
     signer: SignatureCreator?,
     overrideDisclosures: List<List<PointerPart>>? = null
@@ -49,7 +48,6 @@ fun W3C.getVpToken(
         query,
         audience,
         transactionData,
-        specVersion,
         nonce,
         signer,
         overrideDisclosures

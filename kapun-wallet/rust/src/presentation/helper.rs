@@ -21,7 +21,7 @@ use std::sync::Arc;
 use anyhow::{Context, anyhow};
 use regex::Regex;
 use reqwest::Url;
-use sdjwt::{ExternalSigner, Holder, SpecVersion};
+use sdjwt::{ExternalSigner, Holder};
 use serde::Deserialize;
 use serde_json::{Value, json};
 
@@ -347,15 +347,6 @@ pub(super) fn create_submission(
         })
         .ok_or(anyhow!("No input descriptors"))?;
 
-    let transaction_data = input_descriptor
-        .get("transaction_data")
-        .and_then(|a| a.as_array())
-        .map(|a| {
-            a.iter()
-                .flat_map(|v| v.as_str().map(|s| s.to_owned()))
-                .collect::<Vec<_>>()
-        });
-
     for field in input_descriptor
         .get("constraints")
         .and_then(|a| a.get("fields"))
@@ -371,11 +362,6 @@ pub(super) fn create_submission(
             log_debug!("PEX", &format!("Disclosing: {p}"));
             jwt_presentation.disclose(&p).context("Disclosing failed")?;
         }
-    }
-    if let Some(transaction_data) = transaction_data.clone() {
-        jwt_presentation
-            .with_transaction_data(transaction_data, SpecVersion::PotentialUc5)
-            .context("Transaction data failed")?;
     }
     let vp_token = match jwt_presentation.build() {
         Ok(token) => token,

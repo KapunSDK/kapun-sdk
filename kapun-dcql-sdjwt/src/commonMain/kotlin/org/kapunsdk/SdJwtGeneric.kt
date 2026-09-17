@@ -89,7 +89,6 @@ fun SdJwtBuilder.getVpToken(
     query: CredentialQuery,
     audience: String,
     transactionData: List<String>?,
-    specVersion: SpecVersion?,
     nonce: String,
     signer: SignatureCreator?,
     overrideDisclosures: List<List<PointerPart>>? = null
@@ -97,8 +96,11 @@ fun SdJwtBuilder.getVpToken(
     this.withAudience(audience)
     this.withNonce(nonce)
 
-    if(transactionData != null && specVersion != null) {
-        this.withTransactionData(transactionData, specVersion);
+    if (transactionData != null) {
+        if (query.requireCryptographicHolderBinding == false || this.isW3c()) {
+            return Result.failure(IllegalArgumentException("invalid_transaction_data: SD-JWT holder binding is required"))
+        }
+        this.withTransactionData(transactionData)
     }
 
     // useful for tests

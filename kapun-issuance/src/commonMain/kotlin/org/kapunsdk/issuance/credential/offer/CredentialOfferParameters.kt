@@ -20,7 +20,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * Credential Offer Parameters as described in https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-13.html#name-credential-offer-parameters
+ * Credential Offer Parameters as described in https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-final.html#section-4.1.1
  */
 @Serializable
 data class CredentialOfferParameters(
