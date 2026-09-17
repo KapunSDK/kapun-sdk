@@ -18,15 +18,19 @@ jobs:
           - platform: "android"
             runner: "k8s-runner-heidi"
             container: "cimg/android:2026.08-ndk"
+            linuxRustflags: "-C link-args=-fstack-protector-all"
           - platform: "ios"
             runner: "macOS"
             container: null
+            linuxRustflags: "-C link-args=-fstack-protector-all -lssp"
           - platform: "jvm"
             runner: "macOS"
             container: null
+            linuxRustflags: "-C link-args=-fstack-protector-all -lssp"
           - platform: "jvm-linux"
             runner: "k8s-runner-heidi"
             container: "cimg/base:2026.09"
+            linuxRustflags: "-C link-args=-fstack-protector-all"
     runs-on: ["${{ matrix.runner }}"]
     # Job containers are supported only on Linux. The macOS matrix entries use null above and
     # continue to run directly on the macOS runner.
@@ -93,8 +97,12 @@ jobs:
       - name: Install Android SDK components
         if: matrix.platform == 'android'
         run: |
+          # sdkmanager exits successfully after consuming the input, so yes receives SIGPIPE.
+          # Disable pipefail for this pipeline; keep errexit so sdkmanager failures still fail CI.
+          set +o pipefail
           yes | sdkmanager --licenses
-          yes | sdkmanager --install "ndk;28.2.13676358"
+          set -o pipefail
+          sdkmanager --install "ndk;28.2.13676358"
 
       - name: Ensure gradlew is executable
         run: chmod +x gradlew
@@ -109,12 +117,12 @@ jobs:
           CXX_x86_64_unknown_linux_gnu: x86_64-linux-gnu-g++
           AR_x86_64_unknown_linux_gnu: x86_64-linux-gnu-ar
           CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER: x86_64-linux-gnu-gcc
-          CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS: "-C link-args=-fstack-protector-all -lssp"
+          CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS: ${{ matrix.linuxRustflags }}
           CC_aarch64_unknown_linux_gnu: aarch64-linux-gnu-gcc
           CXX_aarch64_unknown_linux_gnu: aarch64-linux-gnu-g++
           AR_aarch64_unknown_linux_gnu: aarch64-linux-gnu-ar
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
-          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUSTFLAGS: "-C link-args=-fstack-protector-all -lssp"
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUSTFLAGS: ${{ matrix.linuxRustflags }}
           CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER: x86_64-w64-mingw32-gcc
         run: |
           set +e
