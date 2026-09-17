@@ -404,6 +404,7 @@ open class EaaIssuanceProcess(
                 val doctype = when (credConfig) {
                     is CredentialConfiguration.Mdoc -> credConfig.doctype
                     is CredentialConfiguration.SdJwt -> credConfig.vct
+                    is CredentialConfiguration.Bbs -> credConfig.vct ?: ""
                     is CredentialConfiguration.SdJwtVcdm -> ""
                     is CredentialConfiguration.Unknown -> ""
                     null -> ""

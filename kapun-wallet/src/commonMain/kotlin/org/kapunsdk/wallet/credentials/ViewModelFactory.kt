@@ -347,7 +347,7 @@ class ViewModelFactory private constructor(
 							identity.credentials
 						)
 					} ?: fallbackIdentityMapper.mapIdentity(
-						CredentialType.SdJwt,
+						CredentialType.BbsTermwise,
 						identity,
 						jsonContent,
 						activities,

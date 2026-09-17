@@ -98,6 +98,7 @@ object OcaBundleFactory {
 			when (it) {
 				is CredentialConfiguration.Mdoc -> it.doctype == vct
 				is CredentialConfiguration.SdJwt -> it.vct == vct
+				is CredentialConfiguration.Bbs -> it.vct == vct || it.format == "zkp_vc"
 				else -> false
 			}
 		}
