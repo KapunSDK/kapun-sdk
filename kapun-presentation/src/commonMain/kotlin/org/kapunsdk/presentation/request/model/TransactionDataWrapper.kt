@@ -31,41 +31,12 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 @Serializable
 sealed class TransactionDataWrapper {
 
-	data class UC5(val value: Map<String, List<Pair<String, TransactionData>>>) : TransactionDataWrapper()
 	data class OpenId4Vp(val value: List<Pair<String, TransactionData>>) : TransactionDataWrapper()
 
 	companion object {
 
 		@OptIn(ExperimentalEncodingApi::class)
 		fun fromValue(value: Value): TransactionDataWrapper? {
-			val uc5TransactionData = value["presentation_definition"]["input_descriptors"].asArray()?.mapNotNull {
-				val key = it["id"].asString() ?: return@mapNotNull null
-
-				val value = it["transaction_data"].asArray()?.filterNotNull()?.mapNotNull { transactionData ->
-					transactionData.asString()?.let { base64String ->
-						Logger.info("decoding transaction data: \"$base64String\"")
-						try {
-							val jsonString = try {
-								Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT).decode(base64String).decodeToString()
-							} catch (e: Exception) {
-								Logger.info("Decoding without padding failed, retrying with padding")
-								Base64.UrlSafe.withPadding(Base64.PaddingOption.PRESENT).decode(base64String).decodeToString()
-							}
-							val decoded = json.decodeFromString<TransactionData>(jsonString)
-							Pair(base64String, decoded)
-						} catch (ex: Exception) {
-							Logger.error("Failed to decode transaction data: \"${base64String}\"  $ex")
-							null
-						}
-					}
-				}
-				if (value != null) key to value else null
-			}?.toMap()
-
-			if (uc5TransactionData != null && uc5TransactionData.isNotEmpty()) {
-				return UC5(uc5TransactionData)
-			}
-
 			val openId4VpTransactionData = value["transaction_data"].asArray()?.filterNotNull()?.mapNotNull { transactionData ->
 				transactionData.asString()?.let { base64String ->
 					Logger.info("decoding transaction data: \"$base64String\"")
@@ -95,9 +66,6 @@ sealed class TransactionDataWrapper {
 
 	fun specVersion(): SpecVersion {
 		return when (this) {
-			is UC5 -> {
-				SpecVersion.POTENTIAL_UC5
-			}
 			is OpenId4Vp -> {
 				SpecVersion.OID4_VP_DRAFT23
 			}
@@ -106,9 +74,6 @@ sealed class TransactionDataWrapper {
 
 	fun getForCredential(id: String): List<Pair<String, TransactionData>>? {
 		return when (this) {
-			is UC5 -> {
-				value.get(id)
-			}
 			is OpenId4Vp -> {
 				value
 			}
