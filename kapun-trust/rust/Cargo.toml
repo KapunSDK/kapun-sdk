@@ -10,7 +10,7 @@ name = "kapun_trust_rust"
 [dependencies]
 uniffi.workspace = true
 anyhow.workspace = true
-openidconnect-federation.workspace = true
+openid-federation.workspace = true
 reqwest.workspace = true
 serde_json.workspace = true
 josekit.workspace = true

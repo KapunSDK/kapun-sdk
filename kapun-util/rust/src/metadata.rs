@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use openidconnect_federation::models::trust_chain::{TrustAnchor, TrustStore};
+use openid_federation::models::trust_chain::{TrustAnchor, TrustStore};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -37,7 +37,7 @@ pub async fn fetch_metadata_from_issuer_url(
     trust_store: Option<Vec<String>>,
 ) -> Result<FederationResult, MetadataFetchError> {
     let mut res_oidf =
-        match openidconnect_federation::DefaultFederationRelation::new_from_url_async(url).await {
+        match openid_federation::DefaultFederationRelation::new_from_url_async(url).await {
             Ok(res_oidf) => res_oidf,
             Err(e) => {
                 return Err(MetadataFetchError::FetchFailed(format!(

@@ -5230,7 +5230,7 @@ dependencies = [
  "heidi-jwt",
  "josekit",
  "kapun-util-rust",
- "openidconnect-federation",
+ "openid-federation",
  "reqwest 0.11.27",
  "serde_json",
  "uniffi",
@@ -5246,7 +5246,7 @@ dependencies = [
  "flate2",
  "jlc",
  "libc",
- "openidconnect-federation",
+ "openid-federation",
  "p256 0.13.2",
  "rand 0.8.8",
  "serde",
@@ -5301,7 +5301,7 @@ dependencies = [
  "lipsum",
  "monostate",
  "open",
- "openidconnect-federation",
+ "openid-federation",
  "p256 0.13.2",
  "p384",
  "rand 0.8.8",
@@ -6436,9 +6436,9 @@ dependencies = [
 ]
 
 [[package]]
-name = "openidconnect-federation"
+name = "openid-federation"
 version = "0.1.0"
-source = "git+https://github.com/heidiverse/openidconnect-federation.git?branch=feature%2Fkapun#6c15fcd0c06f789c5bb7a4452f3751c827f26ece"
+source = "git+https://github.com/heidiverse/openid-federation.git?branch=main#e72a506c50e7dc1d759877b897777e5ff4f3c465"
 dependencies = [
  "anyhow",
  "base64 0.22.1",

@@ -1,7 +1,7 @@
 use heidi_jwt::jwt::GeneralizedBody;
 use oidcf::models::transformer;
 use oidcf::models::{EntityConfig, EntityStatement};
-use openidconnect_federation as oidcf;
+use openid_federation as oidcf;
 use std::fmt::Display;
 
 #[doc(hidden)]
