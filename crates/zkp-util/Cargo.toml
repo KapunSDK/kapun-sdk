@@ -25,8 +25,8 @@ rdf-proofs = { git = "https://github.com/heidiverse/rdf-proofs", branch = "main"
 rdf-util = { path = "../rdf-util" }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
-ecdsa_pops = { git = "https://github.com/lebedenko-ubique/ecdsa_pops.git", default-features = false }
-rok = { git = "https://github.com/lebedenko-ubique/ecdsa_pops.git", default-features = false }
+ecdsa_pops = { git = "https://github.com/heidiverse/ecdsa_pops.git", default-features = false }
+rok = { git = "https://github.com/heidiverse/ecdsa_pops.git", default-features = false }
 
 [features]
 default = []

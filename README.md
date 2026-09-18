@@ -43,7 +43,7 @@ For a faster local debug build, compile only the ABI used by the connected devic
 ```
 
 Release builds should omit this option so that all supported Android ABIs are included.
-The -PandroidAbis option is provided by the UniFFI plugin v1.2.2-rc2.
+The -PandroidAbis option is provided by the UniFFI plugin v1.2.2-rc6.
 
 Use Android-specific Gradle tasks such as assembleDebug rather than the root build task during
 app development. The root build also runs JVM targets; on macOS that includes the macOS Rust
