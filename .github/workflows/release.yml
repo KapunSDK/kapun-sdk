@@ -67,6 +67,14 @@ jobs:
     steps:
       - uses: actions/checkout@v7.0.1
 
+      - name: Clean Cargo target output
+        run: |
+          # CI does not restore Cargo target outputs, so remove leftovers from previous jobs on
+          # the persistent self-hosted workspace before starting a fresh release build.
+          rm -rf "$CARGO_TARGET_DIR"
+          mkdir -p "$CARGO_TARGET_DIR"
+          df -h "$CARGO_TARGET_DIR"
+
       - name: Determine Gradle tasks
         id: gradle_tasks
         run: |
