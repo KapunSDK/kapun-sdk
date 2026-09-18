@@ -144,7 +144,6 @@ jobs:
             if kill -0 "$gradle_pid" 2>/dev/null; then
               elapsed=$(ps -p "$gradle_pid" -o etime= | xargs)
               echo "Rust/Gradle build still running (Gradle PID $gradle_pid, elapsed $elapsed)"
-              pgrep -fl 'cargo|rustc|git' || true
             fi
           done
 
