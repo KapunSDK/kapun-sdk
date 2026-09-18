@@ -60,6 +60,10 @@ jobs:
       GIT_CONFIG_KEY_0: "credential.helper"
       GIT_CONFIG_VALUE_0: ""
       CARGO_INCREMENTAL: "0"
+      # Normal CI intentionally uses Cargo's dev profile, but does not need full debug info.
+      # This substantially reduces peak disk usage while retaining the same dev-profile code
+      # generation and checks. Release builds use a separate workflow/profile.
+      CARGO_PROFILE_DEV_DEBUG: "0"
     steps:
       - uses: actions/checkout@v7.0.1
 
