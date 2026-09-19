@@ -14,6 +14,8 @@ specific language governing permissions and limitations
 under the License.
  */
 
+@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+
 package org.kapunsdk.wallet.process.presentation
 
 import org.kapunsdk.credentials.Mdoc
@@ -558,7 +560,7 @@ class PresentationProcessKt private constructor(
             is TransactionDataWrapper.UC5 -> {
                 stateData.keys.mapNotNull {
                     (authRequest.transactionData as TransactionDataWrapper.UC5).value
-                        ?.get(it)
+                        .get(it)
                         ?.map { it.second }
                         ?.filter {
                             it.type == TransactionType.QES_AUTHORIZATION.serialName
@@ -568,8 +570,8 @@ class PresentationProcessKt private constructor(
 
             is TransactionDataWrapper.OpenId4Vp -> {
                 (authRequest.transactionData as TransactionDataWrapper.OpenId4Vp).value
-                    ?.map { it.second }
-                    ?.filter {
+                    .map { it.second }
+                    .filter {
                         it.type == TransactionType.QES_AUTHORIZATION.serialName
                     }?.mapNotNull { it.documentDigests }?.flatten() ?: emptyList()
             }
@@ -583,7 +585,7 @@ class PresentationProcessKt private constructor(
             is TransactionDataWrapper.UC5 -> {
                 stateData.keys.mapNotNull {
                     (authRequest.transactionData as TransactionDataWrapper.UC5).value
-                        ?.get(it)
+                        .get(it)
                         ?.map { it.second }
                         ?.filter {
                             it.type == TransactionType.QCERT_CREATION_ACCEPTANCE.serialName
@@ -593,8 +595,8 @@ class PresentationProcessKt private constructor(
 
             is TransactionDataWrapper.OpenId4Vp -> {
                 (authRequest.transactionData as TransactionDataWrapper.OpenId4Vp).value
-                    ?.map { it.second }
-                    ?.filter {
+                    .map { it.second }
+                    .filter {
                         it.type == TransactionType.QCERT_CREATION_ACCEPTANCE.serialName
                     } ?: emptyList()
             }

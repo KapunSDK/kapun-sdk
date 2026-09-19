@@ -103,13 +103,11 @@ class EaaRefreshProcess(
 				null,
 			)
 
-			val agentInformation = credentialIssuerMetadata?.let {
-				trustController.startIssuanceFlow(
-					it.claims.credentialIssuer,
-					identity.credentialConfigurationIds?.let { json.decodeFromString<List<String>>(it) } ?: emptyList(),
-					it
-				).agentInformation
-			}
+			val agentInformation = trustController.startIssuanceFlow(
+				credentialIssuerMetadata.claims.credentialIssuer,
+				identity.credentialConfigurationIds?.let { json.decodeFromString<List<String>>(it) } ?: emptyList(),
+				credentialIssuerMetadata
+			).agentInformation
 
 			identityRepository.updateTokens(identity.id, Tokens.fromNative(tokens))
 			val batchSizeUint =

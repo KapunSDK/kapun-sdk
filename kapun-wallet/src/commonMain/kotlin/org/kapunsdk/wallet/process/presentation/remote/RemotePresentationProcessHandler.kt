@@ -14,6 +14,8 @@ specific language governing permissions and limitations
 under the License.
  */
 
+@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+
 package org.kapunsdk.wallet.process.presentation.remote
 
 import org.kapunsdk.trust.TrustFrameworkController
@@ -30,7 +32,6 @@ import org.kapunsdk.wallet.process.ProcessEvent
 import org.kapunsdk.wallet.process.ProcessHandler
 import org.kapunsdk.wallet.process.ProcessStep
 import io.ktor.client.HttpClient
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonNames
@@ -38,7 +39,7 @@ import uniffi.kapun_util_rust.Value
 import uniffi.kapun_wallet_rust.WalletBackend
  
 @Serializable
-data class DCRequests @OptIn(ExperimentalSerializationApi::class) constructor(@JsonNames("requests", "providers") val providers: List<DCProvider>) {
+data class DCRequests constructor(@JsonNames("requests", "providers") val providers: List<DCProvider>) {
 	@Serializable
 	data class DCProvider(val request: String? = null, val data: Value? = null, val protocol : String?) {
 		fun getInnerRequest(json: Json) : String? {
@@ -59,7 +60,7 @@ data class DCRequests @OptIn(ExperimentalSerializationApi::class) constructor(@J
 		}
 	}
 	@Serializable
-	data class WrappedRequest @OptIn(ExperimentalSerializationApi::class) constructor(@JsonNames("client_id") val clientId: String? = null, val request: String)
+	data class WrappedRequest constructor(@JsonNames("client_id") val clientId: String? = null, val request: String)
 
 }
 
@@ -96,7 +97,9 @@ class RemotePresentationProcessHandler(
 					json,
 				)
 				val data = if(inputEvent.isDCApi) {
-					val element : DCRequests? = runCatching { json.decodeFromString<DCRequests>(inputEvent.qrCodeData) }.getOrNull() ?: null
+					val element: DCRequests? = runCatching {
+						json.decodeFromString<DCRequests>(inputEvent.qrCodeData)
+					}.getOrNull()
 					element?.providers?.firstOrNull()?.getInnerRequest(json) ?: ""
 				} else {
 					inputEvent.qrCodeData

@@ -36,6 +36,37 @@ This project evolved from the former Heidi SDK and is now maintained as the Kapu
 ./gradlew :examples:android-verifier:installDebug
 ```
 
+For a faster local debug build, compile only the ABI used by the connected device:
+
+```bash
+./gradlew :examples:android-wallet:assembleDebug -PandroidAbis=arm64-v8a
+```
+
+Release builds should omit this option so that all supported Android ABIs are included.
+The -PandroidAbis option is provided by the UniFFI plugin v1.2.2-rc6.
+
+Use Android-specific Gradle tasks such as assembleDebug rather than the root build task during
+app development. The root build also runs JVM targets; on macOS that includes the macOS Rust
+library needed by JVM/JNA binding generation.
+
+Rust outputs are shared between SDK modules automatically in this checkout. The root build configures
+all UniFFI modules to use the visible `cargo-target` directory, which is ignored by Git and survives
+Gradle's `clean` task. This means developers do not need to set `CARGO_TARGET_DIR` for normal SDK
+builds. To remove the Rust cache as well, run:
+
+```bash
+./gradlew cleanCargoCache
+```
+
+When the SDK is included in another KMP project, the included SDK build still uses this same
+checkout-local directory. If the consumer is configured as a separate Gradle build that does not
+load the SDK root build configuration, set the same absolute path in both builds:
+
+```bash
+export CARGO_TARGET_DIR="/absolute/path/to/shared/cargo-target"
+./gradlew :app:assembleDebug
+```
+
 ### iOS
 
 Open `sample-ios-kapun.xcodeproj` in Xcode, select a simulator or device, and run the `sample-ios-kapun` target. Device builds require your own provisioning profile. The sample requires iOS 16 or newer.

@@ -11,7 +11,7 @@ tracing = "^0.1"
 kapun-crypto-provider = { path = "../../kapun-crypto-provider", default-features = false }
 simple_x509 = { version = "1.1.0"}
 rand.workspace = true
-p12 = { git = "https://github.com/ubamrein/p12.git", optional = true}
+p12 = { git = "https://github.com/heidiverse/p12.git", optional = true}
 x509-cert = { version = "0.3.0", features = ["builder"], optional = true }
 signature = "3.0.0"
 sha2.workspace = true

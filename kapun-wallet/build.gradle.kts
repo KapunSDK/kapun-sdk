@@ -38,7 +38,6 @@ buildConfig {
 kotlin {
     compilerOptions {
         freeCompilerArgs.add("-Xexpect-actual-classes")
-        freeCompilerArgs.add("-Xwhen-guards")
     }
 
 	sourceSets.all {
@@ -123,8 +122,8 @@ kotlin {
             implementation(libs.owf.identity)
 
             // Compose Resources (currently only used for tests, but doesn't work in commonTest)
-            implementation(compose.runtime)
-            implementation(compose.components.resources)
+            implementation("org.jetbrains.compose.runtime:runtime:${libs.versions.compose.multiplatform.get()}")
+            implementation("org.jetbrains.compose.components:components-resources:${libs.versions.compose.multiplatform.get()}")
         }
 
         commonTest.dependencies {

@@ -12,29 +12,76 @@ permissions:
 
 jobs:
   release:
+    # Publishing must only ever happen for version tags, even if this workflow is
+    # accidentally dispatched or GitHub reports an invalid workflow on a branch push.
+    if: startsWith(github.ref, 'refs/tags/v')
     strategy:
       fail-fast: false
       max-parallel: 4
       matrix:
-        platform: ["kmp", "android", "ios", "jvm"]
+        include:
+          - platform: "android"
+            runner: "k8s-runner-heidi"
+            container: "cimg/android:2026.08-ndk"
+            linuxRustflags: "-C link-args=-fstack-protector-all"
+          - platform: "ios"
+            runner: "macOS"
+            container: null
+            linuxRustflags: "-C link-args=-fstack-protector-all -lssp"
+          - platform: "jvm"
+            runner: "macOS"
+            container: null
+            linuxRustflags: "-C link-args=-fstack-protector-all -lssp"
     name: "Publish to Maven Central"
-    runs-on: ["self-hosted", "macOS"]
+    runs-on: ["${{ matrix.runner }}"]
+    # Job containers are supported only on Linux. The macOS matrix entries use null above and
+    # continue to run directly on the macOS runner.
+    container: ${{ matrix.container }}
+    defaults:
+      run:
+        # GitHub uses sh as the default shell inside a job container; the workflow uses Bash arrays.
+        shell: bash
     timeout-minutes: 120
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-${{ matrix.platform }}
       cancel-in-progress: false
+    env:
+      # Keep Cargo's compilation cache separate from Gradle outputs. Release builds still compile
+      # every ABI required by the published artifact.
+      # runner.temp is unavailable in a job-level env block. Keep this aligned with
+      # the shared target directory configured by the Gradle/UniFFI plugin.
+      CARGO_TARGET_DIR: ${{ github.workspace }}/cargo-target
+      # Keep Cargo's registry and Git caches private to this matrix job. The self-hosted runner
+      # can execute matrix jobs concurrently; sharing $HOME/.cargo makes them wait on Cargo's
+      # package-cache lock.
+      CARGO_HOME: ${{ github.workspace }}/.cargo
+      # Use Git CLI so the credential.helper override below is honored. Cargo's default libgit2
+      # transport does not apply this Git configuration and can wait for credentials.
+      CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+      # Do not let a missing CI credential invoke a developer credential helper indefinitely.
+      GIT_CONFIG_COUNT: "1"
+      GIT_CONFIG_KEY_0: "credential.helper"
+      GIT_CONFIG_VALUE_0: ""
+      CARGO_INCREMENTAL: "0"
 
     steps:
       - uses: actions/checkout@v7.0.1
+
+      - name: Clean Cargo target output
+        run: |
+          # CI does not restore Cargo target outputs, so remove leftovers from previous jobs on
+          # the persistent self-hosted workspace before starting a fresh release build.
+          rm -rf "$CARGO_TARGET_DIR"
+          mkdir -p "$CARGO_TARGET_DIR"
+          df -h "$CARGO_TARGET_DIR"
 
       - name: Determine Gradle tasks
         id: gradle_tasks
         run: |
           targets=()
           case "${{ matrix.platform }}" in
-            kmp) targets+=("KotlinMultiplatform") ;;
             android) targets+=("Android") ;;
-            ios) targets+=("IosArm64" "IosSimulatorArm64") ;;
+            ios) targets+=("KotlinMultiplatform" "IosArm64" "IosSimulatorArm64") ;;
             jvm) targets+=("Jvm") ;;
           esac
 
@@ -45,24 +92,34 @@ jobs:
           echo "tasks=$tasks" >> "$GITHUB_OUTPUT";
 
       - name: Set up JDK
-        uses: actions/setup-java@v6.0.0
+        uses: actions/setup-java@v6.0.1
         with:
           distribution: "zulu"
           java-version: "17"
 
       - name: Setup rust Tool Chain
-        # No toolchain input: the version is taken from rust-toolchain.toml
-        uses: actions-rust-lang/setup-rust-toolchain@v1.17.0
+        uses: actions-rust-lang/setup-rust-toolchain@v2.0.0
+        with:
+          toolchain: "1.97.1"
+          # Release publication still builds all supported targets itself. Keep only the Cargo
+          # registry/git caches here; target outputs are shared within the job via cargo-target.
+          cache-targets: false
+          cache-key: rust-registry-v1
 
       - name: Install Android SDK components
-        if: matrix.platform == 'android' || matrix.platform == 'kmp'
+        if: matrix.platform == 'android'
         run: |
+          # sdkmanager exits successfully after consuming the input, so yes receives SIGPIPE.
+          # Disable pipefail for this pipeline; keep errexit so sdkmanager failures still fail CI.
+          set +o pipefail
           yes | sdkmanager --licenses
-          yes | sdkmanager --install "ndk;28.2.13676358"
+          set -o pipefail
+          sdkmanager --install "ndk;28.2.13676358"
 
       - name: Ensure gradlew is executable
         run: chmod +x gradlew
       - name: Install Linux-Toolchain
+        if: matrix.platform == 'jvm'
         run: |
           brew tap messense/macos-cross-toolchains
           # install x86_64-unknown-linux-gnu toolchain
@@ -72,6 +129,7 @@ jobs:
           # install mingw-w64 targets
           brew install mingw-w64
       - name: Export iOS deployment target
+        if: matrix.platform == 'ios'
         run: |
           echo "IPHONEOS_DEPLOYMENT_TARGET=$(grep '^IPHONEOS_DEPLOYMENT_TARGET=' gradle.properties | cut -d '=' -f2)" >> "$GITHUB_ENV"
 
@@ -81,12 +139,12 @@ jobs:
           CXX_x86_64_unknown_linux_gnu: x86_64-linux-gnu-g++
           AR_x86_64_unknown_linux_gnu: x86_64-linux-gnu-ar
           CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER: x86_64-linux-gnu-gcc
-          CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS: "-C link-args=-fstack-protector-all -lssp"
+          CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS: ${{ matrix.linuxRustflags }}
           CC_aarch64_unknown_linux_gnu: aarch64-linux-gnu-gcc
           CXX_aarch64_unknown_linux_gnu: aarch64-linux-gnu-g++
           AR_aarch64_unknown_linux_gnu: aarch64-linux-gnu-ar
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
-          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUSTFLAGS: "-C link-args=-fstack-protector-all -lssp"
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUSTFLAGS: ${{ matrix.linuxRustflags }}
           CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER: x86_64-w64-mingw32-gcc
           ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.MAVEN_SIGNING_KEY_ARMOR_ASC }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyId: ${{ secrets.MAVEN_SIGNING_KEY_ID }}
@@ -94,4 +152,20 @@ jobs:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
         run: |
-          ./gradlew buildBindings ${{ steps.gradle_tasks.outputs.tasks }} -PreleaseBuild=true -PgithubRefName=${{ github.ref_name }} -PRELEASE_SIGNING_ENABLED=true
+          set +e
+          ./gradlew buildBindings ${{ steps.gradle_tasks.outputs.tasks }} -PreleaseBuild=true -PgithubRefName=${{ github.ref_name }} -PRELEASE_SIGNING_ENABLED=true --console=plain &
+          gradle_pid=$!
+
+          trap 'kill "$gradle_pid" 2>/dev/null || true' INT TERM
+          while kill -0 "$gradle_pid" 2>/dev/null; do
+            sleep 60
+            if kill -0 "$gradle_pid" 2>/dev/null; then
+              elapsed=$(ps -p "$gradle_pid" -o etime= | xargs)
+              echo "Rust/Gradle build still running (Gradle PID $gradle_pid, elapsed $elapsed)"
+            fi
+          done
+
+          wait "$gradle_pid"
+          exit_code=$?
+          trap - INT TERM
+          exit "$exit_code"

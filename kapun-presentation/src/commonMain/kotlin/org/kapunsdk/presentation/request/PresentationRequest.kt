@@ -14,6 +14,8 @@ specific language governing permissions and limitations
 under the License.
  */
 
+@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+
 package org.kapunsdk.presentation.request
 
 import org.kapunsdk.presentation.request.model.OID4VPVersion
@@ -21,7 +23,6 @@ import org.kapunsdk.util.extensions.*
 import org.kapunsdk.util.extensions.get
 import org.kapunsdk.wallet.process.presentation.models.TransactionDataWrapper
 import kotlinx.serialization.EncodeDefault
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonNames
@@ -37,7 +38,6 @@ data class VersionedPresentationRequest(
 	val request: PresentationRequest,
 )
 
-@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class ZkpInfo(
 	val definition: String,
@@ -63,7 +63,7 @@ data class ZkpInfo(
 }
 
 @Serializable
-data class PresentationRequest @OptIn(ExperimentalSerializationApi::class) constructor(
+data class PresentationRequest constructor(
 	@SerialName("client_id")
 	val clientId: String,
 	@EncodeDefault

@@ -54,8 +54,8 @@ kotlin {
 
 			// Compose Resources (currently only used for tests, but doesn't work in commonTest)
 			// See: https://youtrack.jetbrains.com/issue/CMP-4442
-			implementation(compose.runtime)
-			implementation(compose.components.resources)
+			implementation("org.jetbrains.compose.runtime:runtime:${libs.versions.compose.multiplatform.get()}")
+			implementation("org.jetbrains.compose.components:components-resources:${libs.versions.compose.multiplatform.get()}")
 		}
 
 		commonTest.dependencies {
