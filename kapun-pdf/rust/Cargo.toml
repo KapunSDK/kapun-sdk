@@ -9,9 +9,10 @@ name = "kapun_pdf_rust"
 
 [dependencies]
 uniffi.workspace = true
-typst = "0.14.0"
+typst = { git = "https://github.com/typst/typst.git", tag = "v0.14.2", package = "typst" }
 typst-assets = {version = "0.14.0", features = ["fonts"]}
-typst-pdf = "0.14.0"
+typst-pdf = { git = "https://github.com/typst/typst.git", tag = "v0.14.2", package = "typst-pdf" }
+typst-render = { git = "https://github.com/typst/typst.git", tag = "v0.14.2", package = "typst-render", optional = true }
 ureq.workspace = true
 fontdb = "0.16.2"
 # Fetching and unzipping packages
@@ -27,3 +28,4 @@ tar = "0.4"
 [features]
 default = ["uniffi"]
 uniffi = []
+png = ["dep:typst-render"]

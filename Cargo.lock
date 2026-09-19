@@ -5199,6 +5199,7 @@ dependencies = [
  "typst",
  "typst-assets",
  "typst-pdf",
+ "typst-render",
  "uniffi",
  "ureq 3.4.2",
  "zune-inflate",
@@ -6918,6 +6919,15 @@ name = "pin-utils"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b870d8c151b6f2fb93e84a13146138f05d02ed11c7e7c54f8826aaaf7c9f184"
+
+[[package]]
+name = "pixglyph"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "47945e80a49d08350e4a007ac4294c6498d23956c18ea5e6ff480dc93d31643c"
+dependencies = [
+ "ttf-parser 0.25.1",
+]
 
 [[package]]
 name = "pkcs1"
@@ -10000,8 +10010,7 @@ checksum = "b6f5e870be6c3b371b77fe0ee0bafb859fa4964b4404c27de1d380043c4dda20"
 [[package]]
 name = "typst"
 version = "0.14.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1f6511ee598476f4f322b4d13891083d96dbacb8f9c2b908604c7094ba390653"
+source = "git+https://github.com/typst/typst.git?tag=v0.14.2#b33de9de113c91c184214b299bd7a8eb3070c3ab"
 dependencies = [
  "comemo",
  "ecow",
@@ -10026,8 +10035,7 @@ checksum = "5613cb719a6222fe9b74027c3625d107767ec187bff26b8fc931cf58942c834f"
 [[package]]
 name = "typst-eval"
 version = "0.14.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "687757487dfc0c1e941344d5024cf7a28364e70c3e304faad89ac65597f62526"
+source = "git+https://github.com/typst/typst.git?tag=v0.14.2#b33de9de113c91c184214b299bd7a8eb3070c3ab"
 dependencies = [
  "comemo",
  "ecow",
@@ -10046,8 +10054,7 @@ dependencies = [
 [[package]]
 name = "typst-html"
 version = "0.14.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e29f8da4f964d4c90739c3c1e0288b0ba1bccc3cc50623a6d558300b86ca8aad"
+source = "git+https://github.com/typst/typst.git?tag=v0.14.2#b33de9de113c91c184214b299bd7a8eb3070c3ab"
 dependencies = [
  "bumpalo",
  "comemo",
@@ -10067,8 +10074,7 @@ dependencies = [
 [[package]]
 name = "typst-layout"
 version = "0.14.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4cab0200105831a9158e63718a0f6141c78cb2c1722ed17d19ad28941e3b8491"
+source = "git+https://github.com/typst/typst.git?tag=v0.14.2#b33de9de113c91c184214b299bd7a8eb3070c3ab"
 dependencies = [
  "az",
  "bumpalo",
@@ -10103,8 +10109,7 @@ dependencies = [
 [[package]]
 name = "typst-library"
 version = "0.14.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e276a5de53020c43efe2111ec236252e54ea4480b5ac18063e663dfbe03d9d1b"
+source = "git+https://github.com/typst/typst.git?tag=v0.14.2#b33de9de113c91c184214b299bd7a8eb3070c3ab"
 dependencies = [
  "az",
  "bitflags 2.13.2",
@@ -10169,8 +10174,7 @@ dependencies = [
 [[package]]
 name = "typst-macros"
 version = "0.14.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "141cbd1027129fbf6bda1013f52a264df7befc7388cc8f47767d65e803fd3a59"
+source = "git+https://github.com/typst/typst.git?tag=v0.14.2#b33de9de113c91c184214b299bd7a8eb3070c3ab"
 dependencies = [
  "heck",
  "proc-macro2",
@@ -10181,8 +10185,7 @@ dependencies = [
 [[package]]
 name = "typst-pdf"
 version = "0.14.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "37c8a4630754767cd10d48e8b8186e7dc784631a30a3a93521edf7d77aebd0c0"
+source = "git+https://github.com/typst/typst.git?tag=v0.14.2#b33de9de113c91c184214b299bd7a8eb3070c3ab"
 dependencies = [
  "az",
  "bytemuck",
@@ -10207,8 +10210,7 @@ dependencies = [
 [[package]]
 name = "typst-realize"
 version = "0.14.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f7ffe964757fb93d2e98978aa2a74ee85b0f94c8643e8f3550737258b58f39d8"
+source = "git+https://github.com/typst/typst.git?tag=v0.14.2#b33de9de113c91c184214b299bd7a8eb3070c3ab"
 dependencies = [
  "arrayvec",
  "bumpalo",
@@ -10223,10 +10225,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "typst-render"
+version = "0.14.2"
+source = "git+https://github.com/typst/typst.git?tag=v0.14.2#b33de9de113c91c184214b299bd7a8eb3070c3ab"
+dependencies = [
+ "bytemuck",
+ "comemo",
+ "hayro",
+ "image",
+ "pixglyph",
+ "resvg",
+ "tiny-skia",
+ "ttf-parser 0.25.1",
+ "typst-assets",
+ "typst-library",
+ "typst-macros",
+ "typst-timing",
+]
+
+[[package]]
 name = "typst-svg"
 version = "0.14.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e46b811837ade1f0243ef0d8bf3fb06d166443090eac22c28643f374c2ccdc9d"
+source = "git+https://github.com/typst/typst.git?tag=v0.14.2#b33de9de113c91c184214b299bd7a8eb3070c3ab"
 dependencies = [
  "base64 0.22.1",
  "comemo",
@@ -10249,8 +10269,7 @@ dependencies = [
 [[package]]
 name = "typst-syntax"
 version = "0.14.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a95d9192060e23b1e491b0b94dff676acddc92a4d672aeb8ca3890a5a734e879"
+source = "git+https://github.com/typst/typst.git?tag=v0.14.2#b33de9de113c91c184214b299bd7a8eb3070c3ab"
 dependencies = [
  "ecow",
  "rustc-hash 2.1.3",
@@ -10268,8 +10287,7 @@ dependencies = [
 [[package]]
 name = "typst-timing"
 version = "0.14.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7be94f8faf19841b49574ef5c7fd7a12e2deb7c3d8deba5a596f35d2222024cd"
+source = "git+https://github.com/typst/typst.git?tag=v0.14.2#b33de9de113c91c184214b299bd7a8eb3070c3ab"
 dependencies = [
  "parking_lot 0.12.5",
  "serde",
@@ -10279,8 +10297,7 @@ dependencies = [
 [[package]]
 name = "typst-utils"
 version = "0.14.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a3966c92e8fa48c7ce898130d07000d985f18206d92b250f0f939287fbccdee3"
+source = "git+https://github.com/typst/typst.git?tag=v0.14.2#b33de9de113c91c184214b299bd7a8eb3070c3ab"
 dependencies = [
  "once_cell",
  "portable-atomic",

@@ -32,16 +32,49 @@ use typst::{
 use typst_pdf::PdfOptions;
 
 #[uniffi::export]
-fn render(main_file: &str, additional_files: HashMap<String, Vec<u8>>) -> Vec<u8> {
-    let world = TypstWrapperWorld::new(".", main_file, additional_files);
-    let doc = typst::compile(&world);
-    let Ok(doc_output) = doc.output else {
+pub fn render(main_file: &str, additional_files: HashMap<String, Vec<u8>>) -> Vec<u8> {
+    let Some(doc_output) = compile(main_file, additional_files) else {
         return vec![];
     };
     let Ok(pdf) = typst_pdf::pdf(&doc_output, &PdfOptions::default()) else {
         return vec![];
     };
     pdf
+}
+
+fn compile(
+    main_file: &str,
+    additional_files: HashMap<String, Vec<u8>>,
+) -> Option<typst::layout::PagedDocument> {
+    let world = TypstWrapperWorld::new(".", main_file, additional_files);
+    typst::compile(&world).output.ok()
+}
+
+/// Render every compiled page to a PNG image.
+///
+/// This is optional because raster rendering adds the `typst-render` graphics
+/// stack to consumers that only need PDF output. The returned buffers are
+/// ordered like the pages in the compiled Typst document.
+#[cfg(feature = "png")]
+#[uniffi::export]
+pub fn render_png(
+    main_file: &str,
+    additional_files: HashMap<String, Vec<u8>>,
+    pixel_per_pt: f32,
+) -> Vec<Vec<u8>> {
+    let Some(document) = compile(main_file, additional_files) else {
+        return vec![];
+    };
+    let pixel_per_pt = if pixel_per_pt.is_finite() && pixel_per_pt > 0.0 {
+        pixel_per_pt
+    } else {
+        2.0
+    };
+    document
+        .pages
+        .iter()
+        .filter_map(|page| typst_render::render(page, pixel_per_pt).encode_png().ok())
+        .collect()
 }
 
 /// Main interface that determines the environment for Typst.
@@ -330,3 +363,16 @@ pub unsafe extern "C" fn __deregister_frame() {}
 pub unsafe extern "C" fn __register_frame() {}
 
 uniffi::setup_scaffolding!();
+
+#[cfg(all(test, feature = "png"))]
+mod tests {
+    use super::render_png;
+    use std::collections::HashMap;
+
+    #[test]
+    fn png_renderer_returns_one_png_for_one_page() {
+        let pages = render_png("= Preview\n\nHello from Typst.", HashMap::new(), 1.0);
+        assert_eq!(pages.len(), 1);
+        assert!(pages[0].starts_with(b"\x89PNG\r\n\x1a\n"));
+    }
+}
