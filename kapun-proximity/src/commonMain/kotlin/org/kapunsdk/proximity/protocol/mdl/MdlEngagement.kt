@@ -28,14 +28,15 @@ data class MdlEngagement(val coseKey: ByteArray,
 		private const val MDL_ENGAGEMENT_VERSION = "1.1"
 
 		fun fromQrCode(qrcodeData: String) : MdlEngagement? {
-			val originalData = base64UrlDecode(qrcodeData)
+			val encodedData = qrcodeData.removePrefix("mdoc:")
+			val originalData = runCatching { base64UrlDecode(encodedData) }.getOrNull() ?: return null
 			return fromCbor(originalData)
 	}
 	fun fromCbor(originalData: ByteArray) : MdlEngagement? {
-		val deviceEngagementValue = decodeCbor(originalData)
+		val deviceEngagementValue = runCatching { decodeCbor(originalData) }.getOrNull() ?: return null
 		// verify version
-		val deviceEngagement = deviceEngagementValue.asOrderedObject()
-		val version = deviceEngagement!![Value.Number(JsonNumber.Integer(0))]
+		val deviceEngagement = deviceEngagementValue.asOrderedObject() ?: return null
+		val version = deviceEngagement[Value.Number(JsonNumber.Integer(0))]
 
 		//extract key
 		val coseKey = deviceEngagement[Value.Number(JsonNumber.Integer(1))]
@@ -45,10 +46,10 @@ data class MdlEngagement(val coseKey: ByteArray,
 		var centralClientModeSupported : Value? = null
 		var peripheralServerModeSupported : Value?  = null
 		if(transportOptions != null) {
-			val firstOption = transportOptions[0]
+			val firstOption = transportOptions.firstOrNull() ?: return null
 			// BLE options are the third element
-			val bleOptions = firstOption[2].asOrderedObject()!!
-			val peripheralServerModeSupported = bleOptions[Value.Number(JsonNumber.Integer(0))]
+			val bleOptions = firstOption[2].asOrderedObject() ?: return null
+			peripheralServerModeSupported = bleOptions[Value.Number(JsonNumber.Integer(0))]
 			centralClientModeSupported = bleOptions[Value.Number(JsonNumber.Integer(1))]
 			centralClientUuid = if (centralClientModeSupported?.asBoolean() == true) {
 				bleOptions[Value.Number(JsonNumber.Integer(11))]?.asBytes()?.let {
@@ -101,7 +102,7 @@ data class MdlEngagement(val coseKey: ByteArray,
 			bleOptions.put(10, peripheralServerUuid.toByteArray())
 		}
 		if(centralClientModeSupported && centralClientUuid != null) {
-			bleOptions.put(11, centralClientUuid)
+			bleOptions.put(11, centralClientUuid.toByteArray())
 		}
 		val deviceEngagement = mutableMapOf(
 			0 to MDL_ENGAGEMENT_VERSION,
@@ -124,6 +125,6 @@ data class MdlEngagement(val coseKey: ByteArray,
 	}
 
 	override fun createQrCodeForEngagement(): String {
-		return base64UrlEncode(originalData)
+		return "mdoc:${base64UrlEncode(originalData)}"
 	}
 }

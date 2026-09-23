@@ -39,7 +39,7 @@ object MdlCoseKey {
 				x = publicKey.slice(1..<67).toByteArray()
 				y = publicKey.slice(67..<133).toByteArray()
 			}
-			KeyType.ED25519 -> {
+			KeyType.X25519 -> {
 				if(publicKey.size != 32) {
 					return Value.Null
 				}

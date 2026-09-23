@@ -77,7 +77,7 @@ class ProximityWallet private constructor(
 		fun createReverse(	protocol: ProximityProtocol,
 							  scope: CoroutineScope,
 						   readerEngagement: String,
-						   keyType: KeyType = KeyType.ED25519
+						   keyType: KeyType = KeyType.X25519
 						   ) : ProximityWallet {
 			return when (protocol) {
 				ProximityProtocol.MDL -> {
@@ -116,7 +116,7 @@ class ProximityWallet private constructor(
 			scope: CoroutineScope,
 			serviceUuid: String,
 			peripheralServerUuid: String? = null,
-			keyType: KeyType = KeyType.ED25519
+			keyType: KeyType = KeyType.X25519
 		): ProximityWallet {
 			return when (protocol) {
 				ProximityProtocol.MDL -> {
@@ -155,7 +155,7 @@ class ProximityWallet private constructor(
 			scope: CoroutineScope,
 			serviceUuid: Uuid,
 			peripheralServerUuid: Uuid? = null,
-			keyType: KeyType = KeyType.ED25519
+			keyType: KeyType = KeyType.X25519
 		): ProximityWallet {
 			return when (protocol) {
 				ProximityProtocol.MDL -> {

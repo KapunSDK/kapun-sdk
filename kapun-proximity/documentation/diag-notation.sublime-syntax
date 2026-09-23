@@ -1,0 +1,30 @@
+%YAML 1.2
+---
+name: diag-notation
+file_extensions:
+  - diag
+scope: source.diag-notation
+variables:
+  ident: '[A-Za-z0-9_-]+'
+contexts:
+  main:
+    - match: '^\s*({{ident}})(\s*=)'
+      captures:
+        1: entity.name.struct.diag-notation
+        2: punctuation.separator.diag-notation
+    - match: '#\d+\.\d+'
+      scope: keyword.control.tag.diag-notation
+    - match: '"[^"\\]*(?:\\.[^"\\]*)*"'
+      scope: string.quoted.double.diag-notation
+    - match: ';.*$'
+      scope: comment.line.diag-notation
+    - match: '\b(?:uint|int|tstr|bstr|bool|null|any)\b'
+      scope: storage.type.primitive.diag-notation
+    - match: '\b{{ident}}\b'
+      scope: entity.name.type.diag-notation
+    - match: '[{}\[\],:]'
+      scope: punctuation.diag-notation
+    - match: '[?+*]'
+      scope: keyword.control.conditional.diag-notation
+    - match: '\b\d+\b'
+      scope: constant.numeric.diag-notation

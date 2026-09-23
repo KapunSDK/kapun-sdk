@@ -5213,6 +5213,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "kapun-proximity-docgen"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "ciborium",
+ "kapun-crypto-rust",
+ "kapun-pdf-rust",
+ "p256 0.13.2",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "typst",
+]
+
+[[package]]
 name = "kapun-trust-rust"
 version = "0.1.0"
 dependencies = [

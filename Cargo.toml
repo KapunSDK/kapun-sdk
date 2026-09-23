@@ -15,6 +15,7 @@ members = [
     "kapun-util/rust",
     "kapun-wallet/rust",
     "kapun-pdf/rust",
+    "kapun-proximity/documentation",
     "crates/zkp-util",
     "crates/rdf-util",
     "crates/kapun-x509/kapun-x509",

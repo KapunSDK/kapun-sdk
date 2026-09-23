@@ -1,0 +1,16 @@
+[package]
+name = "kapun-proximity-docgen"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+base64.workspace = true
+ciborium.workspace = true
+kapun-crypto-rust = { path = "../../kapun-crypto/rust" }
+kapun-pdf-rust = { path = "../../kapun-pdf/rust" }
+p256.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+typst = "0.14.0"

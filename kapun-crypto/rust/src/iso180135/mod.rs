@@ -31,7 +31,9 @@ pub enum KeyType {
     P256,
     P384,
     P521,
-    Ed25519,
+    /// X25519 key agreement. The historical enum name was Ed25519, but this
+    /// branch uses x25519-dalek and is encoded as COSE OKP/X25519.
+    X25519,
     #[cfg(feature = "x448")]
     Ed448,
 }
@@ -40,7 +42,7 @@ pub enum EphemeralSecretKey {
     P256(p256::ecdh::EphemeralSecret),
     P384(p384::ecdh::EphemeralSecret),
     P521(p521::ecdh::EphemeralSecret),
-    Ed25519(x25519_dalek::EphemeralSecret),
+    X25519(x25519_dalek::EphemeralSecret),
     #[cfg(feature = "x448")]
     Ed448(x448::Secret),
 }
@@ -51,8 +53,8 @@ impl EphemeralSecretKey {
             KeyType::P256 => Self::P256(p256::ecdh::EphemeralSecret::random(&mut OsRng)),
             KeyType::P384 => Self::P384(p384::ecdh::EphemeralSecret::random(&mut OsRng)),
             KeyType::P521 => Self::P521(p521::ecdh::EphemeralSecret::random(&mut OsRng)),
-            KeyType::Ed25519 => {
-                Self::Ed25519(x25519_dalek::EphemeralSecret::random_from_rng(&mut OsRng))
+            KeyType::X25519 => {
+                Self::X25519(x25519_dalek::EphemeralSecret::random_from_rng(&mut OsRng))
             }
             #[cfg(feature = "x448")]
             KeyType::Ed448 => {
@@ -75,7 +77,7 @@ impl EphemeralSecretKey {
             EphemeralSecretKey::P521(ephemeral_secret) => {
                 ephemeral_secret.public_key().to_sec1_bytes().to_vec()
             }
-            EphemeralSecretKey::Ed25519(ephemeral_secret) => {
+            EphemeralSecretKey::X25519(ephemeral_secret) => {
                 x25519_dalek::PublicKey::from(ephemeral_secret)
                     .to_bytes()
                     .to_vec()
@@ -109,7 +111,7 @@ impl EphemeralSecretKey {
                     .raw_secret_bytes()
                     .to_vec()
             }
-            EphemeralSecretKey::Ed25519(ephemeral_secret) => {
+            EphemeralSecretKey::X25519(ephemeral_secret) => {
                 let mut pub_key = [0u8; 32];
                 if peer_public_key.len() != 32 {
                     return None;
@@ -312,7 +314,7 @@ mod tests {
             KeyType::P256,
             KeyType::P384,
             KeyType::P521,
-            KeyType::Ed25519,
+            KeyType::X25519,
             #[cfg(feature = "x448")]
             KeyType::Ed448,
         ] {

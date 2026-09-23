@@ -20,7 +20,9 @@ import org.kapunsdk.util.extensions.asBoolean
 import org.kapunsdk.util.extensions.asBytes
 import org.kapunsdk.util.extensions.asLong
 import org.kapunsdk.util.extensions.get
+import org.kapunsdk.util.extensions.toCbor
 import uniffi.kapun_util_rust.decodeCbor
+import uniffi.kapun_util_rust.encodeCbor
 
 data class MdlSessionData(
 	val data: ByteArray?,
@@ -28,6 +30,15 @@ data class MdlSessionData(
 	val shaSum: ByteArray?,
 	val dcApiSelected: Boolean? = false
 ) {
+	fun asCbor(): ByteArray {
+		return encodeCbor(mapOf(
+			"data" to data,
+			"status" to status,
+			"shaSum" to shaSum,
+			"dcApiSelected" to (dcApiSelected ?: false),
+		).toCbor())
+	}
+
     companion object {
         fun fromCbor(data: ByteArray) : MdlSessionData? {
             val decoded = runCatching { decodeCbor(data) }.getOrNull() ?: return null

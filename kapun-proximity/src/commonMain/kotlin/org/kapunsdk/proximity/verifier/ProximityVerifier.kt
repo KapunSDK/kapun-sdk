@@ -74,7 +74,7 @@ class ProximityVerifier<T> private constructor(
 							  serviceUuid: String,
 							  preferDcApi: Boolean = true,
 							  peripheralServerUuid: String? = null,
-							  keyType: KeyType = KeyType.ED25519): ProximityVerifier<T> {
+													  keyType: KeyType = KeyType.X25519): ProximityVerifier<T> {
 			val publicKey = EphemeralKey(Role.SK_READER, keyType)
 			return when (protocol) {
 				ProximityProtocol.MDL -> {
@@ -117,7 +117,7 @@ class ProximityVerifier<T> private constructor(
 			requester: DocumentRequester<T>,
 			qrcodeData: String? = null,
 			preferDcApi: Boolean = true,
-			keyType: KeyType = KeyType.ED25519
+			keyType: KeyType = KeyType.X25519
 		): ProximityVerifier<T>? {
 			val publicKey = EphemeralKey(Role.SK_READER, keyType)
 			return when (protocol) {
