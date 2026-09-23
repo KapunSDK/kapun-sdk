@@ -16,6 +16,7 @@ under the License.
 package org.kapunsdk.proximity.verifier
 
 import org.kapunsdk.proximity.ProximityProtocol
+import org.kapunsdk.proximity.ble.ProximityBleOptions
 import org.kapunsdk.proximity.ProximityError
 import org.kapunsdk.proximity.documents.DocumentRequest
 import org.kapunsdk.proximity.documents.DocumentRequester
@@ -74,7 +75,8 @@ class ProximityVerifier<T> private constructor(
 							  serviceUuid: String,
 							  preferDcApi: Boolean = true,
 							  peripheralServerUuid: String? = null,
-							  keyType: KeyType = KeyType.ED25519): ProximityVerifier<T> {
+							  keyType: KeyType = KeyType.ED25519,
+							  bleOptions: ProximityBleOptions = ProximityBleOptions.Default): ProximityVerifier<T> {
 			val publicKey = EphemeralKey(Role.SK_READER, keyType)
 			return when (protocol) {
 				ProximityProtocol.MDL -> {
@@ -85,7 +87,8 @@ class ProximityVerifier<T> private constructor(
 						TransportProtocol.Role.VERIFIER,
 						Uuid.parse(serviceUuid),
 						peripheralServerUuid?.let { Uuid.parse(it)},
-						publicKey
+						publicKey,
+						options = bleOptions
 					)
 					val engagementBuilder = MdlEngagementBuilder(
 						"",
@@ -117,7 +120,8 @@ class ProximityVerifier<T> private constructor(
 			requester: DocumentRequester<T>,
 			qrcodeData: String? = null,
 			preferDcApi: Boolean = true,
-			keyType: KeyType = KeyType.ED25519
+			keyType: KeyType = KeyType.ED25519,
+			bleOptions: ProximityBleOptions = ProximityBleOptions.Default
 		): ProximityVerifier<T>? {
 			val publicKey = EphemeralKey(Role.SK_READER, keyType)
 			return when (protocol) {
@@ -129,7 +133,8 @@ class ProximityVerifier<T> private constructor(
 						TransportProtocol.Role.VERIFIER,
 						deviceEngagement?.centralClientUuid,
 						deviceEngagement?.peripheralServerUuid,
-						publicKey
+						publicKey,
+						options = bleOptions
 					)
 					ProximityVerifier(protocol, scope, deviceEngagement, transportProtocol, requester, readerKey = coseKey, isDcApi = preferDcApi)
 				}

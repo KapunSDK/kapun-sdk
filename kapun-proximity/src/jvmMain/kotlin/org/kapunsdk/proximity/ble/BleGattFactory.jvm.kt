@@ -25,7 +25,7 @@ internal actual class BleGattFactory {
 		TODO("Not yet implemented")
 	}
 
-	internal actual fun createClient(serviceUuid: Uuid): BleGattClient {
+	internal actual fun createClient(serviceUuid: Uuid, options: ProximityBleOptions): BleGattClient {
 		TODO("Not yet implemented")
 	}
 	internal actual fun isBleAdvSupported() : Boolean {

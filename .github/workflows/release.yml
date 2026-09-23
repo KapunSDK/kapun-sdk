@@ -21,7 +21,7 @@ jobs:
       matrix:
         include:
           - platform: "android"
-            runner: "k8s-runner-heidi"
+            runner: "k8s-runner-kapunsdk"
             container: "cimg/android:2026.08-ndk"
             linuxRustflags: "-C link-args=-fstack-protector-all"
           - platform: "ios"

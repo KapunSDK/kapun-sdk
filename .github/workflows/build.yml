@@ -17,7 +17,7 @@ jobs:
       matrix:
         include:
           - platform: "android"
-            runner: "k8s-runner-heidi"
+            runner: "k8s-runner-kapunsdk"
             container: "cimg/android:2026.08-ndk"
             linuxRustflags: "-C link-args=-fstack-protector-all"
           - platform: "ios"
@@ -29,7 +29,7 @@ jobs:
             container: null
             linuxRustflags: "-C link-args=-fstack-protector-all -lssp"
           - platform: "jvm-linux"
-            runner: "k8s-runner-heidi"
+            runner: "k8s-runner-kapunsdk"
             container: "cimg/base:2026.09"
             linuxRustflags: "-C link-args=-fstack-protector-all"
     runs-on: ["${{ matrix.runner }}"]

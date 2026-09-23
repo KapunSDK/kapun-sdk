@@ -27,5 +27,6 @@ internal expect class BleGattFactory {
 
 	internal fun createClient(
 		serviceUuid: Uuid,
+		options: ProximityBleOptions = ProximityBleOptions.Default,
 	): BleGattClient
 }

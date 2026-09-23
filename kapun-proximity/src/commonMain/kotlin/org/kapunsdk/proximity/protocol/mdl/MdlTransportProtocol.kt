@@ -16,8 +16,10 @@ under the License.
 
 package org.kapunsdk.proximity.protocol.mdl
 
+import org.kapunsdk.proximity.ble.ProximityBleOptions
 import org.kapunsdk.proximity.di.KapunProximityKoinComponent
 import org.kapunsdk.proximity.protocol.BleTransportProtocol
+import org.kapunsdk.util.log.Logger
 import uniffi.kapun_crypto_rust.EphemeralKey
 import uniffi.kapun_crypto_rust.SessionCipher
 import uniffi.kapun_util_rust.Value
@@ -28,7 +30,8 @@ internal class MdlTransportProtocol(
     private val serviceUuidCentralMode: Uuid?,
     private val serviceUuidPeripheralMode: Uuid?,
     private val ephemeralKey: EphemeralKey,
-    private val deviceMacAddress: String? = null
+    private val deviceMacAddress: String? = null,
+    private val options: ProximityBleOptions = ProximityBleOptions.Default
 ) : BleTransportProtocol(role), KapunProximityKoinComponent, MdlTransportProtocolExtensions {
     var centralClientModeTransportProtocol: MdlCentralClientModeTransportProtocol?
     var peripheralServerModeTransportProtocol: MdlPeripheralServerModeTransportProtocol?
@@ -43,19 +46,36 @@ internal class MdlTransportProtocol(
             TODO("Session Transcript should not be overridden")
         }
     init {
-        centralClientModeTransportProtocol = if (serviceUuidCentralMode != null) { MdlCentralClientModeTransportProtocol(role, serviceUuidCentralMode, ephemeralKey, deviceMacAddress) } else { null }
-        peripheralServerModeTransportProtocol = if(serviceUuidPeripheralMode != null){ MdlPeripheralServerModeTransportProtocol(role, serviceUuidPeripheralMode, ephemeralKey, deviceMacAddress) } else {
+        centralClientModeTransportProtocol = if (serviceUuidCentralMode != null) { MdlCentralClientModeTransportProtocol(role, serviceUuidCentralMode, ephemeralKey, deviceMacAddress, options) } else { null }
+        peripheralServerModeTransportProtocol = if(serviceUuidPeripheralMode != null){ MdlPeripheralServerModeTransportProtocol(role, serviceUuidPeripheralMode, ephemeralKey, deviceMacAddress, options) } else {
             null
         }
         if(centralClientModeTransportProtocol?.isSupported() == false) {
+            Logger(TAG).warn("central client mode offered but not supported on this device, dropping it")
             centralClientModeTransportProtocol = null
         }
         if(peripheralServerModeTransportProtocol?.isSupported() == false) {
+            Logger(TAG).warn("peripheral server mode offered but not supported on this device, dropping it")
             peripheralServerModeTransportProtocol = null
         }
         if (peripheralServerModeTransportProtocol != null && centralClientModeTransportProtocol != null) {
+            // Both sides run this same rule, so the preference has to stay in sync across them.
+            // To select central client mode, omit the peripheral server UUID from the engagement.
             centralClientModeTransportProtocol = null
         }
+        val selected = when {
+            centralClientModeTransportProtocol != null -> "centralClient"
+            peripheralServerModeTransportProtocol != null -> "peripheralServer"
+            else -> "none"
+        }
+        Logger(TAG).debug("transport mode selected: role=$role mode=$selected")
+        if (selected == "none") {
+            Logger(TAG).error("no usable BLE transport mode for role=$role, the session cannot connect")
+        }
+    }
+
+    companion object {
+        private const val TAG = "MdlTransportProtocol"
     }
 
     override fun getMessage(): ByteArray? {

@@ -20,9 +20,12 @@ import android.bluetooth.*
 import android.bluetooth.le.*
 import android.content.Context
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.os.ParcelUuid
 import org.kapunsdk.proximity.ble.gatt.BleGattCharacteristic
 import org.kapunsdk.proximity.ble.gatt.BleGattService
+import org.kapunsdk.proximity.ble.ProximityBleOptions
 import org.kapunsdk.proximity.ProximityError
 import org.kapunsdk.proximity.ble.server.ChunkAccumulator
 import org.kapunsdk.proximity.ble.server.ChunkProcessingResult
@@ -42,10 +45,13 @@ internal class GattClient(
     private val bluetoothManager: BluetoothManager,
     private val serviceUuid: UUID,
     private val encodedEphemeralDeviceKey: ByteArray?, // TODO Use for session encryption
+    private val options: ProximityBleOptions = ProximityBleOptions.Default,
 ) : BluetoothGattCallback(), BleGattClient {
 
     companion object {
         private const val TAG = "GattClient"
+
+        private const val MTU_TIMEOUT_MS = 3000L
 
         private val SHUTDOWN_UUID = Uuid.random()
     }
@@ -165,6 +171,7 @@ internal class GattClient(
     override fun disconnect() {
         if (inhibitCallbacks) return
         inhibitCallbacks = true
+        cancelMtuWatchdog()
         if (gatt != null) {
             // used to convey we want to shutdown once all writes are done.
             writeCharacteristicNonChunked(SHUTDOWN_UUID, TransportProtocol.SHUTDOWN_MESSAGE)
@@ -261,34 +268,110 @@ internal class GattClient(
         when (newState) {
             BluetoothProfile.STATE_CONNECTED -> {
                 try {
-                    Logger(TAG).debug("gatt connected: status=$status, starting service discovery")
                     if (clearCache) {
                         clearCache(gatt)
                     }
 
                     mtuRequested = false
                     cachedCharacteristicValueSize = 0
+                    discoveryStarted = false
+                    connectionReported = false
 
                     gatt.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH)
-                    gatt.discoverServices()
+
+                    if (options.preferLe2MPhy) {
+                        // The peer may refuse; onPhyUpdate reports what was actually granted.
+                        gatt.setPreferredPhy(
+                            BluetoothDevice.PHY_LE_2M_MASK,
+                            BluetoothDevice.PHY_LE_2M_MASK,
+                            BluetoothDevice.PHY_OPTION_NO_PREFERRED
+                        )
+                    }
+
+                    if (options.mtuBeforeDiscovery) {
+                        // Discovery at the default ATT MTU of 23 fits one 128-bit-UUID entry per
+                        // PDU, so every attribute on the peer costs a round trip. Settle the MTU
+                        // first and let onMtuChanged start discovery.
+                        Logger(TAG).debug("gatt connected: status=$status, negotiating MTU before discovery")
+                        requestMtuSafely(gatt)
+                        armMtuWatchdog(gatt)
+                    } else {
+                        Logger(TAG).debug("gatt connected: status=$status, starting service discovery")
+                        startServiceDiscovery(gatt)
+                    }
                 } catch (e: SecurityException) {
                     reportError(ProximityError.Unknown(e.message ?: e::class.simpleName ?: "Unknown error"))
                 }
             }
             BluetoothProfile.STATE_DISCONNECTED -> {
                 Logger(TAG).debug("gatt disconnected: status=$status")
+                cancelMtuWatchdog()
                 chunkAccumulator.clear()
                 writeQueues.clear()
                 coordinator.reset()
                 mtuRequested = false
                 cachedCharacteristicValueSize = 0
+                discoveryStarted = false
+                connectionReported = false
                 reportPeerDisconnected()
             }
         }
     }
 
-    private val coordinator = Coordinator { gatt -> requestMtuSafely(gatt) }
+    // Both orderings converge here once the CCCD writes are done: the legacy one still has the MTU
+    // exchange left to do, the new one is already ready.
+    private val coordinator = Coordinator { gatt -> onDescriptorPhaseComplete(gatt) }
     private var mtuRequested = false
+    private var discoveryStarted = false
+    private var connectionReported = false
+
+    private val mtuWatchdogHandler = Handler(Looper.getMainLooper())
+    private var mtuWatchdog: Runnable? = null
+
+    /**
+     * With [ProximityBleOptions.mtuBeforeDiscovery] the MTU exchange gates service discovery, so a
+     * peer that never answers it would stall the whole session. Fall through to discovery instead;
+     * [characteristicValueSize] already degrades to MTU 23 with a warning.
+     */
+    private fun armMtuWatchdog(gatt: BluetoothGatt) {
+        cancelMtuWatchdog()
+        val runnable = Runnable {
+            if (inhibitCallbacks || discoveryStarted) return@Runnable
+            Logger(TAG).warn("MTU exchange did not complete in ${MTU_TIMEOUT_MS}ms, discovering services anyway")
+            startServiceDiscovery(gatt)
+        }
+        mtuWatchdog = runnable
+        mtuWatchdogHandler.postDelayed(runnable, MTU_TIMEOUT_MS)
+    }
+
+    private fun cancelMtuWatchdog() {
+        mtuWatchdog?.let { mtuWatchdogHandler.removeCallbacks(it) }
+        mtuWatchdog = null
+    }
+
+    private fun startServiceDiscovery(gatt: BluetoothGatt) {
+        if (discoveryStarted) return
+        discoveryStarted = true
+        cancelMtuWatchdog()
+        gatt.discoverServices()
+    }
+
+    private fun onDescriptorPhaseComplete(gatt: BluetoothGatt) {
+        if (options.mtuBeforeDiscovery) {
+            signalConnectionReady()
+        } else {
+            Logger(TAG).debug("requesting MTU")
+            requestMtuSafely(gatt)
+        }
+    }
+
+    /** Reports the link as usable exactly once, whichever ordering got us here. */
+    private fun signalConnectionReady() {
+        if (connectionReported) return
+        connectionReported = true
+        Logger(TAG).debug("connection ready: mtu=$negotiatedMtu characteristics=${characteristics.size}")
+        reportPeerConnected()
+    }
 
     // Start by bumping MTU, callback in onMtuChanged()...
     //
@@ -336,6 +419,9 @@ internal class GattClient(
 
         val callbackListener = listener ?: return
         if (inhibitCallbacks) return
+        // Assigned before the descriptor phase can signal readiness, since the listener may start
+        // writing characteristics synchronously from that callback.
+        this.gatt = gatt
         characteristics = callbackListener.onServicesDiscovered(gatt.services.map { BleGattService(it) })
 
         coordinator.reset()
@@ -364,20 +450,24 @@ internal class GattClient(
 
         if (coordinator.hasPendingDescriptors()) {
             Logger(TAG).debug("writing CCCD descriptors: pending=${coordinator.pendingCount()}")
-            coordinator.deferMtuUntilComplete()
+            coordinator.deferCompletionUntilWritten()
             coordinator.flush(gatt)
         } else {
-            Logger(TAG).debug("no CCCD writes needed, requesting MTU")
-            requestMtuSafely(gatt)
+            Logger(TAG).debug("no CCCD writes needed")
+            onDescriptorPhaseComplete(gatt)
         }
-
-        this.gatt = gatt
     }
 
 
     override fun onMtuChanged(gatt: BluetoothGatt, mtu: Int, status: Int) {
         if (status != BluetoothGatt.GATT_SUCCESS) {
             Logger(TAG).error("MTU negotiation failed: status=$status")
+            if (options.mtuBeforeDiscovery) {
+                // Discovery is gated on this callback in the new ordering, so carry on at the
+                // default MTU rather than stalling the session.
+                if (!inhibitCallbacks) startServiceDiscovery(gatt)
+                return
+            }
             reportError(ProximityError.Unknown("Error changing MTU, status: $status"))
             return
         }
@@ -386,8 +476,29 @@ internal class GattClient(
         if (inhibitCallbacks) return
         listener?.onMtuChanged(mtu)
 
-        // Once the MTU is changed, consider the connection as established
-        reportPeerConnected()
+        if (options.mtuBeforeDiscovery) {
+            // MTU settled first; discovery runs at the negotiated size and readiness is signalled
+            // once the CCCD writes land.
+            startServiceDiscovery(gatt)
+        } else {
+            // Legacy ordering: the MTU exchange is the last step, so the link is ready now.
+            signalConnectionReady()
+        }
+    }
+
+    override fun onPhyUpdate(gatt: BluetoothGatt, txPhy: Int, rxPhy: Int, status: Int) {
+        Logger(TAG).debug("phy updated: tx=${phyName(txPhy)} rx=${phyName(rxPhy)} status=$status")
+    }
+
+    override fun onPhyRead(gatt: BluetoothGatt, txPhy: Int, rxPhy: Int, status: Int) {
+        Logger(TAG).debug("phy read: tx=${phyName(txPhy)} rx=${phyName(rxPhy)} status=$status")
+    }
+
+    private fun phyName(phy: Int): String = when (phy) {
+        BluetoothDevice.PHY_LE_1M -> "1M"
+        BluetoothDevice.PHY_LE_2M -> "2M"
+        BluetoothDevice.PHY_LE_CODED -> "CODED"
+        else -> "unknown($phy)"
     }
 
     @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
@@ -522,8 +633,18 @@ internal class GattClient(
         reportPeerConnecting()
 
         try {
-            Logger(TAG).debug("connectGatt issued")
-            gatt = device.connectGatt(context, false, this, BluetoothDevice.TRANSPORT_LE)
+            Logger(TAG).debug("connectGatt issued: preferLe2MPhy=${options.preferLe2MPhy}")
+            gatt = if (options.preferLe2MPhy) {
+                device.connectGatt(
+                    context,
+                    false,
+                    this,
+                    BluetoothDevice.TRANSPORT_LE,
+                    BluetoothDevice.PHY_LE_2M_MASK or BluetoothDevice.PHY_LE_1M_MASK
+                )
+            } else {
+                device.connectGatt(context, false, this, BluetoothDevice.TRANSPORT_LE)
+            }
         } catch (e: SecurityException) {
             reportError(ProximityError.Unknown(e.message ?: e::class.simpleName ?: "Unknown error"))
         } finally {
@@ -705,12 +826,12 @@ internal class GattClient(
     ) {
         private val queue = ArrayDeque<PendingDescriptor>()
         private var inFlight = false
-        private var mtuDeferred = false
+        private var completionDeferred = false
 
         fun reset() {
             queue.clear()
             inFlight = false
-            mtuDeferred = false
+            completionDeferred = false
         }
 
         fun enqueue(descriptor: BluetoothGattDescriptor, value: ByteArray) {
@@ -721,17 +842,17 @@ internal class GattClient(
 
         fun pendingCount(): Int = queue.size
 
-        fun deferMtuUntilComplete() {
-            mtuDeferred = true
+        fun deferCompletionUntilWritten() {
+            completionDeferred = true
         }
 
         fun flush(gatt: BluetoothGatt) {
             if (inFlight) return
             val next = if (queue.isEmpty()) null else queue.removeFirst()
             if (next == null) {
-                if (mtuDeferred) {
-                    mtuDeferred = false
-                    Logger(TAG).debug("CCCD writes complete, requesting MTU")
+                if (completionDeferred) {
+                    completionDeferred = false
+                    Logger(TAG).debug("CCCD writes complete")
                     onAllDescriptorsWritten(gatt)
                 }
                 return
