@@ -38,6 +38,7 @@ actual class KapunSdk(
 		Logger.sink = logSink
 		bridgeAllRustLogSinks()
 		uniffi.kapun_wallet_rust.setUntrustedTls(networkConfiguration.allowUntrustedCertificates)
+		uniffi.kapun_util_rust.setUserAgent(networkConfiguration.userAgent)
 		KapunTrust().initialize(networkConfiguration)
 		KapunIssuance().initialize(networkConfiguration)
 		KapunVisualization().initialize()

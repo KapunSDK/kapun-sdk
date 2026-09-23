@@ -86,18 +86,18 @@ impl TypstWrapperWorld {
             );
         }
 
-        let http = if kapun_util_rust::network::untrusted_tls_allowed() {
-            let config = ureq::Agent::config_builder()
-                .tls_config(
-                    ureq::tls::TlsConfig::builder()
-                        .disable_verification(true)
-                        .build(),
-                )
-                .build();
-            ureq::Agent::new_with_config(config)
-        } else {
-            ureq::Agent::new_with_defaults()
-        };
+        let mut config = ureq::Agent::config_builder();
+        if let Some(user_agent) = kapun_util_rust::network::user_agent() {
+            config = config.user_agent(user_agent);
+        }
+        if kapun_util_rust::network::untrusted_tls_allowed() {
+            config = config.tls_config(
+                ureq::tls::TlsConfig::builder()
+                    .disable_verification(true)
+                    .build(),
+            );
+        }
+        let http = ureq::Agent::new_with_config(config.build());
 
         Self {
             library: LazyHash::new(Library::default()),

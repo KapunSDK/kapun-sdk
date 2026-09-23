@@ -103,7 +103,9 @@ pub fn get_reqwest_client() -> ClientBuilder {
             client_builder = client_builder.proxy(proxy.clone());
         }
     }
-    client_builder = client_builder.user_agent(APP_USER_AGENT);
+    client_builder = client_builder.user_agent(
+        kapun_util_rust::network::user_agent().unwrap_or_else(|| APP_USER_AGENT.to_string()),
+    );
     client_builder
 }
 #[allow(clippy::unwrap_used)]

@@ -26,6 +26,7 @@ actual class KapunIssuance(private val context: Context) {
 
 	actual fun initialize(networkConfiguration: KapunNetworkConfiguration) {
 		uniffi.kapun_util_rust.setUntrustedTls(networkConfiguration.allowUntrustedCertificates)
+		uniffi.kapun_util_rust.setUserAgent(networkConfiguration.userAgent)
 		KapunIssuanceKoinContext.initialize(networkConfiguration) {
 			androidContext(context)
 		}

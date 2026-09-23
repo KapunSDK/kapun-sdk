@@ -22,8 +22,11 @@ import io.ktor.client.HttpClient
  * Network dependencies and security policy supplied by the host application.
  *
  * The SDK does not close [httpClient]. The host remains responsible for its lifecycle.
+ * When [httpClient] is null, [userAgent] is applied to the SDK-created Ktor client. Rust-owned
+ * clients use the same value through the platform bindings.
  */
 class KapunNetworkConfiguration(
 	val httpClient: HttpClient? = null,
 	val allowUntrustedCertificates: Boolean = false,
+	val userAgent: String? = null,
 )

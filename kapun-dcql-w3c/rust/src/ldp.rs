@@ -408,6 +408,9 @@ async fn retrieve_public_key(
     if kapun_util_rust::network::untrusted_tls_allowed() {
         client_builder = client_builder.danger_accept_invalid_certs(true);
     }
+    if let Some(user_agent) = kapun_util_rust::network::user_agent() {
+        client_builder = client_builder.user_agent(user_agent);
+    }
     let client = client_builder
         .build()
         .map_err(|e| ProofVerificationError::NetworkError(e.to_string()))?;

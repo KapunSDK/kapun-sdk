@@ -19,7 +19,10 @@ package org.kapunsdk.wallet.network.di
 import org.kapunsdk.wallet.network.configureSystemProxy
 import org.kapunsdk.util.network.KapunNetworkConfiguration
 import io.ktor.client.HttpClient
+import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.request.header
+import io.ktor.http.HttpHeaders
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
 import org.koin.dsl.module
@@ -36,6 +39,9 @@ internal fun networkModule(networkConfiguration: KapunNetworkConfiguration) = mo
 	single {
 		networkConfiguration.httpClient ?: HttpClient {
 			expectSuccess = true
+			defaultRequest {
+				networkConfiguration.userAgent?.let { header(HttpHeaders.UserAgent, it) }
+			}
 			engine {
 				configureSystemProxy()
 			}

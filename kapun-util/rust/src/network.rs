@@ -14,9 +14,13 @@ specific language governing permissions and limitations
 under the License.
  */
 
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Mutex,
+};
 
 static ALLOW_UNTRUSTED_TLS: AtomicBool = AtomicBool::new(false);
+static USER_AGENT: Mutex<Option<String>> = Mutex::new(None);
 
 /// Configure whether SDK-owned Rust networking may skip TLS certificate validation.
 ///
@@ -29,4 +33,16 @@ pub fn set_untrusted_tls(allow: bool) {
 
 pub fn untrusted_tls_allowed() -> bool {
     ALLOW_UNTRUSTED_TLS.load(Ordering::Relaxed)
+}
+
+/// Configure the user-agent for SDK-owned Rust HTTP clients.
+#[cfg_attr(feature = "uniffi", uniffi::export)]
+pub fn set_user_agent(user_agent: Option<String>) {
+    if let Ok(mut current) = USER_AGENT.lock() {
+        *current = user_agent;
+    }
+}
+
+pub fn user_agent() -> Option<String> {
+    USER_AGENT.lock().ok().and_then(|current| current.clone())
 }
