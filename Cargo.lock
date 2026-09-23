@@ -5193,6 +5193,7 @@ name = "kapun-pdf-rust"
 version = "0.1.0"
 dependencies = [
  "fontdb 0.16.2",
+ "kapun-util-rust",
  "tar",
  "time",
  "ttf-parser 0.25.1",
@@ -5330,7 +5331,8 @@ dependencies = [
  "flate2",
  "josekit",
  "kapun-crypto-provider",
- "p12",
+ "kapun-util-rust",
+ "p12 0.6.3 (git+https://github.com/heidiverse/p12.git)",
  "pem",
  "rand 0.8.8",
  "sha2 0.10.9",
@@ -5351,7 +5353,7 @@ version = "0.1.0"
 source = "git+https://github.com/KapunSDK/kapun-sdk.git#4d379c1395e7f67e6a908614da536acd52e84eb3"
 dependencies = [
  "kapun-crypto-provider",
- "p12",
+ "p12 0.6.3 (git+https://github.com/ubamrein/p12.git)",
  "rand 0.8.8",
  "sha2 0.10.9",
  "signature 3.0.0",
@@ -6558,6 +6560,25 @@ dependencies = [
 name = "p12"
 version = "0.6.3"
 source = "git+https://github.com/heidiverse/p12.git#081769dd57c8831d3ec4f8b3476ff9f2e792b131"
+dependencies = [
+ "aes 0.8.4",
+ "cbc 0.1.2",
+ "cipher 0.4.4",
+ "des",
+ "getrandom 0.2.17",
+ "hmac 0.12.1",
+ "lazy_static",
+ "pbkdf2 0.12.2",
+ "rc2",
+ "sha1 0.10.7",
+ "sha2 0.10.9",
+ "yasna",
+]
+
+[[package]]
+name = "p12"
+version = "0.6.3"
+source = "git+https://github.com/ubamrein/p12.git#081769dd57c8831d3ec4f8b3476ff9f2e792b131"
 dependencies = [
  "aes 0.8.4",
  "cbc 0.1.2",

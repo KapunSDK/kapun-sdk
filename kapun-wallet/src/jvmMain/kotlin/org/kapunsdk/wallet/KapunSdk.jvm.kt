@@ -18,12 +18,15 @@ package org.kapunsdk.wallet
 
 import org.kapunsdk.util.log.LogSink
 import org.kapunsdk.util.log.Logger
+import org.kapunsdk.util.network.KapunNetworkConfiguration
 
 actual class KapunSdk {
-	actual fun initialize(logSink: LogSink?, databaseName: String) {
+	actual fun initialize(logSink: LogSink?, databaseName: String, networkConfiguration: KapunNetworkConfiguration) {
 		Logger.sink = logSink
 		bridgeAllRustLogSinks()
 		logKapunSdkInitialized()
 	}
+
+	actual fun setUntrustedCertificatesAllowed(allow: Boolean) = Unit
 
 }

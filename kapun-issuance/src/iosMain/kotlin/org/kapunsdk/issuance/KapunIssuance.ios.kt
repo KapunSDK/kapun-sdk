@@ -17,11 +17,17 @@ under the License.
 package org.kapunsdk.issuance
 
 import org.kapunsdk.issuance.di.KapunIssuanceKoinContext
+import org.kapunsdk.util.network.KapunNetworkConfiguration
 
 actual class KapunIssuance {
 
-	actual fun initialize() {
-		KapunIssuanceKoinContext.initialize()
+	actual fun initialize(networkConfiguration: KapunNetworkConfiguration) {
+		uniffi.kapun_util_rust.setUntrustedTls(networkConfiguration.allowUntrustedCertificates)
+		KapunIssuanceKoinContext.initialize(networkConfiguration)
+	}
+
+	actual fun setUntrustedCertificatesAllowed(allow: Boolean) {
+		uniffi.kapun_util_rust.setUntrustedTls(allow)
 	}
 
 }

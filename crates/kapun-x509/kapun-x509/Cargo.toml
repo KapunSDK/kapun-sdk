@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 x509-parser = { version = "0.16.0", features = ["validate"] }
 ureq = { workspace = true, optional = true }
+kapun-util-rust = { path = "../../../kapun-util/rust", optional = true, default-features = false }
 whitespace-sifter = "2.3.7"
 tracing = "^0.1"
 kapun-crypto-provider = { path = "../../kapun-crypto-provider", default-features = false }
@@ -20,7 +21,7 @@ sha2.workspace = true
 [features]
 default = ["crl", "builder"]
 uniffi = []
-crl = ["dep:ureq"]
+crl = ["dep:ureq", "dep:kapun-util-rust"]
 builder = ["p12", "x509-cert"]
 p12 = ["dep:p12"]
 

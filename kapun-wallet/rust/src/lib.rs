@@ -127,6 +127,13 @@ pub mod uniffi_reqwest {
     }
 
     #[cfg_attr(feature = "uniffi", uniffi::export)]
+    /// Allow or reject invalid TLS certificates and hostnames for SDK-owned requests.
+    pub fn set_untrusted_tls(allow: bool) {
+        UNSAFE_TLS.store(allow, std::sync::atomic::Ordering::Relaxed);
+        kapun_util_rust::network::set_untrusted_tls(allow);
+    }
+
+    #[cfg_attr(feature = "uniffi", uniffi::export)]
     /// Set a proxy for the reqwest client
     pub fn set_proxy(ip_address: String, port: u16) {
         let _ = PROXY

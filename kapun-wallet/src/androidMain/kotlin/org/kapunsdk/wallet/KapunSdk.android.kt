@@ -21,21 +21,33 @@ import org.kapunsdk.issuance.KapunIssuance
 import org.kapunsdk.trust.KapunTrust
 import org.kapunsdk.util.log.LogSink
 import org.kapunsdk.util.log.Logger
+import org.kapunsdk.util.network.KapunNetworkConfiguration
 import org.kapunsdk.visualization.KapunVisualization
 import org.kapunsdk.wallet.di.KapunWalletKoinContext
 import org.koin.android.ext.koin.androidContext
 
 actual class KapunSdk(private val context: Context) {
 
- actual fun initialize(logSink: LogSink?, databaseName: String) {
+ actual fun initialize(
+	logSink: LogSink?,
+	databaseName: String,
+	networkConfiguration: KapunNetworkConfiguration,
+) {
 		Logger.sink = logSink
 		bridgeAllRustLogSinks()
-		KapunTrust(context).initialize()
-		KapunIssuance(context).initialize()
+		uniffi.kapun_wallet_rust.setUntrustedTls(networkConfiguration.allowUntrustedCertificates)
+		KapunTrust(context).initialize(networkConfiguration)
+		KapunIssuance(context).initialize(networkConfiguration)
 		KapunVisualization(context).initialize()
-		KapunWalletKoinContext.initialize(databaseName) {
+		KapunWalletKoinContext.initialize(databaseName, networkConfiguration) {
 			androidContext(context)
 		}
 		logKapunSdkInitialized()
+	}
+
+	actual fun setUntrustedCertificatesAllowed(allow: Boolean) {
+		uniffi.kapun_wallet_rust.setUntrustedTls(allow)
+		uniffi.kapun_trust_rust.setUntrustedTls(allow)
+		uniffi.kapun_util_rust.setUntrustedTls(allow)
 	}
 }

@@ -86,6 +86,19 @@ impl TypstWrapperWorld {
             );
         }
 
+        let http = if kapun_util_rust::network::untrusted_tls_allowed() {
+            let config = ureq::Agent::config_builder()
+                .tls_config(
+                    ureq::tls::TlsConfig::builder()
+                        .disable_verification(true)
+                        .build(),
+                )
+                .build();
+            ureq::Agent::new_with_config(config)
+        } else {
+            ureq::Agent::new_with_defaults()
+        };
+
         Self {
             library: LazyHash::new(Library::default()),
             book: LazyHash::new(font_book),
@@ -96,7 +109,7 @@ impl TypstWrapperWorld {
             cache_directory: std::env::var_os("CACHE_DIRECTORY")
                 .map(|os_path| os_path.into())
                 .unwrap_or(std::env::temp_dir()),
-            http: ureq::Agent::new_with_defaults(),
+            http,
             files: Arc::new(Mutex::new(files)),
         }
     }

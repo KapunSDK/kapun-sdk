@@ -24,6 +24,7 @@ use std::{
 };
 pub mod log;
 pub mod metadata;
+pub mod network;
 pub mod value;
 
 #[derive(Debug, Clone)]

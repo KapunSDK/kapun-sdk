@@ -16,8 +16,12 @@ under the License.
 
 package org.kapunsdk.issuance
 
+import org.kapunsdk.util.network.KapunNetworkConfiguration
+
 actual class KapunIssuance {
-	actual fun initialize() {
+	actual fun initialize(networkConfiguration: KapunNetworkConfiguration) {
 	}
+
+	actual fun setUntrustedCertificatesAllowed(allow: Boolean) = Unit
 
 }

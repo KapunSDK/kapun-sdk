@@ -16,15 +16,16 @@ under the License.
 
 package org.kapunsdk.trust.networking.di
 
+import org.kapunsdk.util.network.KapunNetworkConfiguration
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.cache.HttpCache
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.serialization.kotlinx.json.json
 import org.koin.dsl.module
 
-internal fun networkModule() = module {
+internal fun networkModule(networkConfiguration: KapunNetworkConfiguration) = module {
 	single {
-		HttpClient {
+		networkConfiguration.httpClient ?: HttpClient {
 			expectSuccess = true
 			install(HttpCache)
 			install(ContentNegotiation) {

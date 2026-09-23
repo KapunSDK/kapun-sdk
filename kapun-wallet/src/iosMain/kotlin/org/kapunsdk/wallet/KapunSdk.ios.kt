@@ -20,6 +20,7 @@ import org.kapunsdk.issuance.KapunIssuance
 import org.kapunsdk.trust.KapunTrust
 import org.kapunsdk.util.log.LogSink
 import org.kapunsdk.util.log.Logger
+import org.kapunsdk.util.network.KapunNetworkConfiguration
 import org.kapunsdk.visualization.KapunVisualization
 import org.kapunsdk.wallet.crypto.factories.HardwareSignerFactory
 import org.kapunsdk.wallet.di.KapunWalletKoinContext
@@ -29,13 +30,18 @@ actual class KapunSdk(
 	private val hardwareSignerFactory: HardwareSignerFactory,
 ) {
 
-	actual fun initialize(logSink: LogSink?, databaseName: String) {
+	actual fun initialize(
+		logSink: LogSink?,
+		databaseName: String,
+		networkConfiguration: KapunNetworkConfiguration,
+	) {
 		Logger.sink = logSink
 		bridgeAllRustLogSinks()
-		KapunTrust().initialize()
-		KapunIssuance().initialize()
+		uniffi.kapun_wallet_rust.setUntrustedTls(networkConfiguration.allowUntrustedCertificates)
+		KapunTrust().initialize(networkConfiguration)
+		KapunIssuance().initialize(networkConfiguration)
 		KapunVisualization().initialize()
-		KapunWalletKoinContext.initialize(databaseName) {
+		KapunWalletKoinContext.initialize(databaseName, networkConfiguration) {
 			modules(
 				module {
 					single<HardwareSignerFactory> { hardwareSignerFactory }
@@ -43,6 +49,12 @@ actual class KapunSdk(
 			)
 		}
 		logKapunSdkInitialized()
+	}
+
+	actual fun setUntrustedCertificatesAllowed(allow: Boolean) {
+		uniffi.kapun_wallet_rust.setUntrustedTls(allow)
+		uniffi.kapun_trust_rust.setUntrustedTls(allow)
+		uniffi.kapun_util_rust.setUntrustedTls(allow)
 	}
 
 }

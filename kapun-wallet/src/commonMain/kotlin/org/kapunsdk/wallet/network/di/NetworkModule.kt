@@ -17,13 +17,14 @@ under the License.
 package org.kapunsdk.wallet.network.di
 
 import org.kapunsdk.wallet.network.configureSystemProxy
+import org.kapunsdk.util.network.KapunNetworkConfiguration
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
 import org.koin.dsl.module
 
-internal fun networkModule() = module {
+internal fun networkModule(networkConfiguration: KapunNetworkConfiguration) = module {
 	single {
 		Json {
 			encodeDefaults = true
@@ -33,7 +34,7 @@ internal fun networkModule() = module {
 	}
 
 	single {
-		HttpClient {
+		networkConfiguration.httpClient ?: HttpClient {
 			expectSuccess = true
 			engine {
 				configureSystemProxy()

@@ -1,4 +1,4 @@
-/* Copyright 2025 Ubique Innovation AG
+/* Copyright 2026 Ubique Innovation AG
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,11 +14,16 @@ specific language governing permissions and limitations
 under the License.
  */
 
-package org.kapunsdk.trust
+package org.kapunsdk.util.network
 
-import org.kapunsdk.util.network.KapunNetworkConfiguration
+import io.ktor.client.HttpClient
 
-expect class KapunTrust {
-	fun initialize(networkConfiguration: KapunNetworkConfiguration = KapunNetworkConfiguration())
-	fun setUntrustedCertificatesAllowed(allow: Boolean)
-}
+/**
+ * Network dependencies and security policy supplied by the host application.
+ *
+ * The SDK does not close [httpClient]. The host remains responsible for its lifecycle.
+ */
+class KapunNetworkConfiguration(
+	val httpClient: HttpClient? = null,
+	val allowUntrustedCertificates: Boolean = false,
+)

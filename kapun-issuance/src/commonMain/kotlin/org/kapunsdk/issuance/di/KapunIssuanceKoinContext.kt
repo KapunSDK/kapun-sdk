@@ -18,15 +18,19 @@ package org.kapunsdk.issuance.di
 import org.koin.core.Koin
 import org.koin.core.KoinApplication
 import org.koin.dsl.koinApplication
+import org.kapunsdk.util.network.KapunNetworkConfiguration
 
 internal object KapunIssuanceKoinContext {
 
 	private lateinit var koinApp: KoinApplication
 	lateinit var koin: Koin
 
-	fun initialize(appConfiguration: KoinApplication.() -> Unit = {}) {
+	fun initialize(
+		networkConfiguration: KapunNetworkConfiguration = KapunNetworkConfiguration(),
+		appConfiguration: KoinApplication.() -> Unit = {},
+	) {
 		koinApp = koinApplication {
-			issuanceModules()
+			issuanceModules(networkConfiguration)
 			appConfiguration()
 		}
 		koin = koinApp.koin

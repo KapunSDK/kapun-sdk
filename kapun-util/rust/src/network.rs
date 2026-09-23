@@ -1,0 +1,32 @@
+/* Copyright 2026 Ubique Innovation AG
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+ */
+
+use std::sync::atomic::{AtomicBool, Ordering};
+
+static ALLOW_UNTRUSTED_TLS: AtomicBool = AtomicBool::new(false);
+
+/// Configure whether SDK-owned Rust networking may skip TLS certificate validation.
+///
+/// This is intended for development environments only. Host applications should keep this
+/// disabled unless the user explicitly opted into untrusted connections.
+#[cfg_attr(feature = "uniffi", uniffi::export)]
+pub fn set_untrusted_tls(allow: bool) {
+    ALLOW_UNTRUSTED_TLS.store(allow, Ordering::Relaxed);
+}
+
+pub fn untrusted_tls_allowed() -> bool {
+    ALLOW_UNTRUSTED_TLS.load(Ordering::Relaxed)
+}

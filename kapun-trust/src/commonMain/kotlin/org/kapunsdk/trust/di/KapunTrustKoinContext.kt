@@ -18,16 +18,20 @@ package org.kapunsdk.trust.di
 import org.koin.core.Koin
 import org.koin.core.KoinApplication
 import org.koin.dsl.koinApplication
+import org.kapunsdk.util.network.KapunNetworkConfiguration
 
 internal object KapunTrustKoinContext {
 
 	private lateinit var koinApp: KoinApplication
 	lateinit var koin: Koin
 
-	fun initialize(declaration: KoinApplication.() -> Unit = {}) {
+	fun initialize(
+		networkConfiguration: KapunNetworkConfiguration = KapunNetworkConfiguration(),
+		declaration: KoinApplication.() -> Unit = {},
+	) {
 		koinApp = koinApplication {
 			declaration()
-			trustModules()
+			trustModules(networkConfiguration)
 		}
 		koin = koinApp.koin
 	}

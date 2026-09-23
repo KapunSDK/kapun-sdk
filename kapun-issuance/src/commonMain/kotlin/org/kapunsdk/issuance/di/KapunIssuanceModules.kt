@@ -21,11 +21,12 @@ import org.kapunsdk.issuance.networking.di.networkModule
 import org.kapunsdk.issuance.networking.di.jsonModule
 import org.kapunsdk.issuance.credential.offer.di.credentialOfferModule
 import org.koin.core.KoinApplication
+import org.kapunsdk.util.network.KapunNetworkConfiguration
 
-internal fun KoinApplication.issuanceModules() {
+internal fun KoinApplication.issuanceModules(networkConfiguration: KapunNetworkConfiguration) {
 	modules(
 		jsonModule(),
-		networkModule(),
+		networkModule(networkConfiguration),
 		metadataModule(),
 		credentialOfferModule(),
 	)
