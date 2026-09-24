@@ -74,6 +74,12 @@ pub fn clear_log_sink() {
     kapun_util_rust::log::clear_log_sink();
 }
 
+/// Set the user-agent in this native library's private kapun-util copy.
+#[cfg_attr(feature = "uniffi", uniffi::export)]
+pub fn set_user_agent(user_agent: Option<String>) {
+    kapun_util_rust::network::set_user_agent(user_agent);
+}
+
 #[cfg(all(feature = "reqwest", feature = "uniffi"))]
 lazy_static! {
     pub static ref PROXY: Mutex<Arc<Option<Proxy>>> = Mutex::new(Arc::new(None));

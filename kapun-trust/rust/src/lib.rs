@@ -10,6 +10,12 @@ use std::{
 
 static ALLOW_UNTRUSTED_TLS: AtomicBool = AtomicBool::new(false);
 
+#[uniffi::export]
+/// Set the user-agent in this native library's private kapun-util copy.
+pub fn set_user_agent(user_agent: Option<String>) {
+    kapun_util_rust::network::set_user_agent(user_agent);
+}
+
 #[doc(hidden)]
 #[inline(never)]
 pub fn uniffi_link_anchor() -> u8 {
@@ -74,12 +80,12 @@ pub fn oidcf_trust_chain_from_url(
     lenient_leaf_entity_config: bool,
 ) -> Result<OidcfTrustChainInfo, FederationError> {
     if ALLOW_UNTRUSTED_TLS.load(Ordering::Relaxed) {
-        oidcf_trust_chain_from_url_with_config::<oidcf::NoVerifyConfig>(
+        oidcf_trust_chain_from_url_with_config::<kapun_util_rust::network::SdkNoVerifyConfig>(
             url,
             lenient_leaf_entity_config,
         )
     } else {
-        oidcf_trust_chain_from_url_with_config::<oidcf::DefaultConfig>(
+        oidcf_trust_chain_from_url_with_config::<kapun_util_rust::network::SdkDefaultConfig>(
             url,
             lenient_leaf_entity_config,
         )
@@ -107,12 +113,16 @@ pub fn oidcf_trust_chain_from_presentation_request(
     lenient_leaf_entity_config: bool,
 ) -> Result<OidcfTrustChainInfo, FederationError> {
     if ALLOW_UNTRUSTED_TLS.load(Ordering::Relaxed) {
-        oidcf_trust_chain_from_presentation_request_with_config::<oidcf::NoVerifyConfig>(
+        oidcf_trust_chain_from_presentation_request_with_config::<
+            kapun_util_rust::network::SdkNoVerifyConfig,
+        >(
             presentation_request_jwt,
             lenient_leaf_entity_config,
         )
     } else {
-        oidcf_trust_chain_from_presentation_request_with_config::<oidcf::DefaultConfig>(
+        oidcf_trust_chain_from_presentation_request_with_config::<
+            kapun_util_rust::network::SdkDefaultConfig,
+        >(
             presentation_request_jwt,
             lenient_leaf_entity_config,
         )

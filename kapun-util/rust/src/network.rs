@@ -22,6 +22,26 @@ use std::sync::{
 static ALLOW_UNTRUSTED_TLS: AtomicBool = AtomicBool::new(false);
 static USER_AGENT: Mutex<Option<String>> = Mutex::new(None);
 
+/// Fetch configurations used by SDK-owned OpenID Federation requests.
+pub struct SdkDefaultConfig;
+pub struct SdkNoVerifyConfig;
+
+impl openid_federation::FetchConfig for SdkDefaultConfig {
+    const VERIFY_TLS: bool = true;
+
+    fn user_agent() -> Option<String> {
+        user_agent()
+    }
+}
+
+impl openid_federation::FetchConfig for SdkNoVerifyConfig {
+    const VERIFY_TLS: bool = false;
+
+    fn user_agent() -> Option<String> {
+        user_agent()
+    }
+}
+
 /// Configure whether SDK-owned Rust networking may skip TLS certificate validation.
 ///
 /// This is intended for development environments only. Host applications should keep this
