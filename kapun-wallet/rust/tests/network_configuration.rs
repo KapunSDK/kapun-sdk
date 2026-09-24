@@ -181,7 +181,6 @@ async fn federation_fetch_applies_tls_policy_and_user_agent() {
     .expect("federation should accept a self-signed certificate when enabled");
     assert_eq!(
         jwt.payload_unverified()
-            .expect("test JWT should contain a payload")
             .insecure()
             .get("sub")
             .and_then(serde_json::Value::as_str),
