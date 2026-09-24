@@ -42,11 +42,13 @@ pub async fn fetch_metadata_from_issuer_url(
             url,
             trust_store,
         )
+        .await
     } else {
         fetch_metadata_from_issuer_url_with_config::<crate::network::SdkDefaultConfig>(
             url,
             trust_store,
         )
+        .await
     }
 }
 
