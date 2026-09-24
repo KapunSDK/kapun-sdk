@@ -6429,7 +6429,7 @@ dependencies = [
 [[package]]
 name = "openid-federation"
 version = "0.1.0"
-source = "git+https://github.com/heidiverse/openid-federation.git?branch=main#e72a506c50e7dc1d759877b897777e5ff4f3c465"
+source = "git+https://github.com/heidiverse/openid-federation.git?branch=main#076d478296c844b10fb80f59ea733d1dd21e7b84"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
