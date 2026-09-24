@@ -19,7 +19,6 @@ package org.kapunsdk.wallet
 import android.content.Context
 import org.kapunsdk.issuance.KapunIssuance
 import org.kapunsdk.trust.KapunTrust
-import org.kapunsdk.trust.framework.swiss.SwissTrustConfiguration
 import org.kapunsdk.util.log.LogSink
 import org.kapunsdk.util.log.Logger
 import org.kapunsdk.visualization.KapunVisualization
@@ -28,17 +27,13 @@ import org.koin.android.ext.koin.androidContext
 
 actual class KapunSdk(private val context: Context) {
 
- actual fun initialize(
-	logSink: LogSink?,
-	databaseName: String,
-	swissTrustConfiguration: SwissTrustConfiguration,
- ) {
+ actual fun initialize(logSink: LogSink?, databaseName: String) {
 		Logger.sink = logSink
 		bridgeAllRustLogSinks()
 		KapunTrust(context).initialize()
 		KapunIssuance(context).initialize()
 		KapunVisualization(context).initialize()
-		KapunWalletKoinContext.initialize(databaseName, swissTrustConfiguration) {
+		KapunWalletKoinContext.initialize(databaseName) {
 			androidContext(context)
 		}
 		logKapunSdkInitialized()
