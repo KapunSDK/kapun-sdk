@@ -24,9 +24,15 @@ import io.ktor.client.HttpClient
  * The SDK does not close [httpClient]. The host remains responsible for its lifecycle.
  * When [httpClient] is null, [userAgent] is applied to the SDK-created Ktor client. Rust-owned
  * clients use the same value through the platform bindings.
+ *
+ * Ktor engines keep their normal certificate validation in all cases. To use a custom trust
+ * policy for Ktor requests, provide an [httpClient] configured with that platform's engine. The
+ * [allowUntrustedCertificates] flag applies only to SDK-owned Rust requests, including OpenID
+ * Federation discovery.
  */
 class KapunNetworkConfiguration(
 	val httpClient: HttpClient? = null,
+	/** Allows SDK-owned Rust requests to skip certificate and hostname validation. */
 	val allowUntrustedCertificates: Boolean = false,
 	val userAgent: String? = null,
 )

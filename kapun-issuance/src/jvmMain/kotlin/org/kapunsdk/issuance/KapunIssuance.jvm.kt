@@ -19,6 +19,10 @@ package org.kapunsdk.issuance
 import org.kapunsdk.util.network.KapunNetworkConfiguration
 
 actual class KapunIssuance {
+	actual fun initialize() {
+		initialize(KapunNetworkConfiguration())
+	}
+
 	actual fun initialize(networkConfiguration: KapunNetworkConfiguration) {
 	}
 

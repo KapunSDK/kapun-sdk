@@ -19,6 +19,10 @@ package org.kapunsdk.trust
 import org.kapunsdk.util.network.KapunNetworkConfiguration
 
 actual class KapunTrust {
+	actual fun initialize() {
+		initialize(KapunNetworkConfiguration())
+	}
+
 	actual fun initialize(networkConfiguration: KapunNetworkConfiguration) {
 	}
 

@@ -28,6 +28,10 @@ import org.koin.android.ext.koin.androidContext
 
 actual class KapunSdk(private val context: Context) {
 
+	actual fun initialize(logSink: LogSink?, databaseName: String) {
+		initialize(logSink, databaseName, KapunNetworkConfiguration())
+	}
+
  actual fun initialize(
 	logSink: LogSink?,
 	databaseName: String,
@@ -36,6 +40,7 @@ actual class KapunSdk(private val context: Context) {
 		Logger.sink = logSink
 		bridgeAllRustLogSinks()
 		uniffi.kapun_wallet_rust.setUntrustedTls(networkConfiguration.allowUntrustedCertificates)
+		uniffi.kapun_wallet_rust.setUserAgent(networkConfiguration.userAgent)
 		uniffi.kapun_util_rust.setUserAgent(networkConfiguration.userAgent)
 		KapunTrust(context).initialize(networkConfiguration)
 		KapunIssuance(context).initialize(networkConfiguration)

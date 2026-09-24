@@ -30,6 +30,10 @@ actual class KapunSdk(
 	private val hardwareSignerFactory: HardwareSignerFactory,
 ) {
 
+	actual fun initialize(logSink: LogSink?, databaseName: String) {
+		initialize(logSink, databaseName, KapunNetworkConfiguration())
+	}
+
 	actual fun initialize(
 		logSink: LogSink?,
 		databaseName: String,
@@ -38,6 +42,7 @@ actual class KapunSdk(
 		Logger.sink = logSink
 		bridgeAllRustLogSinks()
 		uniffi.kapun_wallet_rust.setUntrustedTls(networkConfiguration.allowUntrustedCertificates)
+		uniffi.kapun_wallet_rust.setUserAgent(networkConfiguration.userAgent)
 		uniffi.kapun_util_rust.setUserAgent(networkConfiguration.userAgent)
 		KapunTrust().initialize(networkConfiguration)
 		KapunIssuance().initialize(networkConfiguration)

@@ -21,6 +21,10 @@ import org.kapunsdk.util.log.Logger
 import org.kapunsdk.util.network.KapunNetworkConfiguration
 
 actual class KapunSdk {
+	actual fun initialize(logSink: LogSink?, databaseName: String) {
+		initialize(logSink, databaseName, KapunNetworkConfiguration())
+	}
+
 	actual fun initialize(logSink: LogSink?, databaseName: String, networkConfiguration: KapunNetworkConfiguration) {
 		Logger.sink = logSink
 		bridgeAllRustLogSinks()

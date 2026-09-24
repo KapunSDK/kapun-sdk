@@ -4,7 +4,8 @@ import org.kapunsdk.util.network.KapunNetworkConfiguration
 
 expect class KapunIssuance {
 
-	fun initialize(networkConfiguration: KapunNetworkConfiguration = KapunNetworkConfiguration())
+	fun initialize()
+	fun initialize(networkConfiguration: KapunNetworkConfiguration)
 	fun setUntrustedCertificatesAllowed(allow: Boolean)
 
 }

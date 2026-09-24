@@ -14,7 +14,12 @@ expect class KapunSdk {
 	fun initialize(
 		logSink: LogSink? = null,
 		databaseName: String = DEFAULT_DATABASE_NAME,
-		networkConfiguration: KapunNetworkConfiguration = KapunNetworkConfiguration(),
+	)
+
+	fun initialize(
+		logSink: LogSink? = null,
+		databaseName: String = DEFAULT_DATABASE_NAME,
+		networkConfiguration: KapunNetworkConfiguration,
 	)
 
 	/** Updates the TLS policy for SDK-owned Rust requests at runtime. */
