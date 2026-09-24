@@ -19,39 +19,56 @@ package org.kapunsdk.credentials.sdjwt
 import org.kapunsdk.util.extensions.asString
 import org.kapunsdk.util.extensions.get
 import io.ktor.http.URLBuilder
-import io.ktor.http.appendPathSegments
+import io.ktor.http.Url
 import io.ktor.http.path
 import io.ktor.http.takeFrom
 import kotlinx.serialization.json.Json
-import uniffi.kapun_crypto_rust.parseEncodedJwtHeader
 import uniffi.kapun_crypto_rust.parseEncodedJwtPayload
 import uniffi.kapun_util_rust.Value
 
 object SdJwtVcSignatureResolver {
 
-    private fun retrievePkUsingJwtVcIssuerMetadata(jwt: String): Value? {
-        val kid = parseEncodedJwtHeader(jwt)
-            ?.let { Json.decodeFromString<Value>(it)["kid"].asString() }
-            ?: return null
+    /**
+     * JWT VC issuer metadata is an HTTP(S) discovery mechanism.  An issuer may
+     * also be identified by a DID, but a DID is not an issuer-metadata URL and
+     * must be handled by the corresponding DID verification method instead.
+     */
+    internal fun jwtVcIssuerMetadataUrl(issuer: String): Url? {
+        val scheme = issuer.substringBefore(':', missingDelimiterValue = "")
+        if (!scheme.equals("http", ignoreCase = true) &&
+            !scheme.equals("https", ignoreCase = true)
+        ) {
+            return null
+        }
 
-        val payload = parseEncodedJwtPayload(jwt)
-            ?.let { Json.decodeFromString<Value>(it) }
-            ?: return null
-
-        val iss = payload["iss"].asString()
-            ?: return null
-
-        val jwks = runCatching {
-            val url = URLBuilder()
-                .takeFrom(iss)
+        return runCatching {
+            URLBuilder()
+                .takeFrom(issuer)
                 .apply {
                     val path = arrayOf(".well-known", "jwt-vc-issuer") + encodedPathSegments
                     path(*path)
                 }
                 .build()
-        }
+        }.getOrNull()
+    }
 
-        // TODO
+    private fun retrievePkUsingJwtVcIssuerMetadata(jwt: String): Value? {
+        // Issuer metadata is optional.  Failure to parse or resolve it must
+        // not prevent callers from receiving/processing the credential; it is
+        // only relevant when signature verification is explicitly requested.
+        val issuer = runCatching {
+            parseEncodedJwtPayload(jwt)
+                ?.let { Json.decodeFromString<Value>(it)["iss"].asString() }
+        }.getOrNull() ?: return null
+
+        // A DID (or any other non-HTTP identifier) is not a URL for this
+        // discovery mechanism.  In particular, do not turn a DID into a
+        // network request just because it is present in `iss`.
+        jwtVcIssuerMetadataUrl(issuer) ?: return null
+
+        // TODO: fetch `url`, select the key identified by the JWT header's
+        // `kid`, and verify the JWT.  Keep this optional lookup best-effort
+        // until the metadata verification implementation is available.
         return null
     }
 

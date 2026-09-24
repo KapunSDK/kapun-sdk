@@ -1,5 +1,6 @@
 package org.kapunsdk.wallet
 
+import org.kapunsdk.trust.framework.swiss.SwissTrustConfiguration
 import org.kapunsdk.util.log.LogSink
 
 const val DEFAULT_DATABASE_NAME = "kapun_database.sqlite"
@@ -10,7 +11,11 @@ expect class KapunSdk {
 	 * @param logSink Receives this SDK's log output; see [org.kapunsdk.util.log.Logger]. When
 	 * null (the default), the SDK logs nothing.
 	 */
-	fun initialize(logSink: LogSink? = null, databaseName: String = DEFAULT_DATABASE_NAME)
+	fun initialize(
+		logSink: LogSink? = null,
+		databaseName: String = DEFAULT_DATABASE_NAME,
+		swissTrustConfiguration: SwissTrustConfiguration = SwissTrustConfiguration(),
+	)
 
 }
 

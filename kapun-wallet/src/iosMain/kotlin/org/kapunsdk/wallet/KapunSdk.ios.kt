@@ -18,6 +18,7 @@ package org.kapunsdk.wallet
 
 import org.kapunsdk.issuance.KapunIssuance
 import org.kapunsdk.trust.KapunTrust
+import org.kapunsdk.trust.framework.swiss.SwissTrustConfiguration
 import org.kapunsdk.util.log.LogSink
 import org.kapunsdk.util.log.Logger
 import org.kapunsdk.visualization.KapunVisualization
@@ -29,13 +30,17 @@ actual class KapunSdk(
 	private val hardwareSignerFactory: HardwareSignerFactory,
 ) {
 
-	actual fun initialize(logSink: LogSink?, databaseName: String) {
+	actual fun initialize(
+		logSink: LogSink?,
+		databaseName: String,
+		swissTrustConfiguration: SwissTrustConfiguration,
+	) {
 		Logger.sink = logSink
 		bridgeAllRustLogSinks()
 		KapunTrust().initialize()
 		KapunIssuance().initialize()
 		KapunVisualization().initialize()
-		KapunWalletKoinContext.initialize(databaseName) {
+		KapunWalletKoinContext.initialize(databaseName, swissTrustConfiguration) {
 			modules(
 				module {
 					single<HardwareSignerFactory> { hardwareSignerFactory }

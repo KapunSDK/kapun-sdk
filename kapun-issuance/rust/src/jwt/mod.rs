@@ -18,7 +18,7 @@ use heidi_jwt::chrono::{DateTime, Utc};
 use heidi_jwt::jwt::verifier_for_jwk;
 use heidi_jwt::jwt::{Jwt, JwtVerifier};
 use heidi_jwt::models::errors::{JwsError, JwtError};
-use kapun_crypto_rust::jwt::{DidVerificationDocument, SimpleVerifier};
+use kapun_crypto_rust::jwt::DidVerificationDocument;
 use kapun_util_rust::{log_error, log_warn};
 use serde::Deserialize;
 use serde::Serialize;
@@ -115,14 +115,14 @@ impl StatusListVerifier {
             log_error!("VALIDATER", "could not parse jwk into key");
             return Err(StatusListError::InvalidSignature);
         };
-        let v: Box<dyn JwtVerifier<StatusListToken>> = Box::new(SimpleVerifier);
-
         self.token
             .verify_signature_with_verifier(verifier.as_ref())
             .map_err(|_| StatusListError::InvalidSignature)?;
-        self.token
-            .verify(v.as_ref())
-            .map_err(|_| StatusListError::InvalidSignature)
+        self.token.verify(self).map_err(|error| match error {
+            JwtError::Jws(JwsError::Expired(_)) => StatusListError::Expired,
+            JwtError::Jws(JwsError::TypeError(_)) => StatusListError::TypeError,
+            _ => StatusListError::InvalidSignature,
+        })
     }
     pub fn valid(&self) -> Result<(), StatusListError> {
         // check if we have a key in the header (e.g. x5c or jwk)

@@ -25,9 +25,16 @@ import org.kapunsdk.wallet.process.legacy.di.processesModule
 import org.kapunsdk.wallet.resources.di.resourcesModule
 import org.kapunsdk.wallet.trust.TrustAnchorRepository
 import org.kapunsdk.wallet.DEFAULT_DATABASE_NAME
+import org.kapunsdk.trust.TrustFrameworkController
+import org.kapunsdk.trust.framework.swiss.SwissTrustConfiguration
+import org.kapunsdk.trust.framework.swiss.SwissTrustFramework
 import org.koin.core.KoinApplication
+import org.koin.dsl.module
 
-fun KoinApplication.kapunWalletModules(databaseName: String = DEFAULT_DATABASE_NAME) {
+fun KoinApplication.kapunWalletModules(
+	databaseName: String = DEFAULT_DATABASE_NAME,
+	swissTrustConfiguration: SwissTrustConfiguration = SwissTrustConfiguration(),
+) {
 	modules(
 		cryptoModule(),
 		databaseModule(databaseName),
@@ -37,5 +44,12 @@ fun KoinApplication.kapunWalletModules(databaseName: String = DEFAULT_DATABASE_N
 		resourcesModule(),
 		credentialsModule(),
 		processesModule(),
+		module {
+			single<SwissTrustConfiguration> { swissTrustConfiguration }
+			single { SwissTrustFramework(get(), get()) }
+			single<TrustFrameworkController> {
+				TrustFrameworkController(listOf(get<SwissTrustFramework>()))
+			}
+		},
 	)
 }

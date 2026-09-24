@@ -18,6 +18,7 @@ package org.kapunsdk.wallet.di
 import org.koin.core.Koin
 import org.koin.core.KoinApplication
 import org.koin.dsl.koinApplication
+import org.kapunsdk.trust.framework.swiss.SwissTrustConfiguration
 import org.kapunsdk.wallet.DEFAULT_DATABASE_NAME
 
 internal object KapunWalletKoinContext {
@@ -27,11 +28,12 @@ internal object KapunWalletKoinContext {
 
 	fun initialize(
 		databaseName: String = DEFAULT_DATABASE_NAME,
+		swissTrustConfiguration: SwissTrustConfiguration = SwissTrustConfiguration(),
 		declaration: KoinApplication.() -> Unit = {},
 	) {
 		koinApp = koinApplication {
 			declaration()
-			kapunWalletModules(databaseName)
+			kapunWalletModules(databaseName, swissTrustConfiguration)
 		}
 		koin = koinApp.koin
 	}

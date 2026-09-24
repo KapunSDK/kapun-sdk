@@ -16,7 +16,7 @@ under the License.
 
 package org.kapunsdk.trust.framework.swiss
 
-import org.kapunsdk.trust.did.tdw03.DidTdwResolver
+import org.kapunsdk.trust.did.DidResolver
 import org.kapunsdk.trust.framework.swiss.dto.IssuanceTrustStatementsDto
 import org.kapunsdk.trust.framework.swiss.dto.VerificationTrustStatementsDto
 import io.ktor.client.HttpClient
@@ -43,8 +43,8 @@ internal class SwissTrustService(
 
 		private const val WELL_KNOWN_PATH = "/.well-known"
 		private const val TRUST_STATEMENT_PATH = "$WELL_KNOWN_PATH/trust-statement"
-		private const val TRUST_API_BASE_URL = "https://trust-reg.trust-infra.swiyu-int.admin.ch"
 		private const val TRUST_API_PATH = "/api/v1/truststatements"
+		private const val TRUST_API_V2_NON_COMPLIANCE_PATH = "/api/v2/non-compliance-trust-list"
 		private val DID_REGEX = Regex("did:(tdw|webvh):(?<integrity>[^:]+):(?<domain>[A-z0-9-_.]+)(:(?<path>[^#]+))?(#(?<fragment>.*))?")
 	}
 
@@ -64,9 +64,15 @@ internal class SwissTrustService(
 		return httpClient.get(url).body<VerificationTrustStatementsDto>()
 	}
 
-	suspend fun getTrustFromDid(did: String) : List<String> {
+	suspend fun getTrustFromDid(
+		did: String,
+		configuration: SwissTrustConfiguration,
+	): List<String> {
 		return kotlin.runCatching {
-			val url = URLBuilder(TRUST_API_BASE_URL).apply {
+			val apiBaseUrl = deriveTrustStatementApiBaseUrl(did)
+				?.takeIf { configuration.allowsApiBaseUrl(it) }
+				?: return@runCatching emptyList<String>()
+			val url = URLBuilder(apiBaseUrl).apply {
 				appendPathSegments(TRUST_API_PATH)
 				appendPathSegments(did, encodeSlash = true)
 			}.build()
@@ -75,28 +81,66 @@ internal class SwissTrustService(
 			return Json.Default.decodeFromString(result)
 		}.getOrDefault(emptyList())
 	}
-	suspend fun getDidDocument(did: String): DidVerificationDocument? {
-		val matches = DID_REGEX.matchEntire(did) ?: return null
-		val url = matches.groups["domain"]?.value ?: return null
-		val path = matches.groups["path"]?.value?.replace(":", "/")?.let {
-			"$it/did.jsonl"
-		}
-		val keyUrl = URLBuilder("https://$url").apply {
-			if(path!=null){
-				appendPathSegments(path)
-			} else {
-				appendPathSegments(".well-known/did.jsonl")
-			}
-		}.build()
-		val res = httpClient.get(keyUrl) {
-			headers {
-				append(HttpHeaders.Accept, "application/jsonl+json")
-			}
-		}.body<String>()
 
+	/**
+	 * Returns the current Swiss Trust Protocol 2.0 non-compliance trust-list
+	 * statement.  The statement is deliberately returned as a JWT string; the
+	 * repository validates its signature, profile version, lifetime and status
+	 * before using it.
+	 */
+	suspend fun getNonComplianceTrustListStatement(
+		statementIssuer: String,
+		configuration: SwissTrustConfiguration,
+	): String? {
 		return runCatching {
-			val jsonl = res.split('\n').toList()
-			val resolver = DidTdwResolver.parse(jsonl)
+			val apiBaseUrl = deriveTrustStatementApiBaseUrl(statementIssuer)
+				?.takeIf { configuration.allowsApiBaseUrl(it) }
+				?: return@runCatching null
+			httpClient.get(URLBuilder(apiBaseUrl).apply {
+				appendPathSegments(TRUST_API_V2_NON_COMPLIANCE_PATH)
+			}.build()).bodyAsText()
+		}.getOrNull()
+	}
+
+	internal fun deriveTrustStatementApiBaseUrl(did: String): String? {
+		val matches = DID_REGEX.matchEntire(did) ?: return null
+		val domain = matches.groups["domain"]?.value ?: return null
+		val trustRegistryDomain = if (domain.startsWith("identifier-reg.")) {
+			"trust-reg.${domain.removePrefix("identifier-reg.")}"
+		} else {
+			domain
+		}
+		return "https://$trustRegistryDomain"
+	}
+
+	suspend fun getDidDocument(did: String): DidVerificationDocument? {
+		return runCatching {
+			val matches = DID_REGEX.matchEntire(did) ?: return@runCatching null
+			val url = matches.groups["domain"]?.value ?: return@runCatching null
+			val path = matches.groups["path"]?.value?.replace(":", "/")?.let {
+				"$it/did.jsonl"
+			}
+			val keyUrl = URLBuilder("https://$url").apply {
+				if (path != null) {
+					appendPathSegments(path)
+				} else {
+					appendPathSegments(".well-known/did.jsonl")
+				}
+			}.build()
+			val res = httpClient.get(keyUrl) {
+				headers {
+					append(HttpHeaders.Accept, "application/jsonl+json")
+				}
+			}.body<String>()
+
+			// JSONL responses commonly end with a newline. Do not pass the
+			// resulting empty line to DidLogEntry.parse(), otherwise a valid
+			// WebVH log is rejected before it can be resolved.
+			val jsonl = res.lineSequence()
+				.map { it.trim() }
+				.filter { it.isNotEmpty() }
+				.toList()
+			val resolver = DidResolver.fromJsonL(jsonl)
 			resolver.resolveLatest().doc()
 		}.getOrNull()
 	}
