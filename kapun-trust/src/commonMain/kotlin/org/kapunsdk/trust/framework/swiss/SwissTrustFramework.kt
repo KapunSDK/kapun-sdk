@@ -34,7 +34,17 @@ const val SWISS_TRUST_FRAMEWORK_ID : String = "swiss_trust_framework"
 
 class SwissTrustFramework(
 	private val documentProvider: DocumentProvider,
+	private val configuration: SwissTrustConfiguration = SwissTrustConfiguration(),
 ) : TrustFramework, KapunTrustKoinComponent {
+	constructor(
+		documentProvider: DocumentProvider,
+		trustedStatementIssuers: List<String>,
+		trustStatementApiBaseUrls: List<String>,
+	) : this(
+		documentProvider,
+		SwissTrustConfiguration(trustedStatementIssuers, trustStatementApiBaseUrls),
+	)
+
 	override val frameworkId: String
 		get() = SWISS_TRUST_FRAMEWORK_ID
 
@@ -46,27 +56,40 @@ class SwissTrustFramework(
 		credentialIssuerMetadata: CredentialIssuerMetadata
 	): AgentInformation? {
         if (credentialIssuerMetadata is CredentialIssuerMetadata.Signed) {
-            return trustRepository.getIssuerInformationFromSignedMetadata(credentialIssuerMetadata)
+            return trustRepository.getIssuerInformationFromSignedMetadata(credentialIssuerMetadata, configuration)
         }
 
 		val trustData = trustRepository.getIssuanceTrustData(
 			baseUrl,
 			credentialConfigurationIds,
-			credentialIssuerMetadata.claims.credentialConfigurationsSupported
+			credentialIssuerMetadata.claims.credentialConfigurationsSupported,
+			configuration,
 		) ?: return null
 
 		return fromTrustData(trustData)
 	}
 
 	override suspend fun getVerifierInformation(requestUri: String, presentationRequest: PresentationRequest, originalRequest: String?): AgentInformation? {
-		return trustRepository.getVerificationTrustData(requestUri, presentationRequest, originalRequest)?.let {
-			fromTrustData(it)
+		val trustData = trustRepository.getVerificationTrustData(
+			requestUri,
+			presentationRequest,
+			originalRequest,
+			configuration,
+		)
+			?: return null
+		val agentInformation = fromTrustData(trustData)
+		return if (trustData.identity == null) {
+			agentInformation.copy(
+				displayName = presentationRequest.clientMetadata?.clientName ?: agentInformation.displayName,
+				logoUri = presentationRequest.clientMetadata?.logoUri ?: agentInformation.logoUri,
+			)
+		} else {
+			agentInformation
 		}
 	}
 
 	override suspend fun validatePresentationRequest(presentationRequest: PresentationRequest): ValidationInfo {
-		// The Swiss Trust Framework has no concept of semantic correctness of a presentation request.
-		return ValidationInfo(isValid = true)
+		return trustRepository.validatePresentationRequest(presentationRequest, configuration)
 	}
 
     override suspend fun getAllowedDocuments(

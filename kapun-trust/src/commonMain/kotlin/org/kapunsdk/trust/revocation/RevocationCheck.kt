@@ -16,6 +16,7 @@ under the License.
 
 package org.kapunsdk.trust.revocation
 
+import org.kapunsdk.trust.framework.swiss.SwissTrustService
 import org.kapunsdk.trust.di.KapunTrustKoinComponent
 import org.kapunsdk.util.log.Logger
 import io.ktor.client.HttpClient
@@ -24,26 +25,61 @@ import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 import org.koin.core.component.inject
 import uniffi.kapun_issuance_rust.StatusListException
 import uniffi.kapun_issuance_rust.StatusListVerifier
+import uniffi.kapun_crypto_rust.DidVerificationDocument
+import uniffi.kapun_crypto_rust.parseEncodedJwtHeader
+import org.koin.core.module.dsl.singleOf
+import org.koin.dsl.module
 
 class RevocationCheck : KapunTrustKoinComponent {
+	companion object {
+		val koinModule = module {
+			singleOf(::RevocationCheck)
+		}
+	}
+
     private val httpClient by inject<HttpClient>()
     private val json by inject<Json>()
     private val cache by inject<RevocationCache>()
-    suspend fun check(url: String, index: Int) : Boolean {
+    private val trustService by inject<SwissTrustService>()
+    suspend fun check(
+        url: String,
+        index: Int,
+        expectedIssuer: String? = null,
+        didDocument: DidVerificationDocument? = null,
+    ) : Boolean {
         return runCatching {
-            cache.getResult(url, index)?.let { return it }
-            val statusListToken = cache.getList(url) ?:
+            if (expectedIssuer == null) {
+                cache.getResult(url, index)?.let { return it }
+            }
+            val cachedStatusList = cache.getList(url)
+            val statusListToken = cachedStatusList ?:
                 httpClient.get(url) { accept(ContentType("application", "statuslist+jwt")) }
                     .bodyAsText()
-            if(cache.getList(url) == null) {
+            if (cachedStatusList == null) {
                 cache.insertList(url, statusListToken)
+            }
+            val statusListIssuer = extractStatusListIssuer(statusListToken, json)
+            if (expectedIssuer != null) {
+                if (statusListIssuer != normalizeIssuer(expectedIssuer)) {
+                    return@runCatching true
+                }
             }
             val jwt = StatusListVerifier(statusListToken)
             try {
-                jwt.valid()
+                if (statusListIssuer?.startsWith("did:") == true) {
+                    val statusListDidDocument = didDocument
+                        ?: trustService.getDidDocument(statusListIssuer)
+                        ?: return@runCatching true
+                    jwt.validForDidDoc(statusListDidDocument)
+                } else {
+                    jwt.valid()
+                }
                 val statusList= jwt.getPayload()
                 val isRevoked = statusList.isRevoked(index)
                 cache.insertResult(url, index, isRevoked)
@@ -55,4 +91,12 @@ class RevocationCheck : KapunTrustKoinComponent {
             }
         }.getOrNull() ?: true
     }
+
+    private fun normalizeIssuer(value: String): String =
+        value.removePrefix("decentralized_identifier:").substringBefore('#')
 }
+
+internal fun extractStatusListIssuer(statusListToken: String, json: Json): String? =
+    parseEncodedJwtHeader(statusListToken)?.let {
+        json.decodeFromString<JsonObject>(it)["kid"]?.jsonPrimitive?.contentOrNull
+    }?.removePrefix("decentralized_identifier:")?.substringBefore('#')

@@ -404,6 +404,17 @@ async fn retrieve_public_key(
         return Ok(public_key_multibase.to_string());
     }
 
+    let document_url = reqwest::Url::parse(document_url).map_err(|_| {
+        ProofVerificationError::InvalidVerificationMethod(
+            "Verification method must use an HTTP(S) URL or did:key".to_string(),
+        )
+    })?;
+    if !matches!(document_url.scheme(), "http" | "https") {
+        return Err(ProofVerificationError::InvalidVerificationMethod(
+            "Verification method must use an HTTP(S) URL or did:key".to_string(),
+        ));
+    }
+
     let mut client_builder = reqwest::Client::builder();
     if kapun_util_rust::network::untrusted_tls_allowed() {
         client_builder = client_builder.danger_accept_invalid_certs(true);
@@ -662,7 +673,19 @@ mod eddsa_rdfc_2022 {
 
 #[cfg(test)]
 mod tests {
-    use crate::ldp::DataIntegrityProof;
+    use crate::ldp::{DataIntegrityProof, ProofVerificationError, retrieve_public_key};
+
+    #[tokio::test]
+    async fn non_http_verification_method_is_not_fetched() {
+        let error = retrieve_public_key("did:example:issuer#key-1".to_string())
+            .await
+            .unwrap_err();
+
+        assert!(matches!(
+            error,
+            ProofVerificationError::InvalidVerificationMethod(_)
+        ));
+    }
 
     #[test]
     fn test_parse_proof_example_2() {

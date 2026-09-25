@@ -26,9 +26,14 @@ import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonNames
+import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import uniffi.kapun_dcql_rust.DcqlQuery
 import uniffi.kapun_util_rust.Value
 import uniffi.kapun_credential_core_rust.generateNonce
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 
 /**
  * Data class to hold both the OID4VP draft version and the parsed PresentationRequest
@@ -83,6 +88,12 @@ data class PresentationRequest constructor(
 	val presentationDefinitionUri: Value? = null,
 	@SerialName("dcql_query")
 	val dcqlQuery: DcqlQuery? = null,
+	/**
+	 * A space separated list of presentation scopes.  In the Swiss profile a
+	 * scope identifies the DCQL query embedded in a verifier-info vqPS JWT.
+	 */
+	@SerialName("scope")
+	val scope: String? = null,
 	@SerialName("transaction_data")
 	val transactionData: TransactionDataWrapper? = null,
 	@SerialName("client_metadata")
@@ -173,7 +184,7 @@ data class PresentationRequest constructor(
 			val clientId = rawClientId
 
 			val presentationDefinition = value["presentation_definition"]
-			val dcqlQuery: DcqlQuery? = value["dcql_query"]
+			val directDcqlQuery: DcqlQuery? = value["dcql_query"]
 				.takeIf { it != Value.Null }?.let {
 					it.asString()?.let {
 						try {
@@ -183,6 +194,9 @@ data class PresentationRequest constructor(
 						}
 					} ?: it.transform<DcqlQuery>()
 				}
+			val scope = value["scope"].takeIf { it != Value.Null }?.asString()
+			val verifierInfo = value["verifier_info"].transform<List<Value>>()
+			val dcqlQuery = scopeBasedDcqlQuery(scope, verifierInfo) ?: directDcqlQuery
 
 			val responseType = value["response_type"].takeIf { it != Value.Null }?.asString() ?: "vp_token"
 
@@ -196,6 +210,7 @@ data class PresentationRequest constructor(
 					presentationDefinition
 				},
 				dcqlQuery = dcqlQuery,
+				scope = scope,
 				transactionData = TransactionDataWrapper.fromValue(value),
 				clientMetadata = value["client_metadata"].transform(),
 				verifierAttestations = value["verifier_attestations"].transform(),
@@ -205,6 +220,67 @@ data class PresentationRequest constructor(
 			)
 
 			return VersionedPresentationRequest(version, request)
+		}
+
+		/**
+		 * Resolves the Swiss Profile Verification vqPS query for the request's
+		 * active scope.  The embedded query is authoritative when available;
+		 * callers can fall back to the top-level dcql_query for older requests.
+		 */
+		internal fun scopeBasedDcqlQuery(
+			scope: String?,
+			verifierInfo: List<Value>?
+		): DcqlQuery? {
+			val requestedScopes = scope
+				?.split(Regex("\\s+"))
+				?.filter(String::isNotBlank)
+				?.toSet()
+				?: return null
+			if (requestedScopes.isEmpty()) return null
+
+			return verifierInfo.orEmpty().asSequence()
+				.filter {
+					it["format"].asString() == "jwt" &&
+						it["credential_ids"] == Value.Null
+				}
+				.mapNotNull { it["data"].asString() }
+				.filter { jwt ->
+					runCatching {
+						val header = jwtPart(jwt, 0) ?: return@runCatching false
+						val headerObject = json.decodeFromString<kotlinx.serialization.json.JsonObject>(header)
+						headerObject["typ"]?.jsonPrimitive?.content ==
+							"swiyu-verification-query-public-statement+jwt"
+					}.getOrDefault(false)
+				}
+				.mapNotNull { jwt ->
+					val payload = jwtPart(jwt, 1) ?: return@mapNotNull null
+					runCatching {
+						val request = json.parseToJsonElement(payload)
+							.jsonObject["request"]?.jsonObject
+							?: return@runCatching null
+						if (request["type"]?.jsonPrimitive?.content != "DCQL") {
+							return@runCatching null
+						}
+						val statementScope = request["scope"]?.jsonPrimitive?.content
+						if (statementScope == null || statementScope !in requestedScopes) {
+							return@runCatching null
+						}
+						request["query"]?.let { json.decodeFromJsonElement<DcqlQuery>(it) }
+					}.getOrNull()
+				}
+				.firstOrNull()
+		}
+
+		@OptIn(ExperimentalEncodingApi::class)
+		private fun jwtPart(jwt: String, index: Int): String? {
+			val encoded = jwt.split('.').getOrNull(index) ?: return null
+			return runCatching {
+				Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT).decode(encoded).decodeToString()
+			}.getOrElse {
+				runCatching {
+					Base64.UrlSafe.withPadding(Base64.PaddingOption.PRESENT).decode(encoded).decodeToString()
+				}.getOrNull()
+			}
 		}
 	}
 }

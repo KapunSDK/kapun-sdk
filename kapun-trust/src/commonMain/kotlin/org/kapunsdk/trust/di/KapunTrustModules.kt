@@ -21,6 +21,7 @@ import org.kapunsdk.trust.framework.swiss.SwissTrustService
 import org.kapunsdk.trust.networking.di.jsonModule
 import org.kapunsdk.trust.networking.di.networkModule
 import org.kapunsdk.trust.revocation.RevocationCache
+import org.kapunsdk.trust.revocation.RevocationCheck
 import org.kapunsdk.util.network.KapunNetworkConfiguration
 import org.koin.core.KoinApplication
 
@@ -30,6 +31,7 @@ internal fun KoinApplication.trustModules(networkConfiguration: KapunNetworkConf
 		networkModule(networkConfiguration),
 		SwissTrustService.koinModule,
 		SwissTrustRepository.koinModule,
-		RevocationCache.koinModule
+		RevocationCache.koinModule,
+		RevocationCheck.koinModule
 	)
 }
