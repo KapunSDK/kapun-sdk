@@ -108,7 +108,7 @@ impl<T: Serialize + DeserializeOwned> JwtVerifier<T> for GenericJwtVerifier {
                 DateTime::from_timestamp_millis(valid_at).unwrap_or(Utc::now()),
             )
         } else {
-            JwtVerifier::<T>::verify_time(self, jwt)
+            JwtVerifier::<T>::verify_time_at(self, jwt, Utc::now())
         }
     }
     fn verify_header(&self, jwt: &Jwt<T>) -> Result<(), heidi_jwt::models::errors::JwtError> {
