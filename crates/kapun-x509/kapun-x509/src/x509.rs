@@ -104,20 +104,16 @@ pub fn verify_chain_at_with_trust_anchors<Provider: KapunCryptoProvider>(
     check_basic_constraint: bool,
     trust_store: Option<&Vec<Vec<u8>>>,
 ) -> bool {
-    // a valid chain requires at least two certificates (leaf + issuer)
-    // or a trust store, from which we can complete, or add
-    if certs.len() < 2 && trust_store.is_none() {
-        tracing::error!("chain must contain at least two certificates");
-        return false;
-    }
     // first certificate is the leaf certificate
     let mut certs = certs;
-    // the last (or rather first) certificate is not an intermediate and is not counted towards the path len
-    let total_path_len = certs.len() - 1;
 
     // check that the last certificate is self signed and valid
     // or contained in the trust_store
     match certs.last() {
+        // if the trust-anchor is provided, we just skip it
+        Some(last_cert)
+            if let Some(ts) = trust_store
+                && ts.contains(&last_cert) => {}
         Some(last_cert) if let Some(ts) = trust_store => {
             let Some(trust_anchor) = select_root(last_cert.as_slice(), ts) else {
                 return false;
@@ -132,6 +128,14 @@ pub fn verify_chain_at_with_trust_anchors<Provider: KapunCryptoProvider>(
         }
         None => return false,
     }
+    // a valid chain requires at least two certificates (leaf + issuer)
+    if certs.len() < 2 {
+        tracing::error!("chain must contain at least two certificates");
+        return false;
+    }
+    // This should not move up, as we insert certificates in the case of a trust-chain
+    // the last (or rather first) certificate is not an intermediate and is not counted towards the path len
+    let total_path_len = certs.len() - 1;
     let mut prev_cert = certs.pop();
     let mut current_position = 1;
     while let Some(issuer_cert) = prev_cert {
@@ -478,6 +482,14 @@ mod tests {
         .unwrap();
         assert!(verify_chain_at_with_trust_anchors::<JosekitCryptoProvider>(
             vec![leaf.contents().to_vec()],
+            valid_time,
+            #[cfg(feature = "crl")]
+            true,
+            true,
+            Some(&vec![intermediate.contents().to_vec()])
+        ));
+        assert!(verify_chain_at_with_trust_anchors::<JosekitCryptoProvider>(
+            vec![leaf.contents().to_vec(), intermediate.contents().to_vec()],
             valid_time,
             #[cfg(feature = "crl")]
             true,
