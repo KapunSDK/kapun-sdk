@@ -553,6 +553,39 @@ mod tests {
     }
 
     #[test]
+    fn test_direct_subca_anchor() {
+        let valid_time = ASN1Time::from_timestamp(1790610000).unwrap();
+        let leaf = pem::parse(include_bytes!("../test-chains/direct-subca/leaf.pem")).unwrap();
+        let intermediate = pem::parse(include_bytes!(
+            "../test-chains/direct-subca/intermediate.pem"
+        ))
+        .unwrap();
+        let subca = pem::parse(include_bytes!("../test-chains/direct-subca/subca.pem")).unwrap();
+        let root = pem::parse(include_bytes!("../test-chains/direct-subca/root.pem")).unwrap();
+
+        let (_, leaf_cert) = x509_parser::parse_x509_certificate(leaf.contents()).unwrap();
+        let (_, intermediate_cert) =
+            x509_parser::parse_x509_certificate(intermediate.contents()).unwrap();
+        let (_, subca_cert) = x509_parser::parse_x509_certificate(subca.contents()).unwrap();
+        let (_, root_cert) = x509_parser::parse_x509_certificate(root.contents()).unwrap();
+
+        // The trusted SubCA has a parent, but that root is absent from the supplied path.
+        assert_ne!(subca_cert.subject, subca_cert.issuer);
+        assert_eq!(subca_cert.issuer, root_cert.subject);
+        assert_eq!(intermediate_cert.issuer, subca_cert.subject);
+        assert_eq!(leaf_cert.issuer, intermediate_cert.subject);
+
+        assert!(verify_chain_at_with_trust_anchors::<JosekitCryptoProvider>(
+            vec![leaf.contents().to_vec(), intermediate.contents().to_vec()],
+            valid_time,
+            #[cfg(feature = "crl")]
+            true,
+            true,
+            Some(&vec![subca.contents().to_vec()]),
+        ));
+    }
+
+    #[test]
     fn test_same_subject_trust_anchors() {
         let valid_time = ASN1Time::from_timestamp(1790351645).unwrap();
         let leaf = pem::parse(include_bytes!("../test-chains/test-trust-anchor/leaf.pem")).unwrap();
