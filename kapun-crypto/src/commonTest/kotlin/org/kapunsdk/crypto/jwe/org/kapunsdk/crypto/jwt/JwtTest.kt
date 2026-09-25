@@ -1,0 +1,39 @@
+package org.kapunsdk.crypto.jwe.org.kapunsdk.crypto.jwt
+
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import org.kapunsdk.crypto.jwt.Jwt
+import org.kapunsdk.crypto.jwt.JwtValidator
+import org.kapunsdk.util.extensions.json
+import org.kapunsdk.util.extensions.toPlainValue
+import uniffi.kapun_util_rust.Value
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
+
+class JwtTest {
+
+	@Test
+	fun testBasicJwt() {
+		val v = JwtValidator()
+		val j = Jwt("eyJraWQiOiJ0ZXN0LXYxIiwidHlwIjoiZW50aXR5LXN0YXRlbWVudCtqd3QiLCJhbGciOiJFUzI1NiJ9.eyJpc3MiOiJodHRwczovL3Byby5oZWlkaXZlcnNlLmNvbS9pc3N1ZXIvdGVzdC9jL29pZGYtdGVzdC13bGhreC8xLjAuMCIsInN1YiI6Imh0dHBzOi8vcHJvLmhlaWRpdmVyc2UuY29tL2lzc3Vlci90ZXN0L2Mvb2lkZi10ZXN0LXdsaGt4LzEuMC4wIiwibWV0YWRhdGEiOnsib3BlbmlkX2NyZWRlbnRpYWxfaXNzdWVyIjp7ImNyZWRlbnRpYWxfaXNzdWVyIjoiaHR0cHM6Ly9wcm8uaGVpZGl2ZXJzZS5jb20vaXNzdWVyL3Rlc3QvYy9vaWRmLXRlc3Qtd2xoa3gvMS4wLjAiLCJhdXRob3JpemF0aW9uX3NlcnZlcnMiOlsiaHR0cHM6Ly9wcm8uaGVpZGl2ZXJzZS5jb20vaXNzdWVyL3Rlc3QvYy9vaWRmLXRlc3Qtd2xoa3gvMS4wLjAiXSwiY3JlZGVudGlhbF9lbmRwb2ludCI6Imh0dHBzOi8vcHJvLmhlaWRpdmVyc2UuY29tL2lzc3Vlci90ZXN0L2Mvb2lkZi10ZXN0LXdsaGt4LzEuMC4wL2NyZWRlbnRpYWwiLCJkZWZlcnJlZF9jcmVkZW50aWFsX2VuZHBvaW50IjoiaHR0cHM6Ly9wcm8uaGVpZGl2ZXJzZS5jb20vaXNzdWVyL3Rlc3QvYy9vaWRmLXRlc3Qtd2xoa3gvMS4wLjAvZGVmZXJyZWRfY3JlZGVudGlhbCIsIm5vbmNlX2VuZHBvaW50IjoiaHR0cHM6Ly9wcm8uaGVpZGl2ZXJzZS5jb20vaXNzdWVyL3Rlc3QvYy9vaWRmLXRlc3Qtd2xoa3gvMS4wLjAvbm9uY2UiLCJjcmVkZW50aWFsX3JlcXVlc3RfZW5jcnlwdGlvbiI6eyJqd2tzIjp7ImtleXMiOlt7Imt0eSI6IkVDIiwiY3J2IjoiUC0yNTYiLCJ4IjoiQnVUVk1LZ2lpMGxoMExtVGd5NU5XTDJPODVRWGttS21MejJObmNTM011USIsInkiOiJqMWFNTWVSZWRTNTFYVTFDUEN2eTI0YkU0aVNJMVZDbHdEdmdWSVVoVTRFIiwiYWxnIjoiRUNESC1FUyIsImtpZCI6InRlc3QtZGVmYXVsdC1kZWNyeXB0aW9uLXYxIiwidXNlIjoiZW5jIn1dfSwiZW5jX3ZhbHVlc19zdXBwb3J0ZWQiOlsiQTI1NkdDTSJdLCJ6aXBfdmFsdWVzX3N1cHBvcnRlZCI6WyJERUYiXSwiZW5jcnlwdGlvbl9yZXF1aXJlZCI6ZmFsc2V9LCJjcmVkZW50aWFsX3Jlc3BvbnNlX2VuY3J5cHRpb24iOnsiYWxnX3ZhbHVlc19zdXBwb3J0ZWQiOlsiRUNESC1FUyJdLCJlbmNfdmFsdWVzX3N1cHBvcnRlZCI6WyJBMjU2R0NNIl0sInppcF92YWx1ZXNfc3VwcG9ydGVkIjpbIkRFRiJdLCJlbmNyeXB0aW9uX3JlcXVpcmVkIjpmYWxzZX0sImNyZWRlbnRpYWxfY29uZmlndXJhdGlvbnNfc3VwcG9ydGVkIjp7Im9pZGYtdGVzdC13bGhreC0xLjAuMC1zZC1qd3QiOnsiZm9ybWF0IjoiZGMrc2Qtand0IiwidmN0IjoiaHR0cHM6Ly9wcm8uaGVpZGl2ZXJzZS5jb20vYXBpL3B1YmxpYy92Mi9zY2hlbWEvb2lkZi10ZXN0LXdsaGt4LzEuMC4wIiwiY3J5cHRvZ3JhcGhpY19iaW5kaW5nX21ldGhvZHNfc3VwcG9ydGVkIjpbImp3ayJdLCJjcmVkZW50aWFsX3NpZ25pbmdfYWxnX3ZhbHVlc19zdXBwb3J0ZWQiOlsiRVMyNTYiXSwicHJvb2ZfdHlwZXNfc3VwcG9ydGVkIjp7Imp3dCI6eyJwcm9vZl9zaWduaW5nX2FsZ192YWx1ZXNfc3VwcG9ydGVkIjpbIkVTMjU2Il19fSwiY3JlZGVudGlhbF9tZXRhZGF0YSI6eyJkaXNwbGF5IjpbeyJuYW1lIjoiT0lERi1UZXN0IiwiYmFja2dyb3VuZF9jb2xvciI6IiNGRjAwMDAiLCJ0ZXh0X2NvbG9yIjoiI0ZGRkZGRiJ9XX0sInZjdF9tZXRhZGF0YV91cmkiOiJodHRwczovL3Byby5oZWlkaXZlcnNlLmNvbS9hcGkvcHVibGljL3YyL3NjaGVtYS9vaWRmLXRlc3Qtd2xoa3gvMS4wLjAifX19LCJmZWRlcmF0aW9uX2VudGl0eSI6eyJvcmdhbml6YXRpb25fbmFtZSI6InRlc3QifX0sImp3a3MiOnsia2V5cyI6W3sia3R5IjoiRUMiLCJ1c2UiOiJzaWciLCJjcnYiOiJQLTI1NiIsImtpZCI6InRlc3QtdjEiLCJ4IjoiWFdUbFIxbmlmV0pSa3V2YWNkaDJqNFZLVDMzR0haNy1yRkNRTDlUd19FSSIsInkiOiI5emxPUHkxejRvSEMySXljVlJLX1J4NlJOUENkNUhEVlhKdjExajdOY2IwIiwiYWxnIjoiRVMyNTYifV19LCJleHAiOjE3OTAzMTI5MjUsImlhdCI6MTc5MDIyNjUyNX0.nAtIUtZVYsoEs7AWbE0mmwUlVp5guG6lu9stAGkuodsPtTaqJImBLfoPlhmkbI96bVopSskjuamRPKKbthUMuA",
+			v, validityAt = 1790226525*1000)
+		val kid = j.getHeader().jsonObject["kid"]
+		assertEquals("test-v1", kid!!.jsonPrimitive.content)
+		val jwk = "{\n" +
+				"  \"kty\": \"EC\",\n" +
+				"  \"use\": \"sig\",\n" +
+				"  \"crv\": \"P-256\",\n" +
+				"  \"kid\": \"test-v1\",\n" +
+				"  \"x\": \"XWTlR1nifWJRkuvacdh2j4VKT33GHZ7-rFCQL9Tw_EI\",\n" +
+				"  \"y\": \"9zlOPy1z4oHC2IycVRK_Rx6RNPCd5HDVXJv11j7Ncb0\",\n" +
+				"  \"alg\": \"ES256\"\n" +
+				"}"
+		val jwkValue : Value = json.decodeFromString(jwk)
+		val isValidated = j.validateJwtWithType("entity-statement+jwt", jwkValue)
+		assertTrue { isValidated }
+		val wrongType = j.validateJwtWithType("wrong-header", jwkValue)
+		assertFalse { wrongType }
+	}
+}

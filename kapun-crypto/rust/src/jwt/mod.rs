@@ -14,7 +14,7 @@ specific language governing permissions and limitations
 under the License.
  */
 
-use std::str::FromStr;
+use std::{str::FromStr, sync::Arc};
 
 use crate::crypto::{
     base58btc_decode, base64_url_decode,
@@ -26,14 +26,17 @@ use base64::{
 };
 use heidi_jwt::{
     Jwk, JwsHeader,
+    chrono::{DateTime, Utc},
     jwt::{
         Jwt, JwtVerifier, ec_verifier_from_sec1, verifier::DefaultVerifier, verifier_for_der,
         verifier_for_jwk,
     },
+    models::errors::{JwtError, PayloadError},
 };
 use kapun_util_rust::{log_debug, log_error, log_warn, value::Value};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::Map;
+use uniffi::Record;
 
 #[uniffi::export]
 pub fn parse_encoded_jwt_header(jwt: String) -> Option<String> {
@@ -78,6 +81,76 @@ pub fn validate_jwt_signature(jwt: &str, jwt_type: &str) -> bool {
 }
 
 pub struct SimpleVerifier;
+
+#[derive(Record)]
+/// Generic verifier type used for JwtValidation
+pub struct GenericJwtVerifier {
+    /// Optional type to verify against to protected against confusion attacks
+    ty: Option<String>,
+    /// Validator trait to verify body/header
+    jwt_validator: Option<Arc<dyn JwtValidator>>,
+    /// verification at
+    time_of_validity: Option<i64>,
+}
+
+#[uniffi::export(with_foreign)]
+pub trait JwtValidator: Send + Sync {
+    fn validate_body(&self, body: kapun_util_rust::value::Value) -> bool;
+    fn validate_header(&self, header: kapun_util_rust::value::Value) -> bool;
+}
+
+impl<T: Serialize + DeserializeOwned> JwtVerifier<T> for GenericJwtVerifier {
+    fn verify_time(&self, jwt: &Jwt<T>) -> Result<(), JwtError> {
+        if let Some(valid_at) = self.time_of_validity {
+            JwtVerifier::<T>::verify_time_at(
+                self,
+                jwt,
+                DateTime::from_timestamp_millis(valid_at).unwrap_or(Utc::now()),
+            )
+        } else {
+            JwtVerifier::<T>::verify_time(self, jwt)
+        }
+    }
+    fn verify_header(&self, jwt: &Jwt<T>) -> Result<(), heidi_jwt::models::errors::JwtError> {
+        let h: kapun_util_rust::value::Value =
+            serde_json::Value::Object(jwt.header()?.into_map()).into();
+        if let Some(validator) = self.jwt_validator.as_ref() {
+            let validated = validator.validate_header(h);
+            if !validated {
+                return Err(heidi_jwt::models::errors::JwtError::Jws(
+                    heidi_jwt::models::errors::JwsError::InvalidHeader(
+                        "failed to validate header".to_string(),
+                    ),
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    fn verify_body(&self, jwt: &Jwt<T>) -> Result<(), heidi_jwt::models::errors::JwtError> {
+        let Some(validator) = self.jwt_validator.as_ref() else {
+            return Ok(());
+        };
+        let payload = jwt.payload_unverified();
+        let payload = payload.insecure();
+        let Ok(val) = serde_json::to_value(payload) else {
+            return Err(JwtError::Payload(PayloadError::MissingRequiredProperty(
+                "cannot check body".to_string(),
+            )));
+        };
+        let util_value: kapun_util_rust::value::Value = val.into();
+        let validate = validator.validate_body(util_value);
+        if !validate {
+            return Err(JwtError::Payload(PayloadError::InvalidPayload(
+                "cannot check body".to_string(),
+            )));
+        }
+        if let Some(ty) = self.ty.as_ref() {
+            self.assert_type(jwt, ty)?;
+        }
+        Ok(())
+    }
+}
 
 impl<T: Serialize + DeserializeOwned> JwtVerifier<T> for SimpleVerifier {
     fn verify_header(&self, _jwt: &Jwt<T>) -> Result<(), heidi_jwt::models::errors::JwtError> {
@@ -153,6 +226,29 @@ pub fn validate_jwt_with_jwk(jwt: &str, jwk: Value) -> bool {
     // Perform full validation with signature check.
     jwt.verify_signature_with_verifier(verifier.as_ref())
         .is_ok()
+}
+#[uniffi::export]
+pub fn validate_jwt_with_jwk_and_validator(
+    jwt: &str,
+    jwk: Value,
+    validator: GenericJwtVerifier,
+) -> bool {
+    let Ok(jwt) = Jwt::<serde_json::Value>::from_str(jwt) else {
+        return false;
+    };
+    let Some(jwk) = jwk.transform::<Jwk>() else {
+        return false;
+    };
+
+    let Some(verifier) = verifier_for_jwk(jwk) else {
+        return false;
+    };
+    // Perform full validation with signature check.
+    let signature_valid = jwt
+        .verify_signature_with_verifier(verifier.as_ref())
+        .is_ok();
+    let jwt_valid = jwt.verify(&validator).is_ok();
+    signature_valid && jwt_valid
 }
 
 #[derive(Serialize, Deserialize, uniffi::Record)]
