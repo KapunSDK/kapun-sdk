@@ -175,6 +175,21 @@ fn verify_chain(certs: Vec<X509Certificate>) -> bool {
         .collect::<Vec<_>>();
     kapun_x509::x509::verify_chain::<JosekitCryptoProvider>(chain)
 }
+#[uniffi::export]
+fn verify_chain_with_trust_anchors(
+    certs: Vec<X509Certificate>,
+    trust_anchors: Vec<X509Certificate>,
+) -> bool {
+    let chain = certs
+        .into_iter()
+        .map(|a| a.original_cert)
+        .collect::<Vec<_>>();
+    let trust_anchors = trust_anchors
+        .into_iter()
+        .map(|a| a.original_cert)
+        .collect::<Vec<_>>();
+    kapun_x509::x509::verify_chain_with_trust_anchor::<JosekitCryptoProvider>(chain, trust_anchors)
+}
 
 #[cfg(test)]
 mod tests {
