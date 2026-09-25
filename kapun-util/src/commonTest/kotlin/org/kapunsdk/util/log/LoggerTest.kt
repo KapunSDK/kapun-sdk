@@ -21,6 +21,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import uniffi.kapun_util_rust.LogPriority
 
 private data class RecordedLog(
 	val severity: LogSeverity,
@@ -113,5 +114,16 @@ class LoggerTest {
 		assertNull(Logger.sink)
 		assertEquals(1, sink.recorded.size)
 		assertEquals("seen", sink.recorded[0].message)
+	}
+
+	@Test
+	fun testRustCallbackAcknowledgesAndForwardsLogs() {
+		val sink = RecordingLogSink()
+		Logger.sink = sink
+
+		assertTrue(RustToKotlinLogSink.log(LogPriority.WARN, "Rust", "message"))
+		assertTrue(RustToKotlinLogSink.log(LogPriority.SILENT, "Rust", "ignored"))
+
+		assertEquals(listOf(RecordedLog(LogSeverity.WARN, "Rust", "message", null)), sink.recorded)
 	}
 }

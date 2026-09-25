@@ -43,7 +43,9 @@ pub enum LogPriority {
 /// and register it once via [register_log_sink] - typically from `KapunSdk.initialize`.
 #[cfg_attr(feature = "uniffi", uniffi::export(with_foreign))]
 pub trait LogSink: Send + Sync {
-    fn log(&self, priority: LogPriority, tag: String, message: String);
+    // The acknowledgement is ignored. A bool avoids UniFFI's void* return slot, whose
+    // nullability is inconsistent between generated Kotlin/Native bindings and cinterop for ().
+    fn log(&self, priority: LogPriority, tag: String, message: String) -> bool;
 }
 
 /// Defines a component-local UniFFI log callback and adapts it to this crate's [LogSink].
@@ -59,14 +61,14 @@ macro_rules! export_log_sink_bridge {
     () => {
         #[cfg_attr(feature = "uniffi", uniffi::export(with_foreign))]
         pub trait LogSink: Send + Sync {
-            fn log(&self, priority: $crate::log::LogPriority, tag: String, message: String);
+            fn log(&self, priority: $crate::log::LogPriority, tag: String, message: String) -> bool;
         }
 
         struct LocalLogSink(std::sync::Arc<dyn LogSink>);
 
         impl $crate::log::LogSink for LocalLogSink {
-            fn log(&self, priority: $crate::log::LogPriority, tag: String, message: String) {
-                self.0.log(priority, tag, message);
+            fn log(&self, priority: $crate::log::LogPriority, tag: String, message: String) -> bool {
+                self.0.log(priority, tag, message)
             }
         }
 

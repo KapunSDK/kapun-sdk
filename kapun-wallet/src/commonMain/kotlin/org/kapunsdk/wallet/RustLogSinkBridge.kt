@@ -15,9 +15,8 @@ private object ComponentRustLogSink :
 	uniffi.kapun_dcql_rust.LogSink,
 	uniffi.kapun_dcql_sdjwt_rust.LogSink,
 	uniffi.kapun_wallet_rust.LogSink {
-	override fun log(priority: LogPriority, tag: String, message: String) {
+	override fun log(priority: LogPriority, tag: String, message: String): Boolean =
 		RustToKotlinLogSink.log(priority, tag, message)
-	}
 }
 
 /**
