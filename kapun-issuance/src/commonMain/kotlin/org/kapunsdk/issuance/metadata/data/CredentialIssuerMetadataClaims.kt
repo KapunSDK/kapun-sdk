@@ -63,6 +63,9 @@ data class CredentialIssuerMetadataClaims(
 	@SerialName("signed_metadata")
 	val signedMetadata: String? = null,
 
+	@SerialName("credential_issuer_identity_trust_statement")
+	val credentialIssuerIdentityTrustStatement: String? = null,
+
 	@SerialName("display")
 	val display: List<Display>? = null,
 

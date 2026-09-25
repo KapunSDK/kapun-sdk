@@ -33,9 +33,12 @@ fun StatusList.isRevoked(index: Int) : Boolean {
 
 fun StatusList.getStatus(index: Int) : Byte? {
         return runCatching {
+                if (index < 0) {
+                        return null
+                }
                 val decompressed = deflateString(lst)
                 val entrySize = (8U / this.bits).toByte()
-                if(index/entrySize >decompressed.size) {
+                if(index/entrySize >= decompressed.size) {
                         return null
                 }
                 val byteNumber = index / entrySize
@@ -55,4 +58,3 @@ fun StatusList.isSuspended(index: Int) : Boolean {
                 status == SUSPENDED.toByte()
         }.getOrNull() ?: true
 }
-

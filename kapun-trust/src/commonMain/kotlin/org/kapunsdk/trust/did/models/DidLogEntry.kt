@@ -105,6 +105,12 @@ sealed interface DidLogEntry {
     val proofs: List<Pair<DataIntegrityProof, Value>>
 
 
-    fun doc(): DidVerificationDocument? =
-        parseDidVerificationDocument(this.state["value"])
+    fun doc(): DidVerificationDocument? = when (this) {
+		is Tdw03 -> {
+			parseDidVerificationDocument(this.state["value"])
+		}
+		is WebVH10 -> {
+			parseDidVerificationDocument(this.state)
+		}
+	}
 }

@@ -13,7 +13,13 @@ interface DidResolver {
         const val DID_WEB_VH_10_METHOD = "did:webvh:1.0"
 
         fun fromJsonL(lines: List<String>): DidResolver {
-            val entries = lines.map { DidLogEntry.parse(it) }
+            // A JSONL file is required to end each entry with a newline. A
+            // caller that obtains the lines with split('\n') therefore gets
+            // one final empty element; it is not a log entry and must be
+            // ignored.
+            val entries = lines
+                .filter { it.isNotBlank() }
+                .map { DidLogEntry.parse(it) }
 
             // Check if all entries are of type did:tdw:0.3 and
             // the first entry specifies the did:tdw:0.3 method
