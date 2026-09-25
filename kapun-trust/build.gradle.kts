@@ -51,7 +51,7 @@ kotlin {
 
 	sourceSets {
 		commonMain.dependencies {
-			implementation(project(":kapun-util"))
+			api(project(":kapun-util"))
 			implementation(project(":kapun-crypto"))
 			implementation(project(":kapun-credentials"))
 			implementation(project(":kapun-issuance"))

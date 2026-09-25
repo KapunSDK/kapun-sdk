@@ -2,6 +2,22 @@ package org.kapunsdk.wallet
 
 import org.kapunsdk.util.log.RustToKotlinLogSink
 import org.kapunsdk.util.log.bridgeRustLogsToKotlin
+import uniffi.kapun_util_rust.LogPriority
+
+/**
+ * Implements each component's local callback interface. The interfaces intentionally have the
+ * same method shape, but must remain distinct so every native library initializes and uses its
+ * own UniFFI callback vtable.
+ */
+private object ComponentRustLogSink :
+	uniffi.kapun_crypto_rust.LogSink,
+	uniffi.kapun_issuance_rust.LogSink,
+	uniffi.kapun_dcql_rust.LogSink,
+	uniffi.kapun_dcql_sdjwt_rust.LogSink,
+	uniffi.kapun_wallet_rust.LogSink {
+	override fun log(priority: LogPriority, tag: String, message: String): Boolean =
+		RustToKotlinLogSink.log(priority, tag, message)
+}
 
 /**
  * Every Rust crate that has its own `log_warn!`/`log_error!`/`log_debug!` call sites compiles to
@@ -14,9 +30,9 @@ import org.kapunsdk.util.log.bridgeRustLogsToKotlin
  */
 internal fun bridgeAllRustLogSinks() {
 	bridgeRustLogsToKotlin()
-	uniffi.kapun_crypto_rust.registerLogSink(RustToKotlinLogSink)
-	uniffi.kapun_issuance_rust.registerLogSink(RustToKotlinLogSink)
-	uniffi.kapun_dcql_rust.registerLogSink(RustToKotlinLogSink)
-	uniffi.kapun_dcql_sdjwt_rust.registerLogSink(RustToKotlinLogSink)
-	uniffi.kapun_wallet_rust.registerLogSink(RustToKotlinLogSink)
+	uniffi.kapun_crypto_rust.registerLogSink(ComponentRustLogSink)
+	uniffi.kapun_issuance_rust.registerLogSink(ComponentRustLogSink)
+	uniffi.kapun_dcql_rust.registerLogSink(ComponentRustLogSink)
+	uniffi.kapun_dcql_sdjwt_rust.registerLogSink(ComponentRustLogSink)
+	uniffi.kapun_wallet_rust.registerLogSink(ComponentRustLogSink)
 }

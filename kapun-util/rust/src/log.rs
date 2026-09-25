@@ -43,7 +43,45 @@ pub enum LogPriority {
 /// and register it once via [register_log_sink] - typically from `KapunSdk.initialize`.
 #[cfg_attr(feature = "uniffi", uniffi::export(with_foreign))]
 pub trait LogSink: Send + Sync {
-    fn log(&self, priority: LogPriority, tag: String, message: String);
+    // The acknowledgement is ignored. A bool avoids UniFFI's void* return slot, whose
+    // nullability is inconsistent between generated Kotlin/Native bindings and cinterop for ().
+    fn log(&self, priority: LogPriority, tag: String, message: String) -> bool;
+}
+
+/// Defines a component-local UniFFI log callback and adapts it to this crate's [LogSink].
+///
+/// A final Kotlin/Native binary can contain multiple Rust static libraries that each embed a
+/// differently-featured copy of `kapun-util-rust`. Passing this crate's exported callback trait
+/// into those other libraries is unsound: Apple's linker may resolve the shared callback-vtable
+/// initializer to a different embedded copy than the one that later owns the callback. Keeping
+/// the foreign callback type in the consuming component ensures that its vtable and callback
+/// handler always come from the same native library.
+#[macro_export]
+macro_rules! export_log_sink_bridge {
+    () => {
+        #[cfg_attr(feature = "uniffi", uniffi::export(with_foreign))]
+        pub trait LogSink: Send + Sync {
+            fn log(&self, priority: $crate::log::LogPriority, tag: String, message: String) -> bool;
+        }
+
+        struct LocalLogSink(std::sync::Arc<dyn LogSink>);
+
+        impl $crate::log::LogSink for LocalLogSink {
+            fn log(&self, priority: $crate::log::LogPriority, tag: String, message: String) -> bool {
+                self.0.log(priority, tag, message)
+            }
+        }
+
+        #[cfg_attr(feature = "uniffi", uniffi::export)]
+        pub fn register_log_sink(sink: std::sync::Arc<dyn LogSink>) {
+            $crate::log::register_log_sink(std::sync::Arc::new(LocalLogSink(sink)));
+        }
+
+        #[cfg_attr(feature = "uniffi", uniffi::export)]
+        pub fn clear_log_sink() {
+            $crate::log::clear_log_sink();
+        }
+    };
 }
 
 fn sink_slot() -> &'static Mutex<Option<Arc<dyn LogSink>>> {

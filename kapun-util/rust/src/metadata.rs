@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
-use openid_federation::models::trust_chain::{TrustAnchor, TrustStore};
+use openid_federation::models::trust_chain::{FederationRelation, TrustAnchor, TrustStore};
+use openid_federation::FetchConfig;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -36,15 +37,33 @@ pub async fn fetch_metadata_from_issuer_url(
     url: &str,
     trust_store: Option<Vec<String>>,
 ) -> Result<FederationResult, MetadataFetchError> {
-    let mut res_oidf =
-        match openid_federation::DefaultFederationRelation::new_from_url_async(url).await {
-            Ok(res_oidf) => res_oidf,
-            Err(e) => {
-                return Err(MetadataFetchError::FetchFailed(format!(
-                    "Federation failed with: {e}"
-                )))
-            }
-        };
+    if crate::network::untrusted_tls_allowed() {
+        fetch_metadata_from_issuer_url_with_config::<crate::network::SdkNoVerifyConfig>(
+            url,
+            trust_store,
+        )
+        .await
+    } else {
+        fetch_metadata_from_issuer_url_with_config::<crate::network::SdkDefaultConfig>(
+            url,
+            trust_store,
+        )
+        .await
+    }
+}
+
+async fn fetch_metadata_from_issuer_url_with_config<Config: FetchConfig>(
+    url: &str,
+    trust_store: Option<Vec<String>>,
+) -> Result<FederationResult, MetadataFetchError> {
+    let mut res_oidf = match FederationRelation::<Config>::new_from_url_async(url).await {
+        Ok(res_oidf) => res_oidf,
+        Err(e) => {
+            return Err(MetadataFetchError::FetchFailed(format!(
+                "Federation failed with: {e}"
+            )))
+        }
+    };
     res_oidf.build_trust_async().await.map_err(|e| {
         MetadataFetchError::BuildTrustError(format!("Failed to construct trust: {e}"))
     })?;

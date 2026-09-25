@@ -359,8 +359,21 @@ pub fn check_revocation(cert: &x509_parser::prelude::X509Certificate) -> Result<
         tracing::warn!("CRL no URL");
         return Ok(false);
     };
-    // fetch the revocation list
-    let Ok(mut response) = ureq::get(&uri).call() else {
+    // Fetch the revocation list using the same opt-in TLS policy as the SDK's other Rust
+    // networking paths. Certificate validation remains enabled by default.
+    let mut config = ureq::Agent::config_builder();
+    if let Some(user_agent) = kapun_util_rust::network::user_agent() {
+        config = config.user_agent(user_agent);
+    }
+    if kapun_util_rust::network::untrusted_tls_allowed() {
+        config = config.tls_config(
+            ureq::tls::TlsConfig::builder()
+                .disable_verification(true)
+                .build(),
+        );
+    }
+    let agent = ureq::Agent::new_with_config(config.build());
+    let Ok(mut response) = agent.get(&uri).call() else {
         // failed network requests are ignored
         tracing::warn!("Failed to fetch CRL");
         return Ok(false);

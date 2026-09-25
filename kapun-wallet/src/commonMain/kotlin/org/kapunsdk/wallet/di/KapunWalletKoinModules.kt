@@ -25,13 +25,17 @@ import org.kapunsdk.wallet.process.legacy.di.processesModule
 import org.kapunsdk.wallet.resources.di.resourcesModule
 import org.kapunsdk.wallet.trust.TrustAnchorRepository
 import org.kapunsdk.wallet.DEFAULT_DATABASE_NAME
+import org.kapunsdk.util.network.KapunNetworkConfiguration
 import org.koin.core.KoinApplication
 
-fun KoinApplication.kapunWalletModules(databaseName: String = DEFAULT_DATABASE_NAME) {
+fun KoinApplication.kapunWalletModules(
+	databaseName: String = DEFAULT_DATABASE_NAME,
+	networkConfiguration: KapunNetworkConfiguration = KapunNetworkConfiguration(),
+) {
 	modules(
 		cryptoModule(),
 		databaseModule(databaseName),
-		networkModule(),
+		networkModule(networkConfiguration),
 		keyValueModule(),
 		TrustAnchorRepository.koinModule,
 		resourcesModule(),

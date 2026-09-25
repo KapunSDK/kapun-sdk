@@ -16,6 +16,10 @@ under the License.
 
 package org.kapunsdk.trust
 
+import org.kapunsdk.util.network.KapunNetworkConfiguration
+
 expect class KapunTrust {
 	fun initialize()
+	fun initialize(networkConfiguration: KapunNetworkConfiguration)
+	fun setUntrustedCertificatesAllowed(allow: Boolean)
 }

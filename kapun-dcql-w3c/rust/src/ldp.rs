@@ -415,7 +415,20 @@ async fn retrieve_public_key(
         ));
     }
 
-    let doc = reqwest::get(document_url)
+    let mut client_builder = reqwest::Client::builder();
+    if kapun_util_rust::network::untrusted_tls_allowed() {
+        client_builder = client_builder.danger_accept_invalid_certs(true);
+    }
+    if let Some(user_agent) = kapun_util_rust::network::user_agent() {
+        client_builder = client_builder.user_agent(user_agent);
+    }
+    let client = client_builder
+        .build()
+        .map_err(|e| ProofVerificationError::NetworkError(e.to_string()))?;
+
+    let doc = client
+        .get(document_url)
+        .send()
         .await
         .map_err(|e| ProofVerificationError::NetworkError(e.to_string()))?
         .json::<ControlledIdentifierDocument>()

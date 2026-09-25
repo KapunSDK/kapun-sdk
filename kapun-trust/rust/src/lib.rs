@@ -1,8 +1,20 @@
 use heidi_jwt::jwt::GeneralizedBody;
 use oidcf::models::transformer;
+use oidcf::models::trust_chain::FederationRelation;
 use oidcf::models::{EntityConfig, EntityStatement};
 use openid_federation as oidcf;
-use std::fmt::Display;
+use std::{
+    fmt::Display,
+    sync::atomic::{AtomicBool, Ordering},
+};
+
+static ALLOW_UNTRUSTED_TLS: AtomicBool = AtomicBool::new(false);
+
+#[uniffi::export]
+/// Set the user-agent in this native library's private kapun-util copy.
+pub fn set_user_agent(user_agent: Option<String>) {
+    kapun_util_rust::network::set_user_agent(user_agent);
+}
 
 #[doc(hidden)]
 #[inline(never)]
@@ -56,7 +68,31 @@ pub struct OidcfLeafInfo {
 }
 
 #[uniffi::export]
+/// Allow or reject invalid TLS certificates and hostnames for trust-network requests.
+pub fn set_untrusted_tls(allow: bool) {
+    ALLOW_UNTRUSTED_TLS.store(allow, Ordering::Relaxed);
+    kapun_util_rust::network::set_untrusted_tls(allow);
+}
+
+#[uniffi::export]
 pub fn oidcf_trust_chain_from_url(
+    url: &str,
+    lenient_leaf_entity_config: bool,
+) -> Result<OidcfTrustChainInfo, FederationError> {
+    if ALLOW_UNTRUSTED_TLS.load(Ordering::Relaxed) {
+        oidcf_trust_chain_from_url_with_config::<kapun_util_rust::network::SdkNoVerifyConfig>(
+            url,
+            lenient_leaf_entity_config,
+        )
+    } else {
+        oidcf_trust_chain_from_url_with_config::<kapun_util_rust::network::SdkDefaultConfig>(
+            url,
+            lenient_leaf_entity_config,
+        )
+    }
+}
+
+fn oidcf_trust_chain_from_url_with_config<Config: oidcf::FetchConfig>(
     url: &str,
     lenient_leaf_entity_config: bool,
 ) -> Result<OidcfTrustChainInfo, FederationError> {
@@ -65,7 +101,7 @@ pub fn oidcf_trust_chain_from_url(
     };
 
     let mut trust_chain =
-        oidcf::DefaultFederationRelation::new_from_url(url).map_err(wrap_fetch_error)?;
+        FederationRelation::<Config>::new_from_url(url).map_err(wrap_fetch_error)?;
 
     validate_oidf_trust_chain(&mut trust_chain, lenient_leaf_entity_config)?;
     to_oidf_trust_chain_info(trust_chain, lenient_leaf_entity_config)
@@ -73,6 +109,27 @@ pub fn oidcf_trust_chain_from_url(
 
 #[uniffi::export]
 pub fn oidcf_trust_chain_from_presentation_request(
+    presentation_request_jwt: String,
+    lenient_leaf_entity_config: bool,
+) -> Result<OidcfTrustChainInfo, FederationError> {
+    if ALLOW_UNTRUSTED_TLS.load(Ordering::Relaxed) {
+        oidcf_trust_chain_from_presentation_request_with_config::<
+            kapun_util_rust::network::SdkNoVerifyConfig,
+        >(
+            presentation_request_jwt,
+            lenient_leaf_entity_config,
+        )
+    } else {
+        oidcf_trust_chain_from_presentation_request_with_config::<
+            kapun_util_rust::network::SdkDefaultConfig,
+        >(
+            presentation_request_jwt,
+            lenient_leaf_entity_config,
+        )
+    }
+}
+
+fn oidcf_trust_chain_from_presentation_request_with_config<Config: oidcf::FetchConfig>(
     presentation_request_jwt: String,
     lenient_leaf_entity_config: bool,
 ) -> Result<OidcfTrustChainInfo, FederationError> {
@@ -104,11 +161,11 @@ pub fn oidcf_trust_chain_from_presentation_request(
 
     let mut trust_chain = if let Some(oidf_trust_chain) = oidf_trust_chain {
         dbg!(&oidf_trust_chain);
-        oidcf::DefaultFederationRelation::from_trust_cache(&oidf_trust_chain).or(Err(
+        FederationRelation::<Config>::from_trust_cache(&oidf_trust_chain).or(Err(
             FederationError::ValidationFailed(anyhow::anyhow!("invalid trust_chain")),
         ))?
     } else if let Some(iss) = iss {
-        oidcf::DefaultFederationRelation::new_from_url(&iss).map_err(wrap_fetch_error)?
+        FederationRelation::<Config>::new_from_url(&iss).map_err(wrap_fetch_error)?
     } else {
         return Err(FederationError::FetchingFailed(anyhow::anyhow!(
             "no trust_chain nor iss in presentation request"
@@ -131,8 +188,8 @@ pub fn oidcf_trust_chain_from_presentation_request(
     to_oidf_trust_chain_info(trust_chain, lenient_leaf_entity_config)
 }
 
-fn validate_oidf_trust_chain(
-    trust_chain: &mut oidcf::DefaultFederationRelation,
+fn validate_oidf_trust_chain<Config: oidcf::FetchConfig>(
+    trust_chain: &mut FederationRelation<Config>,
     lenient_leaf_entity_config: bool,
 ) -> Result<(), FederationError> {
     let wrap_validation_error = |e: oidcf::models::errors::FederationError| {
@@ -148,8 +205,8 @@ fn validate_oidf_trust_chain(
     Ok(())
 }
 
-fn to_oidf_trust_chain_info(
-    mut trust_chain: oidcf::DefaultFederationRelation,
+fn to_oidf_trust_chain_info<Config: oidcf::FetchConfig>(
+    mut trust_chain: FederationRelation<Config>,
     lenient_leaf_entity_config: bool,
 ) -> Result<OidcfTrustChainInfo, FederationError> {
     let wrap_validation_error = |e: oidcf::models::errors::FederationError| {

@@ -26,9 +26,45 @@ use crate::{
 
 use super::auth::{ClientAttestation, build_pushed_authorization_request};
 
+use openid_federation::models::trust_chain::FederationRelation;
+use openid_federation::FetchConfig;
 use reqwest::Url;
 use reqwest_middleware::ClientWithMiddleware;
 use serde::{Deserialize, Serialize};
+
+fn federation_metadata<Config: FetchConfig>(
+    credential_issuer_url: &str,
+    metadata_key: &str,
+) -> Option<serde_json::Value> {
+    let mut res_oidf = FederationRelation::<Config>::new_from_url(credential_issuer_url).ok()?;
+    let _ = res_oidf.build_trust();
+    if !res_oidf.verify().is_ok() {
+        return None;
+    }
+
+    res_oidf
+        .resolve_metadata(None)
+        .get(metadata_key)
+        .cloned()
+        .map(Into::into)
+}
+
+fn federation_metadata_for_url(
+    credential_issuer_url: &str,
+    metadata_key: &str,
+) -> Option<serde_json::Value> {
+    if crate::UNSAFE_TLS.load(std::sync::atomic::Ordering::Relaxed) {
+        federation_metadata::<kapun_util_rust::network::SdkNoVerifyConfig>(
+            credential_issuer_url,
+            metadata_key,
+        )
+    } else {
+        federation_metadata::<kapun_util_rust::network::SdkDefaultConfig>(
+            credential_issuer_url,
+            metadata_key,
+        )
+    }
+}
 
 /// Convenienve struct for easier fetching of metadata
 pub struct MetadataFetcher {
@@ -69,28 +105,14 @@ impl MetadataFetcher {
         &self,
         credential_issuer_url: Url,
     ) -> Result<AuthorizationServerMetadata, ApiError> {
-        // try openid-federation
-        //
-        let res_oidf = openid_federation::DefaultFederationRelation::new_from_url(
+        if let Some(authorization_server_metadata) = federation_metadata_for_url(
             credential_issuer_url.as_str(),
-        );
-        if let Ok(mut res_oidf) = res_oidf {
-            let _ = res_oidf.build_trust();
-            let is_valid = res_oidf.verify().is_ok();
-            // TODO: we should pass a trust store here, so we can resolve the correct path
-            let metdata = res_oidf.resolve_metadata(None);
-            if is_valid {
-                if let Some(authorization_server_metadata) =
-                    metdata.get("oauth_authorization_server")
-                {
-                    let authorization_server_metadata: serde_json::Value =
-                        authorization_server_metadata.clone().into();
-                    if let Ok(auth_md) = serde_json::from_value::<AuthorizationServerMetadata>(
-                        authorization_server_metadata,
-                    ) {
-                        return Ok(auth_md);
-                    }
-                }
+            "oauth_authorization_server",
+        ) {
+            if let Ok(auth_md) =
+                serde_json::from_value::<AuthorizationServerMetadata>(authorization_server_metadata)
+            {
+                return Ok(auth_md);
             }
         }
 
@@ -166,27 +188,13 @@ impl MetadataFetcher {
         &self,
         credential_issuer_url: Url,
     ) -> Result<CredentialIssuerMetadata, ApiError> {
-        // try openid-federation
-        let res_oidf = openid_federation::DefaultFederationRelation::new_from_url(
-            credential_issuer_url.as_str(),
-        );
-        if let Ok(mut res_oidf) = res_oidf {
-            let _ = res_oidf.build_trust();
-            let is_valid = res_oidf.verify().is_ok();
-            // TODO: we should pass a trust store here, so we can resolve the correct path
-            let metdata = res_oidf.resolve_metadata(None);
-            if is_valid {
-                if let Some(credential_issuer_metadata) = metdata.get("openid_credential_issuer") {
-                    let credential_issuer_metadata: serde_json::Value =
-                        credential_issuer_metadata.clone().into();
-                    if let Ok(credential_issuer_metadata) =
-                        serde_json::from_value::<CredentialIssuerMetadata>(
-                            credential_issuer_metadata,
-                        )
-                    {
-                        return Ok(credential_issuer_metadata);
-                    }
-                }
+        if let Some(credential_issuer_metadata) =
+            federation_metadata_for_url(credential_issuer_url.as_str(), "openid_credential_issuer")
+        {
+            if let Ok(credential_issuer_metadata) =
+                serde_json::from_value::<CredentialIssuerMetadata>(credential_issuer_metadata)
+            {
+                return Ok(credential_issuer_metadata);
             }
         }
 

@@ -59,19 +59,12 @@ pub mod frost;
 #[cfg(all(feature = "uniffi", feature = "reqwest", feature = "oid4vp"))]
 pub mod hsm;
 
-/// This crate compiles to its own native library, statically linking a private copy of
-/// `kapun_util_rust::log` - registering a sink via `kapun-util`'s own binding only reaches
-/// *that* library, not this one's `log_warn!`/`log_error!`/`log_debug!` call sites. This
-/// forwards to this crate's own linked-in copy of the same registration function, so a host app
-/// can reach it too. See `kapun-util/rust/src/log.rs` for the full explanation.
-#[cfg_attr(feature = "uniffi", uniffi::export)]
-pub fn register_log_sink(sink: std::sync::Arc<dyn kapun_util_rust::log::LogSink>) {
-    kapun_util_rust::log::register_log_sink(sink);
-}
+kapun_util_rust::export_log_sink_bridge!();
 
+/// Set the user-agent in this native library's private kapun-util copy.
 #[cfg_attr(feature = "uniffi", uniffi::export)]
-pub fn clear_log_sink() {
-    kapun_util_rust::log::clear_log_sink();
+pub fn set_user_agent(user_agent: Option<String>) {
+    kapun_util_rust::network::set_user_agent(user_agent);
 }
 
 #[cfg(all(feature = "reqwest", feature = "uniffi"))]
@@ -103,7 +96,9 @@ pub fn get_reqwest_client() -> ClientBuilder {
             client_builder = client_builder.proxy(proxy.clone());
         }
     }
-    client_builder = client_builder.user_agent(APP_USER_AGENT);
+    client_builder = client_builder.user_agent(
+        kapun_util_rust::network::user_agent().unwrap_or_else(|| APP_USER_AGENT.to_string()),
+    );
     client_builder
 }
 #[allow(clippy::unwrap_used)]
@@ -124,6 +119,13 @@ pub mod uniffi_reqwest {
         let _ = TRUSTED_ISSUERS
             .lock()
             .map(|mut a| *a = Arc::new(trusted_issuers));
+    }
+
+    #[cfg_attr(feature = "uniffi", uniffi::export)]
+    /// Allow or reject invalid TLS certificates and hostnames for SDK-owned requests.
+    pub fn set_untrusted_tls(allow: bool) {
+        UNSAFE_TLS.store(allow, std::sync::atomic::Ordering::Relaxed);
+        kapun_util_rust::network::set_untrusted_tls(allow);
     }
 
     #[cfg_attr(feature = "uniffi", uniffi::export)]

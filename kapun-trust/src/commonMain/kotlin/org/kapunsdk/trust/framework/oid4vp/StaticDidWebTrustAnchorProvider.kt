@@ -17,6 +17,7 @@ under the License.
 package org.kapunsdk.trust.framework.oid4vp
 
 import org.kapunsdk.trust.framework.DidWebTrustAnchorProvider
+import org.kapunsdk.trust.di.KapunTrustKoinContext
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
@@ -34,7 +35,7 @@ class StaticDidWebTrustAnchorProvider(
     private val trustedDomains: List<String> = listOf()
 ) : DidWebTrustAnchorProvider {
     private val json = Json { ignoreUnknownKeys = true }
-    private val httpClient = HttpClient()
+    private val httpClient by lazy { KapunTrustKoinContext.koin.get<HttpClient>() }
 
     private fun resolveUrl(kid: String): Url? = runCatching {
         if (!kid.startsWith("did:web")) {

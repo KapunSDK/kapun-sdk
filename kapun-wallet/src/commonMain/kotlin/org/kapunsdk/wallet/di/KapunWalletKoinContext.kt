@@ -19,6 +19,7 @@ import org.koin.core.Koin
 import org.koin.core.KoinApplication
 import org.koin.dsl.koinApplication
 import org.kapunsdk.wallet.DEFAULT_DATABASE_NAME
+import org.kapunsdk.util.network.KapunNetworkConfiguration
 
 internal object KapunWalletKoinContext {
 
@@ -27,11 +28,12 @@ internal object KapunWalletKoinContext {
 
 	fun initialize(
 		databaseName: String = DEFAULT_DATABASE_NAME,
+		networkConfiguration: KapunNetworkConfiguration = KapunNetworkConfiguration(),
 		declaration: KoinApplication.() -> Unit = {},
 	) {
 		koinApp = koinApplication {
 			declaration()
-			kapunWalletModules(databaseName)
+			kapunWalletModules(databaseName, networkConfiguration)
 		}
 		koin = koinApp.koin
 	}

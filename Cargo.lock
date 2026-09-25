@@ -5193,6 +5193,7 @@ name = "kapun-pdf-rust"
 version = "0.1.0"
 dependencies = [
  "fontdb 0.16.2",
+ "kapun-util-rust",
  "tar",
  "time",
  "ttf-parser 0.25.1",
@@ -5302,6 +5303,8 @@ dependencies = [
  "reqwest-middleware 0.2.5",
  "reqwest-retry",
  "reqwest_cookie_store",
+ "rustls 0.21.12",
+ "rustls-pemfile",
  "sdjwt",
  "secret_sharing_and_dkg 0.13.0",
  "security-framework 2.10.0",
@@ -5312,6 +5315,7 @@ dependencies = [
  "sha2 0.10.9",
  "task-local-extensions",
  "tokio",
+ "tokio-rustls 0.24.1",
  "uniffi",
  "uuid",
  "wasm-bindgen",
@@ -5330,6 +5334,7 @@ dependencies = [
  "flate2",
  "josekit",
  "kapun-crypto-provider",
+ "kapun-util-rust",
  "p12 0.6.3 (git+https://github.com/heidiverse/p12.git)",
  "pem",
  "rand 0.8.8",
@@ -6427,7 +6432,6 @@ dependencies = [
 [[package]]
 name = "openid-federation"
 version = "0.1.0"
-source = "git+https://github.com/heidiverse/openid-federation.git?branch=main#e72a506c50e7dc1d759877b897777e5ff4f3c465"
 dependencies = [
  "anyhow",
  "base64 0.22.1",

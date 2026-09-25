@@ -96,6 +96,9 @@ wiremock = "0.6"
 tokio = { features = ["full"], workspace = true }
 lipsum = "0.9.1"
 ed25519-dalek = "2.1.1"
+rustls = "0.21"
+rustls-pemfile = "1"
+tokio-rustls = "0.24"
 
 [features]
 default = [

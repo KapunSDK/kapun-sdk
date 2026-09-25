@@ -80,6 +80,11 @@ debug = false
 # patches signature-proof to not enable pasta curves
 halo2curves = { git = "https://github.com/heidiverse/signature-proof.git" }
 
+# Keep federation fetch behavior under SDK control. The pinned upstream revision does not enable
+# invalid-certificate acceptance for NoVerifyConfig and has no user-agent hook.
+[patch."https://github.com/heidiverse/openid-federation.git"]
+openid-federation = { path = "third_party/openid-federation" }
+
 # next-gen-signatures comes from the same upstream workspace as these crates. Keep one copy of
 # their code and dependency graph in the final native library by using the local workspace crates.
 [patch."https://github.com/heidiverse/zk-bridge-services.git"]
