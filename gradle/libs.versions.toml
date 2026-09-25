@@ -32,7 +32,6 @@ ubique-qrscanner = "1.1.1"
 vanniktech-publish = "0.34.0"
 uniffi-bindgen = "v1.2.3"
 uniffi-plugin = "1.2.3"
-uniffi-runtime = "1.2.2"
 material-icons = "1.7.8"
 
 [libraries]

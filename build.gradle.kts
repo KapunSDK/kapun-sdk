@@ -30,18 +30,7 @@ plugins {
 	alias(libs.plugins.vanniktech.publish) apply false
 }
 
-val uniffiRuntimeVersion = libs.versions.uniffi.runtime.get()
-
 subprojects {
-	configurations.configureEach {
-		resolutionStrategy.eachDependency {
-			if (requested.group == "ch.ubique.uniffi" && requested.name == "runtime") {
-				useVersion(uniffiRuntimeVersion)
-				because("UniFFI runtime 1.2.3 is unavailable from the configured Maven repositories")
-			}
-		}
-	}
-
 	pluginManager.withPlugin("ch.ubique.uniffi.plugin") {
 		extensions.configure<CargoExtension> {
 			// Keep Cargo's shared compilation cache in a visible, dedicated directory.
