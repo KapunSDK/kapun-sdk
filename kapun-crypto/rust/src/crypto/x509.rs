@@ -168,12 +168,32 @@ fn try_extract_p256_key(cert: &x509_parser::certificate::X509Certificate) -> X50
 }
 
 #[uniffi::export]
+fn verify_self_signed(cert: X509Certificate) -> bool {
+    kapun_x509::x509::is_self_signed_user_cert::<_, JosekitCryptoProvider>(cert.original_cert)
+}
+
+#[uniffi::export]
 fn verify_chain(certs: Vec<X509Certificate>) -> bool {
     let chain = certs
         .into_iter()
         .map(|a| a.original_cert)
         .collect::<Vec<_>>();
     kapun_x509::x509::verify_chain::<JosekitCryptoProvider>(chain)
+}
+#[uniffi::export]
+fn verify_chain_with_trust_anchors(
+    certs: Vec<X509Certificate>,
+    trust_anchors: Vec<X509Certificate>,
+) -> bool {
+    let chain = certs
+        .into_iter()
+        .map(|a| a.original_cert)
+        .collect::<Vec<_>>();
+    let trust_anchors = trust_anchors
+        .into_iter()
+        .map(|a| a.original_cert)
+        .collect::<Vec<_>>();
+    kapun_x509::x509::verify_chain_with_trust_anchor::<JosekitCryptoProvider>(chain, trust_anchors)
 }
 
 #[cfg(test)]

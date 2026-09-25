@@ -97,39 +97,107 @@ fn check_self_signed<T: AsRef<[u8]>, Provider: KapunCryptoProvider>(
     }
 }
 
-pub fn verify_chain_at<Provider: KapunCryptoProvider>(
+enum AnchorTrust {
+    Explicit,
+    SelfSigned,
+}
+
+pub fn verify_chain_at_with_trust_anchors<Provider: KapunCryptoProvider>(
     certs: Vec<Vec<u8>>,
     time: ASN1Time,
     #[cfg(feature = "crl")] check_crl: bool,
     check_basic_constraint: bool,
+    trust_store: Option<&Vec<Vec<u8>>>,
 ) -> bool {
+    let Some(last_cert) = certs.last() else {
+        return false;
+    };
+
+    let Some(trust_store) = trust_store else {
+        return verify_chain_at_with_anchor::<Provider>(
+            certs,
+            time,
+            #[cfg(feature = "crl")]
+            check_crl,
+            check_basic_constraint,
+            AnchorTrust::SelfSigned,
+        );
+    };
+
+    if trust_store.contains(last_cert) {
+        return verify_chain_at_with_anchor::<Provider>(
+            certs,
+            time,
+            #[cfg(feature = "crl")]
+            check_crl,
+            check_basic_constraint,
+            AnchorTrust::Explicit,
+        );
+    }
+
+    let Ok((_, last_cert)) = parse_x509_certificate(last_cert) else {
+        return false;
+    };
+
+    // A matching issuer name only identifies candidates; validate each completed chain.
+    trust_store.iter().any(|anchor| {
+        let Ok((_, parsed_anchor)) = parse_x509_certificate(anchor) else {
+            return false;
+        };
+        if !are_x509_name_equal(&last_cert.issuer, &parsed_anchor.subject) {
+            return false;
+        }
+
+        let mut candidate_chain = certs.clone();
+        candidate_chain.push(anchor.clone());
+        verify_chain_at_with_anchor::<Provider>(
+            candidate_chain,
+            time,
+            #[cfg(feature = "crl")]
+            check_crl,
+            check_basic_constraint,
+            AnchorTrust::Explicit,
+        )
+    })
+}
+
+fn verify_chain_at_with_anchor<Provider: KapunCryptoProvider>(
+    certs: Vec<Vec<u8>>,
+    time: ASN1Time,
+    #[cfg(feature = "crl")] check_crl: bool,
+    check_basic_constraint: bool,
+    anchor_trust: AnchorTrust,
+) -> bool {
+    // first certificate is the leaf certificate
+    let mut certs = certs;
+
+    // An explicitly trusted anchor need not be self signed.
+    if matches!(anchor_trust, AnchorTrust::SelfSigned) {
+        let Some(last_cert) = certs.last() else {
+            return false;
+        };
+        if !is_valid_ca::<_, Provider>(last_cert) {
+            tracing::error!("trust anchor MUST be valid");
+            return false;
+        }
+    }
     // a valid chain requires at least two certificates (leaf + issuer)
     if certs.len() < 2 {
         tracing::error!("chain must contain at least two certificates");
         return false;
     }
-    // first certificate is the leaf certificate
-    let mut certs = certs;
+    // This should not move up, as we insert certificates in the case of a trust-chain
     // the last (or rather first) certificate is not an intermediate and is not counted towards the path len
     let total_path_len = certs.len() - 1;
-
-    // check that the last certificate is self signed and valid
-    match certs.last() {
-        Some(last_cert) => {
-            if !is_valid_ca::<_, Provider>(last_cert) {
-                tracing::error!("trust anchor MUST be valid");
-                return false;
-            }
-        }
-        None => return false,
-    }
     let mut prev_cert = certs.pop();
     let mut current_position = 1;
     while let Some(issuer_cert) = prev_cert {
         prev_cert = certs.pop();
         if let Some(subject_cert) = prev_cert.as_ref() {
-            let (_, issuer_cert) =
-                x509_parser::parse_x509_certificate(issuer_cert.as_slice()).unwrap();
+            let Ok((_, issuer_cert)) = x509_parser::parse_x509_certificate(issuer_cert.as_slice())
+            else {
+                return false;
+            };
             let mut logger = VecLogger::default();
             let structure_validity =
                 TbsCertificateStructureValidator.validate(&issuer_cert, &mut logger);
@@ -213,6 +281,22 @@ pub fn verify_chain_at<Provider: KapunCryptoProvider>(
     true
 }
 
+pub fn verify_chain_at<Provider: KapunCryptoProvider>(
+    certs: Vec<Vec<u8>>,
+    time: ASN1Time,
+    #[cfg(feature = "crl")] check_crl: bool,
+    check_basic_constraint: bool,
+) -> bool {
+    verify_chain_at_with_trust_anchors::<Provider>(
+        certs,
+        time,
+        #[cfg(feature = "crl")]
+        check_crl,
+        check_basic_constraint,
+        None,
+    )
+}
+
 pub fn verify_chain<Provider: KapunCryptoProvider>(certs: Vec<Vec<u8>>) -> bool {
     verify_chain_at::<Provider>(
         certs,
@@ -222,6 +306,21 @@ pub fn verify_chain<Provider: KapunCryptoProvider>(certs: Vec<Vec<u8>>) -> bool 
         true,
     )
 }
+
+pub fn verify_chain_with_trust_anchor<Provider: KapunCryptoProvider>(
+    certs: Vec<Vec<u8>>,
+    trust_anchors: Vec<Vec<u8>>,
+) -> bool {
+    verify_chain_at_with_trust_anchors::<Provider>(
+        certs,
+        ASN1Time::now(),
+        #[cfg(feature = "crl")]
+        true,
+        true,
+        Some(&trust_anchors),
+    )
+}
+
 // key usage should be parsable and if present be certSign
 fn is_key_usage_correct(cert: &x509_parser::prelude::X509Certificate) -> bool {
     let Ok(key_usage) = cert.key_usage() else {
@@ -417,9 +516,136 @@ mod tests {
         time::ASN1Time,
     };
 
-    use crate::x509::{is_valid_ca, verify_chain_at};
+    use crate::x509::{is_valid_ca, verify_chain_at, verify_chain_at_with_trust_anchors};
 
     use super::{are_x509_name_equal, verify_chain};
+
+    #[test]
+    /// Test if intermediate can act as an trust anchor
+    fn test_intermediate_trust() {
+        let valid_time = ASN1Time::from_timestamp(1790351645).unwrap();
+        use tracing_subscriber::{EnvFilter, fmt, prelude::*};
+        let _ = tracing_subscriber::registry()
+            .with(fmt::layer())
+            .with(EnvFilter::from_default_env())
+            .try_init();
+        let leaf = pem::parse(include_bytes!("../test-chains/test-trust-anchor/leaf.pem")).unwrap();
+        let intermediate = pem::parse(include_bytes!(
+            "../test-chains/test-trust-anchor/intermediary.pem"
+        ))
+        .unwrap();
+        assert!(verify_chain_at_with_trust_anchors::<JosekitCryptoProvider>(
+            vec![leaf.contents().to_vec()],
+            valid_time,
+            #[cfg(feature = "crl")]
+            true,
+            true,
+            Some(&vec![intermediate.contents().to_vec()])
+        ));
+        assert!(verify_chain_at_with_trust_anchors::<JosekitCryptoProvider>(
+            vec![leaf.contents().to_vec(), intermediate.contents().to_vec()],
+            valid_time,
+            #[cfg(feature = "crl")]
+            true,
+            true,
+            Some(&vec![intermediate.contents().to_vec()])
+        ))
+    }
+
+    #[test]
+    fn test_direct_subca_anchor() {
+        let valid_time = ASN1Time::from_timestamp(1790610000).unwrap();
+        let leaf = pem::parse(include_bytes!("../test-chains/direct-subca/leaf.pem")).unwrap();
+        let intermediate = pem::parse(include_bytes!(
+            "../test-chains/direct-subca/intermediate.pem"
+        ))
+        .unwrap();
+        let subca = pem::parse(include_bytes!("../test-chains/direct-subca/subca.pem")).unwrap();
+        let root = pem::parse(include_bytes!("../test-chains/direct-subca/root.pem")).unwrap();
+
+        let (_, leaf_cert) = x509_parser::parse_x509_certificate(leaf.contents()).unwrap();
+        let (_, intermediate_cert) =
+            x509_parser::parse_x509_certificate(intermediate.contents()).unwrap();
+        let (_, subca_cert) = x509_parser::parse_x509_certificate(subca.contents()).unwrap();
+        let (_, root_cert) = x509_parser::parse_x509_certificate(root.contents()).unwrap();
+
+        // The trusted SubCA has a parent, but that root is absent from the supplied path.
+        assert_ne!(subca_cert.subject, subca_cert.issuer);
+        assert_eq!(subca_cert.issuer, root_cert.subject);
+        assert_eq!(intermediate_cert.issuer, subca_cert.subject);
+        assert_eq!(leaf_cert.issuer, intermediate_cert.subject);
+
+        assert!(verify_chain_at_with_trust_anchors::<JosekitCryptoProvider>(
+            vec![leaf.contents().to_vec(), intermediate.contents().to_vec()],
+            valid_time,
+            #[cfg(feature = "crl")]
+            true,
+            true,
+            Some(&vec![subca.contents().to_vec()]),
+        ));
+    }
+
+    #[test]
+    fn test_same_subject_trust_anchors() {
+        let valid_time = ASN1Time::from_timestamp(1790351645).unwrap();
+        let leaf = pem::parse(include_bytes!("../test-chains/test-trust-anchor/leaf.pem")).unwrap();
+        let valid = pem::parse(include_bytes!(
+            "../test-chains/test-trust-anchor/intermediary.pem"
+        ))
+        .unwrap();
+        let wrong = pem::parse(include_bytes!(
+            "../test-chains/test-trust-anchor/same-subject-wrong-key.pem"
+        ))
+        .unwrap();
+
+        // A matching name identifies candidates; only the signing key validates the leaf.
+        for trust_store in [
+            vec![wrong.contents().to_vec(), valid.contents().to_vec()],
+            vec![valid.contents().to_vec(), wrong.contents().to_vec()],
+        ] {
+            assert!(verify_chain_at_with_trust_anchors::<JosekitCryptoProvider>(
+                vec![leaf.contents().to_vec()],
+                valid_time,
+                #[cfg(feature = "crl")]
+                true,
+                true,
+                Some(&trust_store),
+            ));
+        }
+
+        assert!(
+            !verify_chain_at_with_trust_anchors::<JosekitCryptoProvider>(
+                vec![leaf.contents().to_vec()],
+                valid_time,
+                #[cfg(feature = "crl")]
+                true,
+                true,
+                Some(&vec![wrong.contents().to_vec()]),
+            )
+        );
+    }
+    #[test]
+    /// Test if a broken chain still fails even with trust anchors supplied
+    fn test_broken_chain_is_invalid() {
+        let valid_time = ASN1Time::from_timestamp(1790351645).unwrap();
+        use tracing_subscriber::{EnvFilter, fmt, prelude::*};
+        let _ = tracing_subscriber::registry()
+            .with(fmt::layer())
+            .with(EnvFilter::from_default_env())
+            .try_init();
+        let leaf = pem::parse(include_bytes!("../test-chains/test-trust-anchor/leaf.pem")).unwrap();
+        let root = pem::parse(include_bytes!("../test-chains/test-trust-anchor/root.pem")).unwrap();
+        assert!(
+            !verify_chain_at_with_trust_anchors::<JosekitCryptoProvider>(
+                vec![leaf.contents().to_vec()],
+                valid_time,
+                #[cfg(feature = "crl")]
+                true,
+                true,
+                Some(&vec![root.contents().to_vec()])
+            )
+        )
+    }
 
     #[test]
     /// Tests from https://csrc.nist.gov/Projects/pki-testing/x-509-path-validation-test-suite Version 1.07
@@ -601,6 +827,7 @@ mod tests {
         assert!(verify_chain_at::<JosekitCryptoProvider>(
             chain,
             ASN1Time::from_timestamp(1776845275).unwrap(),
+            #[cfg(feature = "crl")]
             true,
             true
         ));
@@ -613,6 +840,7 @@ mod tests {
         assert!(verify_chain_at::<JosekitCryptoProvider>(
             chain,
             ASN1Time::from_timestamp(1776845275).unwrap(),
+            #[cfg(feature = "crl")]
             true,
             true,
         ));
