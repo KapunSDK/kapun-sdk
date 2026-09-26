@@ -155,3 +155,9 @@ jobs:
           exit_code=$?
           trap - INT TERM
           exit "$exit_code"
+
+      # The normal Android matrix builds 64-bit ABIs. Keep the 32-bit ARM release linker
+      # path covered on every branch push; it is not exercised by the dev-profile build above.
+      - name: Check Android ARMv7 release link
+        if: matrix.platform == 'android'
+        run: ./gradlew :kapun-pdf:cargoBuildArmV7AndroidRelease -PreleaseBuild=true --console=plain

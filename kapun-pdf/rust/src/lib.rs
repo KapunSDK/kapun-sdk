@@ -335,11 +335,10 @@ fn retry<T, E>(mut f: impl FnMut() -> Result<T, E>) -> Result<T, E> {
 }
 
 #[cfg(target_arch = "arm")]
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn __deregister_frame() {}
-
-#[cfg(target_arch = "arm")]
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn __register_frame() {}
+#[used]
+static _KEEP_EH_FRAME_STUBS: [unsafe extern "C" fn(*const u8); 2] = [
+    kapun_util_rust::__register_frame,
+    kapun_util_rust::__deregister_frame,
+];
 
 uniffi::setup_scaffolding!();
