@@ -144,11 +144,11 @@ pub fn decode_cbor(cbor: Vec<u8>) -> Result<Value, CborParseError> {
 // fallbacks allow linking, with reduced fidelity for runtime-generated backtraces.
 #[cfg(target_arch = "arm")]
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __deregister_frame(_fde: *const u8) {}
+pub unsafe extern "C" fn __deregister_frame(_fde: *const core::ffi::c_void) {}
 
 #[cfg(target_arch = "arm")]
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __register_frame(_fde: *const u8) {}
+pub unsafe extern "C" fn __register_frame(_fde: *const core::ffi::c_void) {}
 
 #[cfg(feature = "uniffi")]
 uniffi::setup_scaffolding!();
