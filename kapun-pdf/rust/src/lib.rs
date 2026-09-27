@@ -334,9 +334,9 @@ fn retry<T, E>(mut f: impl FnMut() -> Result<T, E>) -> Result<T, E> {
     }
 }
 
-#[cfg(all(target_arch = "arm", target_os = "android"))]
+#[cfg(target_arch = "arm")]
 #[used]
-static _KEEP_EH_FRAME_STUBS: [unsafe extern "C" fn(*const core::ffi::c_void); 2] = [
+static _KEEP_EH_FRAME_STUBS: [unsafe extern "C" fn(); 2] = [
     kapun_util_rust::__register_frame,
     kapun_util_rust::__deregister_frame,
 ];

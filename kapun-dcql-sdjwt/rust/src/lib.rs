@@ -25,9 +25,9 @@ pub trait SignatureCreator: Send + Sync {
     fn sign(&self, bytes: Vec<u8>) -> Result<Vec<u8>, SigningError>;
 }
 
-#[cfg(all(target_arch = "arm", target_os = "android"))]
+#[cfg(target_arch = "arm")]
 #[used]
-static _KEEP_EH_FRAME_STUBS: [unsafe extern "C" fn(*const core::ffi::c_void); 2] = [
+static _KEEP_EH_FRAME_STUBS: [unsafe extern "C" fn(); 2] = [
     kapun_util_rust::__register_frame,
     kapun_util_rust::__deregister_frame,
 ];

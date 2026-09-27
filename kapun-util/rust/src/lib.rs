@@ -140,15 +140,13 @@ pub fn decode_cbor(cbor: Vec<u8>) -> Result<Value, CborParseError> {
         .map_err(|_| CborParseError::NoCbor)
 }
 
-// Some 32-bit ARM toolchains do not provide frame-registration symbols. These no-op
-// fallbacks allow linking, with reduced fidelity for runtime-generated backtraces.
-#[cfg(all(target_arch = "arm", target_os = "android"))]
+#[cfg(target_arch = "arm")]
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __deregister_frame(_fde: *const core::ffi::c_void) {}
+pub unsafe extern "C" fn __deregister_frame() {}
 
-#[cfg(all(target_arch = "arm", target_os = "android"))]
+#[cfg(target_arch = "arm")]
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __register_frame(_fde: *const core::ffi::c_void) {}
+pub unsafe extern "C" fn __register_frame() {}
 
 #[cfg(feature = "uniffi")]
 uniffi::setup_scaffolding!();
