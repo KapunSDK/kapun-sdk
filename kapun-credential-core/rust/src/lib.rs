@@ -43,7 +43,7 @@ pub fn generate_nonce(length: u64) -> String {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __rust_probestack() {}
 
-#[cfg(target_arch = "arm")]
+#[cfg(all(target_arch = "arm", target_os = "android"))]
 #[used]
 static _KEEP_EH_FRAME_STUBS: [unsafe extern "C" fn(*const core::ffi::c_void); 2] = [
     kapun_util_rust::__register_frame,

@@ -30,7 +30,7 @@ pub fn uniffi_link_anchor() -> u8 {
     3
 }
 
-#[cfg(target_arch = "arm")]
+#[cfg(all(target_arch = "arm", target_os = "android"))]
 #[used]
 static _KEEP_EH_FRAME_STUBS: [unsafe extern "C" fn(*const core::ffi::c_void); 2] = [
     kapun_util_rust::__register_frame,
