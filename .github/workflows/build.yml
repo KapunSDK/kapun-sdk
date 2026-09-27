@@ -156,8 +156,8 @@ jobs:
           trap - INT TERM
           exit "$exit_code"
 
-      # The normal Android matrix builds 64-bit ABIs. Check PDF's 32-bit ARM release link
-      # on every branch push; it is not exercised by the dev-profile build above.
+      # The normal Android matrix builds 64-bit ABIs. Check every SDK module's 32-bit ARM
+      # release link on every branch push; it is not exercised by the dev-profile build above.
       - name: Check Android ARMv7 release link
         if: matrix.platform == 'android'
-        run: ./gradlew :kapun-pdf:cargoBuildArmV7AndroidRelease -PreleaseBuild=true --console=plain
+        run: ./gradlew cargoBuildArmV7AndroidRelease -PreleaseBuild=true --console=plain
