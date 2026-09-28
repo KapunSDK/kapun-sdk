@@ -5,6 +5,10 @@ on:
     branches:
       - "**"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -41,9 +45,6 @@ jobs:
         # GitHub uses sh as the default shell inside a job container; the workflow uses Bash arrays.
         shell: bash
     timeout-minutes: 120
-    concurrency:
-      group: ${{ github.workflow }}-${{ github.ref }}-${{ matrix.platform }}
-      cancel-in-progress: true
     env:
       # Share Cargo's target directory between SDK modules in this job. Keep it outside Gradle's
       # build directory so clean does not delete it.
