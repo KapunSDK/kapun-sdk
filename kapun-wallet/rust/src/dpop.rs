@@ -57,6 +57,10 @@ pub mod models {
         /// algorithm (Message Authentication Code (MAC)).
         pub alg: String,
 
+        /// Swiss Profile Issuance version advertised by the issuer metadata.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub profile_version: Option<String>,
+
         /// Represents the public key chosen by the client in JSON Web Key (JWK)
         /// [RFC7517](https://datatracker.ietf.org/doc/html/rfc7517) format as
         /// defined in [Section 4.1.3](https://rfc-editor.org/rfc/rfc7515#section-4.1.3)
@@ -305,14 +309,19 @@ pub fn create_dpop(
     timestamp: u64,
     access_token: Option<String>,
     nonce: Option<String>,
+    profile_version: Option<String>,
 ) -> anyhow::Result<String> {
     let jwk = serde_json::from_str::<Value>(&secret_key.public_key_jwk())?;
     let alg = secret_key.alg();
-    let header: models::Header = serde_json::from_value(json!({
+    let mut header_json = json!({
         "typ": "dpop+jwt",
         "alg": alg,
         "jwk": jwk,
-    }))?;
+    });
+    if let Some(profile_version) = profile_version {
+        header_json["profile_version"] = json!(profile_version);
+    }
+    let header: models::Header = serde_json::from_value(header_json)?;
 
     let ath = if let Some(token) = access_token {
         let mut hasher = sha2::Sha256::new();
@@ -356,6 +365,7 @@ pub fn create_dpop(
 pub struct DpopAuth {
     native_signer: Arc<dyn NativeSigner>,
     nonce: RwLock<Option<String>>,
+    profile_version: RwLock<Option<String>>,
 }
 
 #[cfg_attr(feature = "uniffi", uniffi::export)]
@@ -366,6 +376,7 @@ impl DpopAuth {
         Self {
             native_signer,
             nonce: RwLock::new(nonce),
+            profile_version: RwLock::new(None),
         }
     }
     /// Return the key reference of the DPoP key. This reference is used to fetch
@@ -384,6 +395,17 @@ impl DpopAuth {
 }
 
 impl DpopAuth {
+    pub(crate) fn set_profile_version(
+        &self,
+        profile_version: Option<String>,
+    ) -> anyhow::Result<()> {
+        *self
+            .profile_version
+            .write()
+            .map_err(|_| anyhow!("could not lock profile version"))? = profile_version;
+        Ok(())
+    }
+
     /// Update the nonce used for authentication
     fn update_nonce(&self, response: &Response) -> bool {
         let Some(dpop_nonce) = response
@@ -440,6 +462,10 @@ impl DpopAuth {
             timestamp.as_secs(),
             auth_header,
             nonce_lock.take(),
+            self.profile_version
+                .read()
+                .map_err(|_| anyhow!("could not lock profile version"))?
+                .clone(),
         ) {
             Ok(dpop) => dpop,
             Err(e) => return Err(e),
@@ -476,7 +502,16 @@ impl Middleware for DpopAuth {
             .unwrap_or(true)
         {
             // replaces authorization header
-            let _ = self.prepare_dpop(&mut req);
+            let dpop = match self.prepare_dpop(&mut req) {
+                Ok(dpop) => dpop,
+                Err(e) => {
+                    return Err(reqwest_middleware::Error::Middleware(anyhow!(
+                        "Could not generate dpop: {e}"
+                    )));
+                }
+            };
+            req.headers_mut()
+                .insert("dpop".parse::<HeaderName>().unwrap(), dpop.parse().unwrap());
             let request_clone = req.try_clone();
             let next_clone = next.clone();
             if let Some(req) = request_clone {
@@ -505,7 +540,7 @@ impl Middleware for DpopAuth {
         };
 
         req.headers_mut()
-            .append("dpop".parse::<HeaderName>().unwrap(), dpop.parse().unwrap());
+            .insert("dpop".parse::<HeaderName>().unwrap(), dpop.parse().unwrap());
         let response = next.run(req, extensions).await;
         let Ok(response) = response else {
             return Err(reqwest_middleware::Error::Middleware(anyhow!(
@@ -550,7 +585,7 @@ impl Middleware for DpopAuth {
 
             request_clone
                 .headers_mut()
-                .append("dpop".parse::<HeaderName>().unwrap(), dpop.parse().unwrap());
+                .insert("dpop".parse::<HeaderName>().unwrap(), dpop.parse().unwrap());
             let response = next_clone.run(request_clone, extensions).await;
             let Ok(response) = response else {
                 return Err(reqwest_middleware::Error::Middleware(anyhow!(
@@ -594,6 +629,7 @@ mod tests {
     use std::net::TcpListener;
     use std::sync::Arc;
 
+    use crate::crypto::b64url_decode_bytes;
     use crate::error::SigningError;
     use crate::issuance::helper::bytes_to_ec_jwk;
     use crate::signing::NativeSigner;
@@ -869,14 +905,19 @@ mod tests {
         let dpop = create_dpop(
             Arc::new(TestSigner(secret_key)),
             "GET".to_string(),
-            "https://example.com/token".to_string(),
+            "https://bcs.admin.ch/bcs-web/issuer-agent/oid4vci/api/token".to_string(),
             0,
             None,
             Some("123".to_string()),
+            Some("swiss-profile-issuance:1.0.0".to_string()),
         )
         .unwrap();
 
-        println!("{dpop}");
+        let header = serde_json::from_slice::<serde_json::Value>(
+            &b64url_decode_bytes(dpop.split('.').next().unwrap()).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(header["profile_version"], "swiss-profile-issuance:1.0.0");
     }
 
     #[test]
@@ -893,6 +934,7 @@ mod tests {
             0,
             Some("token".to_string()),
             Some("123".to_string()),
+            None,
         )
         .unwrap();
 
@@ -908,5 +950,27 @@ mod tests {
             Some(public_key),
         )
         .unwrap();
+    }
+
+    #[test]
+    fn should_omit_profile_version_when_metadata_does_not_advertise_one() {
+        let kp = generate::<P256KeyPair>(None);
+        let secret_key = SecretKey::from_bytes(kp.private_key_bytes().as_slice().into()).unwrap();
+
+        let dpop = create_dpop(
+            Arc::new(TestSigner(secret_key)),
+            "GET".to_string(),
+            "https://example.com/token".to_string(),
+            0,
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+        let header = serde_json::from_slice::<serde_json::Value>(
+            &b64url_decode_bytes(dpop.split('.').next().unwrap()).unwrap(),
+        )
+        .unwrap();
+        assert!(header.get("profile_version").is_none());
     }
 }

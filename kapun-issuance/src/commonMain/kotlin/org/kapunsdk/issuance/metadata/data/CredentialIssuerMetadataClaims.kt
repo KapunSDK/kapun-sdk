@@ -108,6 +108,9 @@ data class CredentialResponseEncryption(
 	@SerialName("enc_values_supported")
 	val encValuesSupported: List<String>,
 
+	@SerialName("zip_values_supported")
+	val zipValuesSupported: List<String>? = null,
+
 	@SerialName("encryption_required")
 	val encryptionRequired: Boolean
 )

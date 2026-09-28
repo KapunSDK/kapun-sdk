@@ -83,6 +83,8 @@ pub struct AuthorizationServerMetadata {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct CredentialIssuerMetadata {
     pub credential_issuer: String,
+    /// Swiss Profile version advertised by the issuer metadata.
+    pub profile_version: Option<String>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub authorization_servers: Vec<String>,
     pub credential_endpoint: String,
@@ -126,6 +128,7 @@ pub struct KeySet {
 pub struct CredentialResponseEncryption {
     pub alg_values_supported: Vec<String>,
     pub enc_values_supported: Vec<String>,
+    pub zip_values_supported: Option<Vec<String>>,
     pub encryption_required: bool,
 }
 
@@ -467,6 +470,8 @@ pub struct CredentialRequest {
 pub struct CredentialResponseEncryptionSpecification {
     pub jwk: josekit::jwk::Jwk,
     pub enc: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub zip: Option<String>,
 }
 
 pub mod credential_formats {
