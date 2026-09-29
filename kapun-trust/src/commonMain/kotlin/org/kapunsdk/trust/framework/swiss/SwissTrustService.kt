@@ -18,7 +18,6 @@ package org.kapunsdk.trust.framework.swiss
 
 import org.kapunsdk.trust.did.DidResolver
 import org.kapunsdk.trust.framework.swiss.dto.IssuanceTrustStatementsDto
-import org.kapunsdk.trust.framework.swiss.dto.VerificationTrustStatementsDto
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.get
@@ -54,14 +53,6 @@ internal class SwissTrustService(
 		}.build()
 
 		return httpClient.get(url).body<IssuanceTrustStatementsDto>()
-	}
-
-	suspend fun getVerificationTrustStatements(baseUrl: String): VerificationTrustStatementsDto {
-		val url = URLBuilder(baseUrl).apply {
-			appendPathSegments(TRUST_STATEMENT_PATH)
-		}.build()
-
-		return httpClient.get(url).body<VerificationTrustStatementsDto>()
 	}
 
 	suspend fun getTrustFromDid(
