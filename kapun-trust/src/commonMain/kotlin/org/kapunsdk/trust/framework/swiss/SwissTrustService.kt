@@ -17,7 +17,6 @@ under the License.
 package org.kapunsdk.trust.framework.swiss
 
 import org.kapunsdk.trust.did.DidResolver
-import org.kapunsdk.trust.framework.swiss.dto.IssuanceTrustStatementsDto
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.get
@@ -40,19 +39,9 @@ internal class SwissTrustService(
 			singleOf(::SwissTrustService)
 		}
 
-		private const val WELL_KNOWN_PATH = "/.well-known"
-		private const val TRUST_STATEMENT_PATH = "$WELL_KNOWN_PATH/trust-statement"
 		private const val TRUST_API_PATH = "/api/v1/truststatements"
 		private const val TRUST_API_V2_NON_COMPLIANCE_PATH = "/api/v2/non-compliance-trust-list"
 		private val DID_REGEX = Regex("did:(tdw|webvh):(?<integrity>[^:]+):(?<domain>[A-z0-9-_.]+)(:(?<path>[^#]+))?(#(?<fragment>.*))?")
-	}
-
-	suspend fun getIssuanceTrustStatements(baseUrl: String): IssuanceTrustStatementsDto {
-		val url = URLBuilder(baseUrl).apply {
-			appendPathSegments(TRUST_STATEMENT_PATH)
-		}.build()
-
-		return httpClient.get(url).body<IssuanceTrustStatementsDto>()
 	}
 
 	suspend fun getTrustFromDid(
