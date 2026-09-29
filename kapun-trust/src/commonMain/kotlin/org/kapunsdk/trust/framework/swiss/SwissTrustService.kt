@@ -69,12 +69,13 @@ internal class SwissTrustService(
 		configuration: SwissTrustConfiguration,
 	): List<String> {
 		return kotlin.runCatching {
-			val apiBaseUrl = deriveTrustStatementApiBaseUrl(did)
+			val normalizedDid = normalizeDid(did)
+			val apiBaseUrl = deriveTrustStatementApiBaseUrl(normalizedDid)
 				?.takeIf { configuration.allowsApiBaseUrl(it) }
 				?: return@runCatching emptyList<String>()
 			val url = URLBuilder(apiBaseUrl).apply {
 				appendPathSegments(TRUST_API_PATH)
-				appendPathSegments(did, encodeSlash = true)
+				appendPathSegments(normalizedDid, encodeSlash = true)
 			}.build()
 
 			val result = httpClient.get(url).bodyAsText()
@@ -103,7 +104,7 @@ internal class SwissTrustService(
 	}
 
 	internal fun deriveTrustStatementApiBaseUrl(did: String): String? {
-		val matches = DID_REGEX.matchEntire(did) ?: return null
+		val matches = DID_REGEX.matchEntire(normalizeDid(did)) ?: return null
 		val domain = matches.groups["domain"]?.value ?: return null
 		val trustRegistryDomain = if (domain.startsWith("identifier-reg.")) {
 			"trust-reg.${domain.removePrefix("identifier-reg.")}"
@@ -115,7 +116,7 @@ internal class SwissTrustService(
 
 	suspend fun getDidDocument(did: String): DidVerificationDocument? {
 		return runCatching {
-			val matches = DID_REGEX.matchEntire(did) ?: return@runCatching null
+			val matches = DID_REGEX.matchEntire(normalizeDid(did)) ?: return@runCatching null
 			val url = matches.groups["domain"]?.value ?: return@runCatching null
 			val path = matches.groups["path"]?.value?.replace(":", "/")?.let {
 				"$it/did.jsonl"
@@ -144,5 +145,8 @@ internal class SwissTrustService(
 			resolver.resolveLatest().doc()
 		}.getOrNull()
 	}
+
+	private fun normalizeDid(value: String): String =
+		value.removePrefix("decentralized_identifier:")
 
 }

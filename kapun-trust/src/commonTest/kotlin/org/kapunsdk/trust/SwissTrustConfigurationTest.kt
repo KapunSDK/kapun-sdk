@@ -36,4 +36,20 @@ class SwissTrustConfigurationTest {
 			httpClient.close()
 		}
 	}
+
+	@Test
+	fun acceptsTheSwissDecentralizedIdentifierClientIdPrefix() {
+		val httpClient = HttpClient()
+		try {
+			val service = SwissTrustService(httpClient)
+			assertEquals(
+				"https://trust-reg.trust-infra.swiyu-int.admin.ch",
+				service.deriveTrustStatementApiBaseUrl(
+					"decentralized_identifier:did:webvh:integrity:identifier-reg.trust-infra.swiyu-int.admin.ch:api:v1:did:issuer"
+				),
+			)
+		} finally {
+			httpClient.close()
+		}
+	}
 }
