@@ -214,12 +214,16 @@ internal class SwissTrustRepository(
 			return@withContext it
 		}
 
-		// check presentation request integrity
-		val presentationDidDoc = trustService.getDidDocument(did = presentationRequest.clientId)
-		if (presentationDidDoc != null && originalRequest != null) {
-			val isTrusted = validateJwtWithDidDocument(originalRequest, presentationDidDoc, true)
+		// The client_id may be an HTTPS verifier URL. For Swiss Profile requests,
+		// the signer DID is identified by the signed request JWT's kid.
+		val request = originalRequest ?: return@withContext null
+		val requestKid = getKidFromJwt(request) ?: return@withContext null
+		val requestDid = normalizeDid(requestKid).substringBefore('#')
+		val presentationDidDoc = trustService.getDidDocument(requestDid)
+		if (presentationDidDoc != null) {
+			val isTrusted = validateJwtWithDidDocument(request, presentationDidDoc, true)
 			val trustedIdentityJwt = trustService
-				.getTrustFromDid(presentationRequest.clientId, configuration)
+				.getTrustFromDid(requestDid, configuration)
 				.firstOrNull()
 			val trustedIdentitySdJwt = trustedIdentityJwt?.let { SdJwt.parse(it) }
 
