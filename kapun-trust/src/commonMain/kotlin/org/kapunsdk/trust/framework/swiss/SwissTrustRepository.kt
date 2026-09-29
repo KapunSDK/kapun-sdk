@@ -16,7 +16,6 @@ under the License.
 
 package org.kapunsdk.trust.framework.swiss
 
-import org.kapunsdk.credentials.SdJwt
 import org.kapunsdk.issuance.metadata.data.CredentialIssuerMetadata
 import org.kapunsdk.presentation.request.PresentationRequest
 import org.kapunsdk.trust.framework.swiss.model.TrustData
@@ -27,9 +26,7 @@ import org.kapunsdk.trust.framework.swiss.model.IdentityTrustStatement
 import org.kapunsdk.trust.framework.swiss.model.NonComplianceTrustListStatement
 import org.kapunsdk.trust.framework.swiss.model.ProtectedVerificationAuthorizationTrustStatement
 import org.kapunsdk.trust.framework.swiss.model.TrustedIdentity
-import org.kapunsdk.trust.framework.swiss.model.TrustedIdentityV2
 import org.kapunsdk.trust.framework.swiss.model.VerificationQueryPublicStatement
-import org.kapunsdk.trust.framework.swiss.model.fromV2
 import org.kapunsdk.trust.framework.swiss.allowsApiBaseUrl
 import org.kapunsdk.trust.framework.swiss.allowsStatementIssuer
 import org.kapunsdk.trust.di.KapunTrustKoinComponent
@@ -38,7 +35,6 @@ import org.kapunsdk.trust.model.AgentType
 import org.kapunsdk.trust.revocation.RevocationCheck
 import org.kapunsdk.util.extensions.asString
 import org.kapunsdk.util.extensions.get
-import org.kapunsdk.util.extensions.transform
 import io.ktor.http.Url
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
@@ -146,35 +142,28 @@ internal class SwissTrustRepository(
 		val presentationDidDoc = trustService.getDidDocument(requestDid)
 		if (presentationDidDoc != null) {
 			val isTrusted = validateJwtWithDidDocument(request, presentationDidDoc, true)
-			val trustedIdentityJwt = trustService
-				.getTrustFromDid(requestDid, configuration)
-				.firstOrNull()
-			val trustedIdentitySdJwt = trustedIdentityJwt?.let { SdJwt.parse(it) }
-
-			val signerDid = trustedIdentitySdJwt
-				?.let { getKidFromJwt(it.innerJwt.originalJwt) }
-				?.let(::normalizeDid)
-				?.substringBefore('#')
-			val didDoc = signerDid?.let { trustService.getDidDocument(it) }
-			val isVerified = if (trustedIdentitySdJwt != null && didDoc != null) {
-				validateJwtWithDidDocument(trustedIdentitySdJwt.innerJwt.originalJwt, didDoc, true)
-			} else {
-				null
-			}
-			val trustedIdentity: TrustedIdentityV2? = if (isVerified == true) {
-				trustedIdentitySdJwt?.innerJwt?.claims?.transform<TrustedIdentityV2>()
-			} else {
-				null
+			var trustedIdentity: ValidatedStatement<IdentityTrustStatement>? = null
+			for (statement in trustService.getTrustFromDid(requestDid, configuration)) {
+				if (statementType(statement) != IDENTITY_TRUST_STATEMENT_TYPE) continue
+				trustedIdentity = validateStatement(
+					statement,
+					IDENTITY_TRUST_STATEMENT_TYPE,
+					requestDid,
+					configuration,
+				) {
+					json.decodeFromString<IdentityTrustStatement>(it)
+				}
+				if (trustedIdentity != null) break
 			}
 			if (trustedIdentity != null) {
 				return@withContext TrustData.Verification(
 					baseUrl = baseUrl,
-					identity = TrustedIdentity.fromV2(trustedIdentity),
-					identityJwt = trustedIdentityJwt,
+					identity = trustedIdentityFromStatement(trustedIdentity),
+					identityJwt = trustedIdentity.jwt,
 					verification = null,
 					verificationJwt = null,
 					isTrusted = isTrusted,
-					isVerified = isVerified == true
+					isVerified = true
 				)
 			}
 		}
