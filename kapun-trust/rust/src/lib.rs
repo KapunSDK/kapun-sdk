@@ -115,17 +115,11 @@ pub fn oidcf_trust_chain_from_presentation_request(
     if ALLOW_UNTRUSTED_TLS.load(Ordering::Relaxed) {
         oidcf_trust_chain_from_presentation_request_with_config::<
             kapun_util_rust::network::SdkNoVerifyConfig,
-        >(
-            presentation_request_jwt,
-            lenient_leaf_entity_config,
-        )
+        >(presentation_request_jwt, lenient_leaf_entity_config)
     } else {
         oidcf_trust_chain_from_presentation_request_with_config::<
             kapun_util_rust::network::SdkDefaultConfig,
-        >(
-            presentation_request_jwt,
-            lenient_leaf_entity_config,
-        )
+        >(presentation_request_jwt, lenient_leaf_entity_config)
     }
 }
 
@@ -165,6 +159,13 @@ fn oidcf_trust_chain_from_presentation_request_with_config<Config: oidcf::FetchC
             FederationError::ValidationFailed(anyhow::anyhow!("invalid trust_chain")),
         ))?
     } else if let Some(iss) = iss {
+        // OIDC Federation resolves the issuer as an HTTP(S) entity identifier. Swiss
+        // Profile requests may use a DID issuer instead, for example
+        // `decentralized_identifier:did:webvh:...`. Passing that value to the
+        // federation URL resolver makes it interpret the nested `did:` component as
+        // a network host and results in errors such as "unable to resolve host 'did'".
+        // Let the DID/Swiss trust framework handle those requests instead.
+        federation_issuer_url(&iss)?;
         FederationRelation::<Config>::new_from_url(&iss).map_err(wrap_fetch_error)?
     } else {
         return Err(FederationError::FetchingFailed(anyhow::anyhow!(
@@ -186,6 +187,17 @@ fn oidcf_trust_chain_from_presentation_request_with_config<Config: oidcf::FetchC
         .map_err(wrap_validation_error)?;
 
     to_oidf_trust_chain_info(trust_chain, lenient_leaf_entity_config)
+}
+
+fn federation_issuer_url(issuer: &str) -> Result<reqwest::Url, FederationError> {
+    let url = reqwest::Url::parse(issuer)
+        .map_err(|e| FederationError::FetchingFailed(anyhow::anyhow!(e)))?;
+    if !matches!(url.scheme(), "http" | "https") || url.host_str().is_none() {
+        return Err(FederationError::FetchingFailed(anyhow::anyhow!(
+            "OIDC Federation issuer is not an HTTP(S) entity identifier"
+        )));
+    }
+    Ok(url)
 }
 
 fn validate_oidf_trust_chain<Config: oidcf::FetchConfig>(
@@ -274,6 +286,25 @@ fn as_vec_string(v: &serde_json::Value) -> Option<Vec<String>> {
             .map(|s| s.to_string())
             .collect()
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::federation_issuer_url;
+
+    #[test]
+    fn rejects_did_issuer_from_url_based_federation_resolution() {
+        assert!(
+            federation_issuer_url("decentralized_identifier:did:webvh:example.com:verifier")
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn accepts_http_issuer_for_federation_resolution() {
+        let url = federation_issuer_url("https://verifier.example.com").unwrap();
+        assert_eq!(url.host_str(), Some("verifier.example.com"));
+    }
 }
 
 fn to_leaf_info(

@@ -5,7 +5,7 @@ use std::{
 
 use anyhow::bail;
 use base64::{Engine, prelude::BASE64_URL_SAFE_NO_PAD};
-use kapun_util_rust::{log_debug, log_warn, value::Value};
+use kapun_util_rust::{log_debug, log_warn};
 use reqwest::Url;
 use reqwest_middleware::ClientWithMiddleware;
 
@@ -22,6 +22,7 @@ use crate::{
 };
 
 const DID_JWK_BINDING_METHOD: &str = "did:jwk";
+const DPOP_NO_AUTO_RETRY_HEADER: &str = "x-kapun-dpop-no-auto-retry";
 
 pub async fn get_access_token(
     client: Arc<ClientWithMiddleware>,
@@ -103,64 +104,17 @@ pub async fn get_proof_body(
 }
 
 pub fn get_correct_credential_request(
-    credential_issuer_metadata: &CredentialIssuerMetadata,
     credential_configuration_id: String,
     credential_response_encryption: Option<CredentialResponseEncryptionSpecification>,
-    selected_configuration_format: &Value,
     proofs: CredentialProofs,
 ) -> CredentialRequest {
-    // Backwards compatibility hack to only send appropriate fields in request:
-    // No surefire way to find out which version, but draft 15 compatible issuer will very
-    // likely have a nonce endpoint.
-    let is_openid4vci_draft15_issuer = credential_issuer_metadata.nonce_endpoint.is_some();
-    if is_openid4vci_draft15_issuer {
-        // we also can use proofs ..
-        return CredentialRequest {
-            credential_configuration_id: Some(credential_configuration_id),
-            credential_format: None,
-            proof: proofs,
-            credential_response_encryption,
-            //TODO: Implement credential_identifier
-            credential_identifier: None,
-        };
-    } else {
-        // if we are before 15 we for sure only have proof. so we skip "batches"
-        let proof = {
-            let CredentialProofs::Proofs(p) = proofs else {
-                // we fallback to the proof as we are requesting one proof (or none)
-                return CredentialRequest {
-                    credential_configuration_id: None,
-                    credential_format: Some(selected_configuration_format.clone()),
-                    proof: proofs,
-                    credential_response_encryption: credential_response_encryption.clone(),
-                    //TODO: Implement credential_identifier
-                    credential_identifier: None,
-                };
-            };
-            let proof = match p {
-                KeyProofsType::Jwt(items) => CredentialProofs::Proof(Some(KeyProofType::Jwt {
-                    jwt: items[0].clone(),
-                })),
-                KeyProofsType::Cwt(items) => CredentialProofs::Proof(Some(KeyProofType::Cwt {
-                    cwt: items[0].clone(),
-                })),
-                KeyProofsType::Attestation(items) => {
-                    CredentialProofs::Proof(Some(KeyProofType::Attestation {
-                        attestation: items[0].clone(),
-                    }))
-                }
-            };
-            proof
-        };
-        return CredentialRequest {
-            credential_configuration_id: None,
-            credential_format: Some(selected_configuration_format.clone()),
-            proof: proof,
-            credential_response_encryption: credential_response_encryption.clone(),
-            //TODO: Implement credential_identifier
-            credential_identifier: None,
-        };
-    };
+    CredentialRequest {
+        credential_configuration_id: Some(credential_configuration_id),
+        proof: proofs,
+        credential_response_encryption,
+        //TODO: Implement credential_identifier
+        credential_identifier: None,
+    }
 }
 
 pub async fn get_credential_with_proofs(
@@ -168,7 +122,6 @@ pub async fn get_credential_with_proofs(
     credential_issuer_metadata: CredentialIssuerMetadata,
     access_token: String,
     credential_configuration_id: String,
-    credential_format: Value,
     content_encryptor: Option<Box<dyn ContentEncryptor>>,
     content_decryptor: Option<Box<dyn ContentDecryptor>>,
     proofs: CredentialProofs,
@@ -181,10 +134,8 @@ pub async fn get_credential_with_proofs(
     };
 
     let credential_request = get_correct_credential_request(
-        &credential_issuer_metadata,
         credential_configuration_id,
         credential_response_encryption,
-        &credential_format,
         proofs,
     );
 
@@ -211,6 +162,7 @@ pub async fn get_credential_with_proofs(
         client
             .post(credential_issuer_metadata.credential_endpoint.clone())
             .header("Content-Type", "application/jwt")
+            .header(DPOP_NO_AUTO_RETRY_HEADER, "true")
             .bearer_auth(access_token.clone())
             .body(credential_request)
             .send()
@@ -226,6 +178,7 @@ pub async fn get_credential_with_proofs(
     } else {
         client
             .post(credential_issuer_metadata.credential_endpoint.clone())
+            .header(DPOP_NO_AUTO_RETRY_HEADER, "true")
             .bearer_auth(access_token.clone())
             .json(&credential_request)
             .send()
@@ -280,7 +233,6 @@ pub async fn get_credential(
     access_token: String,
     c_nonce: Option<String>,
     credential_configuration_id: String,
-    credential_format: Value,
     content_encryptor: Option<Box<dyn ContentEncryptor>>,
     content_decryptor: Option<Box<dyn ContentDecryptor>>,
     client_id: String,
@@ -350,12 +302,33 @@ pub async fn get_credential(
         credential_issuer_metadata,
         access_token,
         credential_configuration_id,
-        credential_format,
         content_encryptor,
         content_decryptor,
         credential_proofs,
     )
     .await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn credential_request_uses_only_the_modern_request_shape() {
+        let request = get_correct_credential_request(
+            "example-credential".to_string(),
+            None,
+            CredentialProofs::NoProof,
+        );
+        let request = serde_json::to_value(request).expect("credential request serializes");
+
+        assert_eq!(
+            request.get("credential_configuration_id"),
+            Some(&serde_json::Value::String("example-credential".to_string()))
+        );
+        assert!(!request.as_object().unwrap().contains_key("format"));
+        assert!(!request.as_object().unwrap().contains_key("credential_format"));
+    }
 }
 
 pub async fn try_get_deferred_credential(

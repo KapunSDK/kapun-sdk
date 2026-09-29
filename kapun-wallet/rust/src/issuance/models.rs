@@ -460,10 +460,6 @@ pub struct CredentialRequest {
     pub proof: CredentialProofs,
     pub credential_identifier: Option<String>,
     pub credential_response_encryption: Option<CredentialResponseEncryptionSpecification>,
-    // Format and the format-specific parameters are only kept for backwards compatibility with
-    // pre-draft15 issuers. Remove.
-    #[serde(flatten)]
-    pub credential_format: Option<Value>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
@@ -692,6 +688,7 @@ impl ErrorAsCredentialErrorResponse for reqwest::Response {
         if let Err(err_status) = self.error_for_status_ref() {
             let status = self.status();
             if status.is_client_error() {
+                let has_dpop_nonce = self.headers().contains_key("dpop-nonce");
                 let body = self.text().await.map_err(|e| CredentialErrorResponse {
                     error: "no_credential_error_response".to_string(),
                     error_description: Some(format!("Failed to read response body: {e}")),
@@ -701,6 +698,14 @@ impl ErrorAsCredentialErrorResponse for reqwest::Response {
 
                 match serde_json::from_str::<CredentialErrorResponse>(&body) {
                     Ok(details) => Err(details),
+                    Err(e) if has_dpop_nonce => Err(CredentialErrorResponse {
+                        error: "use_dpop_nonce".to_string(),
+                        error_description: Some(format!(
+                            "Failed to parse response error: {e}\n\nResponse body: {body}"
+                        )),
+                        c_nonce: None,
+                        c_nonce_expires_in: None,
+                    }),
                     Err(e) => Err(CredentialErrorResponse {
                         error: "no_credential_error_response".to_string(),
                         error_description: Some(format!(
