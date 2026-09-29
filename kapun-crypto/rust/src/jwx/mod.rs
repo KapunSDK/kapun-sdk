@@ -211,12 +211,26 @@ impl TryFrom<&KapunValue> for EncryptionParameters {
     type Error = JweError;
 
     fn try_from(value: &KapunValue) -> Result<Self, Self::Error> {
-        let jwks: serde_json::Value = value
+        let mut jwks: serde_json::Value = value
             .get("jwks")
             .ok_or_else(|| invalid("No jwks in encryption metadata"))?
             .to_owned()
             .transform()
             .ok_or_else(|| invalid("Failed to transform jwks"))?;
+
+        // Some verifiers serialize optional JWK members as JSON null instead
+        // of omitting them (for example `use`, or RSA-only `n`/`e` on an EC
+        // key). josekit correctly rejects null for typed JWK parameters, so
+        // remove only those null-valued optional members before parsing. The
+        // JWK parser still validates all required members and their types.
+        if let Some(keys) = jwks.get_mut("keys").and_then(|keys| keys.as_array_mut()) {
+            for key in keys {
+                if let Some(key) = key.as_object_mut() {
+                    key.retain(|_, value| !value.is_null());
+                }
+            }
+        }
+
         let jwks = JwkSet::from_map(
             jwks.as_object()
                 .ok_or_else(|| invalid("jwks is not a JSON object"))?
@@ -460,6 +474,31 @@ fn operation(reason: impl Into<String>) -> JweError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn accepts_null_optional_jwk_parameters() {
+        let metadata: KapunValue = serde_json::json!({
+            "jwks": {
+                "keys": [{
+                    "kty": "EC",
+                    "kid": "e73888de-0eaf-44b4-8fb6-ee73aaf88c1f",
+                    "use": null,
+                    "alg": "ECDH-ES",
+                    "n": null,
+                    "e": null,
+                    "crv": "P-256",
+                    "x": "nEHGT6HADzzHuJwrf073Qln-zqmt4kTEUFpBNfqtHUg",
+                    "y": "6Pwzf2Z-TE5BLCPZ_FTEkcBYVwKCGnqmmE6CXkyg2UM"
+                }]
+            }
+        })
+        .into();
+
+        let parameters = EncryptionParameters::try_from(&metadata).unwrap();
+        assert_eq!(parameters.jwk.key_type(), "EC");
+        assert_eq!(parameters.jwk.algorithm(), Some("ECDH-ES"));
+        assert_eq!(parameters.authorization_encrytped_response_alg, "ECDH-ES");
+    }
 
     #[test]
     fn ecdh_round_trip_with_compression() {
