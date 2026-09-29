@@ -105,6 +105,40 @@ mod issuance {
         }
     }
 
+    async fn build_batch_credential_proofs(
+        subjects: Vec<Arc<SecureSubject>>,
+        credential_issuer_metadata: CredentialIssuerMetadata,
+        credential_configuration_id: String,
+        c_nonce: Option<String>,
+        client_id: String,
+        is_for_pre_authorized: bool,
+        batch_subject: &dyn BatchSigner,
+    ) -> Result<CredentialProofs, ApiError> {
+        let proof_bodies = get_proof_body(
+            subjects,
+            credential_issuer_metadata,
+            credential_configuration_id,
+            c_nonce,
+            client_id,
+            is_for_pre_authorized,
+        )
+        .await
+        .map_err(|e| anyhow::anyhow!("failed to get proof: {e}"))?;
+        let proof_signatures = batch_subject
+            .batch_sign(proof_bodies.clone())
+            .map_err(|e| anyhow::anyhow!("failed to get cred: {e}"))?;
+        let proofs = proof_bodies
+            .into_iter()
+            .zip(proof_signatures.into_iter())
+            .map(|(body, signature)| {
+                let signature_encoded = base64_encode_bytes(&signature);
+                format!("{body}.{signature_encoded}")
+            })
+            .collect::<Vec<_>>();
+
+        Ok(CredentialProofs::Proofs(KeyProofsType::Jwt(proofs)))
+    }
+
     fn swiss_profile_compression(
         profile_version: Option<&str>,
         zip_values_supported: Option<&Vec<String>>,
@@ -340,6 +374,25 @@ mod issuance {
             } else {
                 Err(anyhow::anyhow!("failed to get nonce:").into())
             }
+        }
+
+        async fn request_fresh_nonce(
+            &self,
+            error: &CredentialErrorResponse,
+            fallback_c_nonce: Option<String>,
+            subjects: &Vec<Arc<SecureSubject>>,
+            cred_issuer_meta: &CredentialIssuerMetadata,
+            client: Arc<ClientWithMiddleware>,
+        ) -> Result<Option<String>, ApiError> {
+            if error.c_nonce.is_some() {
+                return Ok(error.c_nonce.clone());
+            }
+            if cred_issuer_meta.nonce_endpoint.is_some() {
+                return self
+                    .request_nonce(None, subjects, cred_issuer_meta, client)
+                    .await;
+            }
+            Ok(fallback_c_nonce)
         }
     }
     #[uniffi::export(async_runtime = "tokio")]
@@ -648,27 +701,16 @@ mod issuance {
             let Some(access_token) = device_bound_tokens.access_token.as_ref() else {
                 return Err(anyhow!("No accesstoken").into());
             };
-            let proof_bodys = get_proof_body(
+            let proofs = build_batch_credential_proofs(
                 subjects.clone(),
                 cred_issuer_meta.clone(),
                 credential_configuration_id.clone(),
                 device_bound_tokens.c_nonce.clone(),
                 self.oidc_settings.client_id.clone(),
                 is_for_pre_authorized_code,
+                batch_subject.as_ref(),
             )
-            .await
-            .map_err(|e| anyhow::anyhow!("failed to get proof: {e}"))?;
-            let proof_signatures = batch_subject
-                .batch_sign(proof_bodys.clone())
-                .map_err(|e| anyhow::anyhow!("failed to get cred: {e}"))?;
-            let proofs = proof_bodys
-                .into_iter()
-                .zip(proof_signatures.into_iter())
-                .map(|(body, signature)| {
-                    let signature_encoded = base64_encode_bytes(&signature);
-                    format!("{body}.{signature_encoded}")
-                })
-                .collect::<Vec<_>>();
+            .await?;
 
             let credential = match get_credential_with_proofs(
                 dpop_client.clone(),
@@ -678,32 +720,92 @@ mod issuance {
                 credential_configuration.credential_format.clone(),
                 None,
                 None,
-                CredentialProofs::Proofs(KeyProofsType::Jwt(proofs.clone())),
+                proofs,
             )
             .await
             {
                 Ok(c) => c,
-                Err(_) => {
-                    let mut cred_issuer_meta = cred_issuer_meta.clone();
-                    // hacky workaround to try old RFC
-                    cred_issuer_meta.nonce_endpoint = None;
+                Err(e) => {
+                    if !should_retry_credential_request(&e) {
+                        return Err(anyhow::anyhow!(
+                            "failed to get cred (get_batch_credentials_with_dpop): {e:?}"
+                        )
+                        .into());
+                    }
+                    let retry_c_nonce = self
+                        .request_fresh_nonce(
+                            &e,
+                            device_bound_tokens.c_nonce.clone(),
+                            &subjects,
+                            &cred_issuer_meta,
+                            dpop_client.clone(),
+                        )
+                        .await?;
+                    let retry_proofs = build_batch_credential_proofs(
+                        subjects.clone(),
+                        cred_issuer_meta.clone(),
+                        credential_configuration_id.clone(),
+                        retry_c_nonce.clone(),
+                        self.oidc_settings.client_id.clone(),
+                        is_for_pre_authorized_code,
+                        batch_subject.as_ref(),
+                    )
+                    .await?;
 
-                    get_credential_with_proofs(
-                        dpop_client,
+                    match get_credential_with_proofs(
+                        dpop_client.clone(),
                         cred_issuer_meta.clone(),
                         access_token.clone(),
                         credential_configuration_id.clone(),
                         credential_configuration.credential_format.clone(),
                         None,
                         None,
-                        CredentialProofs::Proofs(KeyProofsType::Jwt(proofs)),
+                        retry_proofs,
                     )
                     .await
-                    .map_err(|e| {
-                        anyhow::anyhow!(
-                            "failed to get cred (get_batch_credentials_with_dpop): {e:?}"
-                        )
-                    })?
+                    {
+                        Ok(c) => c,
+                        Err(second_error) => {
+                            if !should_retry_credential_request(&second_error) {
+                                return Err(anyhow::anyhow!(
+                                    "failed to get cred (get_batch_credentials_with_dpop): {second_error:?}"
+                                )
+                                .into());
+                            }
+                            let mut legacy_issuer_meta = cred_issuer_meta.clone();
+                            legacy_issuer_meta.nonce_endpoint = None;
+                            let legacy_c_nonce = second_error
+                                .c_nonce
+                                .or(retry_c_nonce)
+                                .or(device_bound_tokens.c_nonce.clone());
+                            let legacy_proofs = build_batch_credential_proofs(
+                                subjects.clone(),
+                                legacy_issuer_meta.clone(),
+                                credential_configuration_id.clone(),
+                                legacy_c_nonce,
+                                self.oidc_settings.client_id.clone(),
+                                is_for_pre_authorized_code,
+                                batch_subject.as_ref(),
+                            )
+                            .await?;
+                            get_credential_with_proofs(
+                                dpop_client,
+                                legacy_issuer_meta,
+                                access_token.clone(),
+                                credential_configuration_id.clone(),
+                                credential_configuration.credential_format.clone(),
+                                None,
+                                None,
+                                legacy_proofs,
+                            )
+                            .await
+                            .map_err(|e| {
+                                anyhow::anyhow!(
+                                    "failed to get cred (get_batch_credentials_with_dpop): {e:?}"
+                                )
+                            })?
+                        }
+                    }
                 }
             };
 
@@ -991,7 +1093,7 @@ mod issuance {
                 subjects.clone(),
                 cred_issuer_meta.clone(),
                 access_token.clone(),
-                c_nonce,
+                c_nonce.clone(),
                 credential_configuration_id.clone(),
                 credential_configuration.credential_format.clone(),
                 None,
@@ -1002,23 +1104,25 @@ mod issuance {
             .await
             {
                 Ok(c) => c,
-                Err(_) => {
-                    let c_nonce = self
-                        .request_nonce(
-                            device_bound_tokens.c_nonce.clone(),
+                Err(e) => {
+                    if !should_retry_credential_request(&e) {
+                        return Err(anyhow::anyhow!("failed to get cred: {e:?}").into());
+                    }
+                    let retry_c_nonce = self
+                        .request_fresh_nonce(
+                            &e,
+                            c_nonce.clone(),
                             &subjects,
                             &cred_issuer_meta,
                             dpop_client.clone(),
                         )
                         .await?;
-                    let mut cred_issuer_meta = cred_issuer_meta.clone();
-                    cred_issuer_meta.nonce_endpoint = None;
-                    get_credential(
+                    match get_credential(
                         dpop_client.clone(),
                         subjects.clone(),
                         cred_issuer_meta.clone(),
                         access_token.clone(),
-                        c_nonce,
+                        retry_c_nonce.clone(),
                         credential_configuration_id.clone(),
                         credential_configuration.credential_format.clone(),
                         None,
@@ -1027,7 +1131,38 @@ mod issuance {
                         is_for_pre_authorized_code,
                     )
                     .await
-                    .map_err(|e| anyhow::anyhow!("failed to get cred: {e:?}"))?
+                    {
+                        Ok(c) => c,
+                        Err(second_error) => {
+                            if !should_retry_credential_request(&second_error) {
+                                return Err(anyhow::anyhow!(
+                                    "failed to get cred: {second_error:?}"
+                                )
+                                .into());
+                            }
+                            let mut legacy_issuer_meta = cred_issuer_meta.clone();
+                            legacy_issuer_meta.nonce_endpoint = None;
+                            let legacy_c_nonce = second_error
+                                .c_nonce
+                                .or(retry_c_nonce)
+                                .or(device_bound_tokens.c_nonce.clone());
+                            get_credential(
+                                dpop_client,
+                                subjects.clone(),
+                                legacy_issuer_meta,
+                                access_token.clone(),
+                                legacy_c_nonce,
+                                credential_configuration_id.clone(),
+                                credential_configuration.credential_format.clone(),
+                                None,
+                                None,
+                                self.oidc_settings.client_id.clone(),
+                                is_for_pre_authorized_code,
+                            )
+                            .await
+                            .map_err(|e| anyhow::anyhow!("failed to get cred: {e:?}"))?
+                        }
+                    }
                 }
             };
             let c_nonce = credential.c_nonce.clone();
@@ -2287,30 +2422,24 @@ mod issuance {
                                 )
                             );
 
-                            let mut credential_issuer_metadata = credential_issuer_metadata.clone();
-                            credential_issuer_metadata.nonce_endpoint = None;
-
                             if content_encryptor.is_none() {
                                 content_decryptor = None
                             }
-                            let c_nonce = if let Some(nonce) = e.c_nonce {
-                                Some(nonce)
-                            } else {
-                                self.request_nonce(
-                                    token_response.c_nonce.clone(),
+                            let retry_c_nonce = self
+                                .request_fresh_nonce(
+                                    &e,
+                                    c_nonce.clone(),
                                     &subjects,
                                     &credential_issuer_metadata,
                                     client.clone(),
                                 )
-                                .await?
-                            };
-
-                            get_credential(
-                                client,
-                                subjects,
+                                .await?;
+                            match get_credential(
+                                client.clone(),
+                                subjects.clone(),
                                 credential_issuer_metadata.clone(),
                                 token_response.access_token.clone(),
-                                c_nonce,
+                                retry_c_nonce.clone(),
                                 credential_configuration_id.clone(),
                                 credential_format.clone(),
                                 content_encryptor.as_ref().map(|a| a.clone_inner()),
@@ -2319,7 +2448,40 @@ mod issuance {
                                 is_for_pre_authorized_code,
                             )
                             .await
-                            .map_err(|e| anyhow::anyhow!("failed to get cred: {e:?}"))?
+                            {
+                                Ok(c) => c,
+                                Err(second_error) => {
+                                    if !should_retry_credential_request(&second_error) {
+                                        return Err(anyhow::anyhow!(
+                                            "failed to get cred: {second_error:?}"
+                                        )
+                                        .into());
+                                    }
+                                    let mut legacy_issuer_metadata =
+                                        credential_issuer_metadata.clone();
+                                    legacy_issuer_metadata.nonce_endpoint = None;
+                                    let legacy_c_nonce = second_error
+                                        .c_nonce
+                                        .or(retry_c_nonce)
+                                        .or(c_nonce.clone())
+                                        .or_else(|| token_response.c_nonce.clone());
+                                    get_credential(
+                                        client,
+                                        subjects,
+                                        legacy_issuer_metadata,
+                                        token_response.access_token.clone(),
+                                        legacy_c_nonce,
+                                        credential_configuration_id.clone(),
+                                        credential_format.clone(),
+                                        content_encryptor.as_ref().map(|a| a.clone_inner()),
+                                        content_decryptor.as_ref().map(|a| a.clone_inner()),
+                                        self.oidc_settings.client_id.clone(),
+                                        is_for_pre_authorized_code,
+                                    )
+                                    .await
+                                    .map_err(|e| anyhow::anyhow!("failed to get cred: {e:?}"))?
+                                }
+                            }
                         }
                     };
                     log_warn!("ISSUANCE", &format!("finished request"));

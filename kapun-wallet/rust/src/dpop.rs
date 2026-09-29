@@ -557,6 +557,11 @@ impl Middleware for DpopAuth {
             *resp.status_mut() = status;
 
             let response = reqwest::Response::from(resp);
+            // Some issuers include a fresh DPoP-Nonce on protocol errors as well as on
+            // successful responses. Keep it before deciding whether the response should be
+            // returned to the caller, otherwise a legacy issuance retry starts without the nonce
+            // and produces an avoidable second 401.
+            self.update_nonce(&response);
             if status == StatusCode::BAD_REQUEST {
                 if let Ok(json) = serde_json::from_str::<serde_json::Value>(&json) {
                     if let Some(true) = json
@@ -569,7 +574,6 @@ impl Middleware for DpopAuth {
                 }
             }
 
-            self.update_nonce(&response);
             let Some(mut request_clone) = request_clone else {
                 println!("request clone was none");
                 return Ok(response);
@@ -627,7 +631,7 @@ impl Middleware for DpopWrapper {
 mod tests {
     use super::{DpopAuth, create_dpop, public_key_from_jwk, validate_dpop};
     use std::net::TcpListener;
-    use std::sync::Arc;
+    use std::sync::{Arc, atomic::AtomicUsize};
 
     use crate::crypto::b64url_decode_bytes;
     use crate::error::SigningError;
@@ -783,6 +787,62 @@ mod tests {
         let result = client.execute(request).await.unwrap();
         // this request should fail, since we used our nonce
         assert_eq!(401, result.status());
+    }
+
+    #[tokio::test]
+    async fn keeps_dpop_nonce_from_a_credential_error_for_the_next_request() {
+        let kp = generate::<P256KeyPair>(None);
+        let secret_key = SecretKey::from_bytes(kp.private_key_bytes().as_slice().into()).unwrap();
+        let signer = Arc::new(TestSigner(secret_key));
+        let calls = Arc::new(AtomicUsize::new(0));
+        let calls_clone = calls.clone();
+
+        let server = MockServer::start().await;
+        let expected_uri = format!("{}/credential", server.uri());
+        Mock::given(method("POST"))
+            .and(path("/credential"))
+            .respond_with(move |req: &wiremock::Request| {
+                let call = calls_clone.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                let headers = req
+                    .headers
+                    .iter()
+                    .map(|(name, value)| (name.to_string(), value.to_str().unwrap().to_string()))
+                    .collect::<Vec<_>>();
+                let validation = validate_dpop(
+                    req.method.to_string(),
+                    expected_uri.clone(),
+                    headers,
+                    if call == 0 {
+                        None
+                    } else {
+                        Some("legacy-dpop-nonce".to_string())
+                    },
+                    None,
+                    None,
+                );
+                if call == 0 {
+                    assert!(validation.is_ok());
+                    ResponseTemplate::new(400)
+                        .insert_header("DPoP-Nonce", "legacy-dpop-nonce")
+                        .set_body_string(r#"{"error":"invalid_nonce"}"#)
+                } else {
+                    ResponseTemplate::new(if validation.is_ok() { 200 } else { 401 })
+                }
+            })
+            .mount(&server)
+            .await;
+
+        let client = ClientBuilder::new(Client::new())
+            .with(DpopAuth::new(signer, None))
+            .build();
+        let response = client
+            .post(format!("{}/credential", server.uri()))
+            .send()
+            .await
+            .unwrap();
+
+        assert_eq!(200, response.status());
+        assert_eq!(2, calls.load(std::sync::atomic::Ordering::SeqCst));
     }
     #[test]
     fn should_decode_jwk() {

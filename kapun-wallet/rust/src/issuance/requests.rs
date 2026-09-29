@@ -48,9 +48,6 @@ pub async fn get_proof_body(
     client_id: String,
     is_for_pre_authorized: bool,
 ) -> Result<Vec<String>, ApiError> {
-    let nonce = c_nonce
-        .as_ref()
-        .ok_or(anyhow::anyhow!("No c_nonce found."))?; // XXX
     let timestamp = SystemTime::now();
     let timestamp = timestamp
         .duration_since(UNIX_EPOCH)
@@ -87,14 +84,14 @@ pub async fn get_proof_body(
             builder = builder.iss(client_id.clone());
         }
 
-        let Ok(kpt) = builder
+        let mut builder = builder
             .aud(credential_issuer_metadata.credential_issuer.clone())
             .iat(timestamp.as_secs() as i64)
-            .exp((timestamp + std::time::Duration::from_secs(360)).as_secs() as i64)
-            .nonce(nonce.clone())
-            .build_no_sign()
-            .await
-        else {
+            .exp((timestamp + std::time::Duration::from_secs(360)).as_secs() as i64);
+        if let Some(nonce) = c_nonce.as_ref() {
+            builder = builder.nonce(nonce.clone());
+        }
+        let Ok(kpt) = builder.build_no_sign().await else {
             continue;
         };
 
