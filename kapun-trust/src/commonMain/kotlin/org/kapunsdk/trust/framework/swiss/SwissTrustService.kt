@@ -25,7 +25,6 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpHeaders
 import io.ktor.http.URLBuilder
 import io.ktor.http.appendPathSegments
-import kotlinx.serialization.json.Json
 import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.module
 import uniffi.kapun_crypto_rust.DidVerificationDocument
@@ -39,7 +38,7 @@ internal class SwissTrustService(
 			singleOf(::SwissTrustService)
 		}
 
-		private const val TRUST_API_PATH = "/api/v1/truststatements"
+		private const val IDENTITY_TRUST_STATEMENT_API_PATH = "/api/v2/identity-trust-statement"
 		private const val TRUST_API_V2_NON_COMPLIANCE_PATH = "/api/v2/non-compliance-trust-list"
 		private val DID_REGEX = Regex("did:(tdw|webvh):(?<integrity>[^:]+):(?<domain>[A-z0-9-_.]+)(:(?<path>[^#]+))?(#(?<fragment>.*))?")
 	}
@@ -54,12 +53,12 @@ internal class SwissTrustService(
 				?.takeIf { configuration.allowsApiBaseUrl(it) }
 				?: return@runCatching emptyList<String>()
 			val url = URLBuilder(apiBaseUrl).apply {
-				appendPathSegments(TRUST_API_PATH)
+				appendPathSegments(IDENTITY_TRUST_STATEMENT_API_PATH)
 				appendPathSegments(normalizedDid, encodeSlash = true)
 			}.build()
 
 			val result = httpClient.get(url).bodyAsText()
-			return Json.Default.decodeFromString(result)
+			return listOf(result)
 		}.getOrDefault(emptyList())
 	}
 
