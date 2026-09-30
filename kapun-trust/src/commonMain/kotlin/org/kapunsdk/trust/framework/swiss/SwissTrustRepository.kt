@@ -30,6 +30,7 @@ import org.kapunsdk.trust.framework.swiss.model.VerificationQueryPublicStatement
 import org.kapunsdk.trust.framework.swiss.allowsApiBaseUrl
 import org.kapunsdk.trust.framework.swiss.allowsStatementIssuer
 import org.kapunsdk.trust.di.KapunTrustKoinComponent
+import org.kapunsdk.trust.did.getDidFromAbsoluteKid
 import org.kapunsdk.trust.model.AgentInformation
 import org.kapunsdk.trust.model.AgentType
 import org.kapunsdk.trust.revocation.RevocationCheck
@@ -69,6 +70,7 @@ internal class SwissTrustRepository(
 			singleOf(::SwissTrustRepository)
 		}
 		private const val SWISS_PROFILE_TRUST_VERSION_PREFIX = "swiss-profile-trust:"
+		private const val DECENTRALIZED_IDENTIFIER_PREFIX = "decentralized_identifier:"
 		private const val IDENTITY_TRUST_STATEMENT_TYPE = "swiyu-identity-trust-statement+jwt"
 		private const val VERIFICATION_QUERY_PUBLIC_STATEMENT_TYPE = "swiyu-verification-query-public-statement+jwt"
 		private const val PROTECTED_VERIFICATION_AUTHORIZATION_STATEMENT_TYPE =
@@ -92,9 +94,9 @@ internal class SwissTrustRepository(
 	): AgentInformation? {
 		val host = Url(metadata.originalUrl).host
 		val kid = getKidFromJwt(metadata.originalJwt) ?: return null
+		val issuerDid = getDidFromAbsoluteKid(kid) ?: return null
 		val did = trustService.getDidDocument(kid) ?: return null
 		val verified = validateJwtWithDidDocument(metadata.originalJwt, did, false)
-		val issuerDid = normalizeDid(kid).substringBefore('#')
 		val identityJwt = metadata.claims.credentialIssuerIdentityTrustStatement
 		val identity = identityJwt?.let {
 			validateStatement(it, IDENTITY_TRUST_STATEMENT_TYPE, issuerDid, configuration) {
@@ -137,11 +139,15 @@ internal class SwissTrustRepository(
 		// The client_id may be an HTTPS verifier URL. For Swiss Profile requests,
 		// the signer DID is identified by the signed request JWT's kid.
 		val request = originalRequest ?: return@withContext null
-		val requestKid = getKidFromJwt(request) ?: return@withContext null
-		val requestDid = normalizeDid(requestKid).substringBefore('#')
+		val requestDid = signerDidFromJwt(request) ?: return@withContext null
+		val clientIdDid = didFromClientId(presentationRequest.clientId)
 		val presentationDidDoc = trustService.getDidDocument(requestDid)
 		if (presentationDidDoc != null) {
-			val isTrusted = validateJwtWithDidDocument(request, presentationDidDoc, true)
+			// A DID resolved from the request's kid is only bound to a DID client_id
+			// by equality. HTTPS client_ids have no URL-to-DID relationship in the
+			// Swiss profile, so the signer cannot be authorized for one here.
+			val isTrusted = clientIdDid == requestDid &&
+				validateJwtWithDidDocument(request, presentationDidDoc, true)
 			var trustedIdentity: ValidatedStatement<IdentityTrustStatement>? = null
 			for (statement in trustService.getTrustFromDid(requestDid, configuration)) {
 				if (statementType(statement) != IDENTITY_TRUST_STATEMENT_TYPE) continue
@@ -191,7 +197,16 @@ internal class SwissTrustRepository(
 	}.getOrNull()
 
 	private fun normalizeDid(value: String): String =
-		value.removePrefix("decentralized_identifier:")
+		value.removePrefix(DECENTRALIZED_IDENTIFIER_PREFIX)
+
+	private fun signerDidFromJwt(jwt: String): String? =
+		getKidFromJwt(jwt)?.let(::getDidFromAbsoluteKid)
+
+	private fun didFromClientId(clientId: String): String? =
+		clientId
+			.takeIf { it.startsWith(DECENTRALIZED_IDENTIFIER_PREFIX) }
+			?.let(::normalizeDid)
+			?.takeIf { it.startsWith("did:") }
 
 	private suspend fun <T : TrustStatementPayload> validateStatement(
 		jwt: String,
@@ -208,7 +223,7 @@ internal class SwissTrustRepository(
 			if (!header.profileVersion.startsWith(SWISS_PROFILE_TRUST_VERSION_PREFIX)) {
 				return@runCatching null
 			}
-			val issuer = normalizeDid(header.kid).substringBefore('#')
+			val issuer = getDidFromAbsoluteKid(header.kid) ?: return@runCatching null
 			if (!configuration.allowsStatementIssuer(issuer)) return@runCatching null
 			if (!trustService.deriveTrustStatementApiBaseUrl(issuer)
 					.let { it != null && configuration.allowsApiBaseUrl(it) }) {
@@ -271,12 +286,21 @@ internal class SwissTrustRepository(
 		}
 		if (!hasSwissProfileRequest) return null
 
-		val clientId = normalizeDid(presentationRequest.clientId)
+		// Trust statements identify the verifier by DID. When a signed request is
+		// available, derive that DID from the request key id and use it for every
+		// subject/non-compliance decision. The client_id binding is checked
+		// separately below; this prevents a signer from borrowing another
+		// verifier's client_id.
+		val clientIdDid = didFromClientId(presentationRequest.clientId) ?: return null
+		val requestSignerDid = originalRequest?.let(::signerDidFromJwt)
+		if (requestSignerDid != null && requestSignerDid != clientIdDid) return null
+		val verifierDid = requestSignerDid ?: clientIdDid
+
 		val identity = verifierInfo
 			.filter { statementType(it) == IDENTITY_TRUST_STATEMENT_TYPE }
 			.singleOrNull()
 			?.let {
-				validateStatement(it, IDENTITY_TRUST_STATEMENT_TYPE, clientId, configuration) {
+				validateStatement(it, IDENTITY_TRUST_STATEMENT_TYPE, verifierDid, configuration) {
 					json.decodeFromString<IdentityTrustStatement>(it)
 				}
 			}
@@ -284,7 +308,7 @@ internal class SwissTrustRepository(
 			.filter { statementType(it) == VERIFICATION_QUERY_PUBLIC_STATEMENT_TYPE }
 			.singleOrNull()
 			?.let {
-				validateStatement(it, VERIFICATION_QUERY_PUBLIC_STATEMENT_TYPE, clientId, configuration) {
+				validateStatement(it, VERIFICATION_QUERY_PUBLIC_STATEMENT_TYPE, verifierDid, configuration) {
 					json.decodeFromString<VerificationQueryPublicStatement>(it)
 				}
 			}
@@ -295,7 +319,7 @@ internal class SwissTrustRepository(
 		val protectedAuthorizationStatements = verifierInfo
 			.filter { statementType(it) == PROTECTED_VERIFICATION_AUTHORIZATION_STATEMENT_TYPE }
 			.mapNotNull {
-				validateStatement(it, PROTECTED_VERIFICATION_AUTHORIZATION_STATEMENT_TYPE, clientId, configuration) {
+				validateStatement(it, PROTECTED_VERIFICATION_AUTHORIZATION_STATEMENT_TYPE, verifierDid, configuration) {
 					json.decodeFromString<ProtectedVerificationAuthorizationTrustStatement>(it)
 				}
 			}
@@ -320,12 +344,12 @@ internal class SwissTrustRepository(
 		}
 		val isCompliant = nonCompliance?.let {
 			it.payload.nonCompliantActors.none { actor ->
-				normalizeDid(actor.actor) == clientId
+				normalizeDid(actor.actor) == verifierDid
 			}
 		} == true
 
 		val requestIntegrity = originalRequest?.let {
-			validateSignedRequest(it, clientId)
+			validateSignedRequest(it, presentationRequest.clientId)
 		} == true
 		val markers = buildList {
 			if (identity != null) add(VERIFIED_IDENTITY_MARKER)
@@ -357,12 +381,11 @@ internal class SwissTrustRepository(
 		request: String,
 		clientId: String,
 	): Boolean = runCatching {
-			// Resolve the DID from the request signer. This handles a key-bearing
-			// `kid` and avoids making DID-document lookup depend on the exact form of
-			// the parsed client_id value.
-			val requestKid = getKidFromJwt(request) ?: return@runCatching false
-			val requestDid = normalizeDid(requestKid).substringBefore('#')
-			val clientDid = normalizeDid(clientId).substringBefore('#')
+			// Resolve the signer from the key-bearing `kid`. An HTTPS client_id has
+			// no verifiable relationship to a DID in this profile and therefore
+			// cannot satisfy this binding.
+			val requestDid = signerDidFromJwt(request) ?: return@runCatching false
+			val clientDid = didFromClientId(clientId) ?: return@runCatching false
 			if (requestDid != clientDid) {
 				return@runCatching false
 			}
