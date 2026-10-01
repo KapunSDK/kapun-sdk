@@ -21,27 +21,188 @@ use std::{
 };
 
 use typst::{
-    diag::{FileError, FileResult, PackageError, PackageResult},
+    diag::{FileError, FileResult, PackageError, PackageResult, Severity, SourceDiagnostic},
     ecow::eco_format,
     foundations::{Bytes, Datetime},
+    layout::PagedDocument,
     syntax::{package::PackageSpec, FileId, Source, VirtualPath},
-    text::{Font, FontBook, FontInfo},
+    text::{Font, FontBook},
     utils::LazyHash,
-    Library, LibraryExt,
+    Library, LibraryExt, World, WorldExt,
 };
 use typst_pdf::PdfOptions;
 
+/// A compiler diagnostic with a source location when Typst can provide one.
+#[derive(uniffi::Record)]
+pub struct TypstDiagnostic {
+    pub severity: String,
+    pub message: String,
+    pub file: String,
+    pub line: Option<u32>,
+    pub column: Option<u32>,
+    pub hints: Vec<String>,
+}
+
+/// The output and diagnostics from a Typst compile or render operation.
+#[derive(uniffi::Record)]
+pub struct TypstRenderResult {
+    pub succeeded: bool,
+    pub output: Vec<u8>,
+    pub diagnostics: Vec<TypstDiagnostic>,
+}
+
 #[uniffi::export]
 fn render(main_file: &str, additional_files: HashMap<String, Vec<u8>>) -> Vec<u8> {
+    render_pdf_with_diagnostics(main_file, additional_files).output
+}
+
+/// Compiles a Typst document to PDF and returns compiler diagnostics to the caller.
+#[uniffi::export]
+fn render_with_diagnostics(
+    main_file: &str,
+    additional_files: HashMap<String, Vec<u8>>,
+) -> TypstRenderResult {
+    render_pdf_with_diagnostics(main_file, additional_files)
+}
+
+/// Compiles a Typst document and renders only its first page directly to PNG.
+#[uniffi::export]
+fn preview_png(main_file: &str, additional_files: HashMap<String, Vec<u8>>) -> TypstRenderResult {
     let world = TypstWrapperWorld::new(".", main_file, additional_files);
-    let doc = typst::compile(&world);
-    let Ok(doc_output) = doc.output else {
-        return vec![];
+    let compiled = typst::compile(&world);
+    let mut diagnostics = font_diagnostics(&world.font_errors);
+    diagnostics.extend(to_diagnostics(&world, compiled.warnings.iter()));
+    let document: PagedDocument = match compiled.output {
+        Ok(document) => document,
+        Err(errors) => {
+            diagnostics.extend(to_diagnostics(&world, errors.iter()));
+            return failed_result(diagnostics);
+        }
     };
-    let Ok(pdf) = typst_pdf::pdf(&doc_output, &PdfOptions::default()) else {
-        return vec![];
+
+    let Some(page) = document.pages.first() else {
+        diagnostics.push(TypstDiagnostic {
+            severity: "Error".to_string(),
+            message: "Typst produced a document with no pages".to_string(),
+            file: String::new(),
+            line: None,
+            column: None,
+            hints: vec![],
+        });
+        return failed_result(diagnostics);
     };
-    pdf
+
+    // At 1.5 pixels per point, an A4 preview is about 900 pixels wide. This is
+    // sufficient for the editor preview while keeping rasterization bounded.
+    let pixmap = typst_render::render(page, 1.5);
+    match pixmap.encode_png() {
+        Ok(png) => TypstRenderResult {
+            succeeded: true,
+            output: png,
+            diagnostics,
+        },
+        Err(error) => {
+            diagnostics.push(TypstDiagnostic {
+                severity: "Error".to_string(),
+                message: format!("Could not encode Typst preview as PNG: {error}"),
+                file: String::new(),
+                line: None,
+                column: None,
+                hints: vec![],
+            });
+            failed_result(diagnostics)
+        }
+    }
+}
+
+fn render_pdf_with_diagnostics(
+    main_file: &str,
+    additional_files: HashMap<String, Vec<u8>>,
+) -> TypstRenderResult {
+    let world = TypstWrapperWorld::new(".", main_file, additional_files);
+    let compiled = typst::compile(&world);
+    let mut diagnostics = font_diagnostics(&world.font_errors);
+    diagnostics.extend(to_diagnostics(&world, compiled.warnings.iter()));
+    let document = match compiled.output {
+        Ok(document) => document,
+        Err(errors) => {
+            diagnostics.extend(to_diagnostics(&world, errors.iter()));
+            return failed_result(diagnostics);
+        }
+    };
+
+    match typst_pdf::pdf(&document, &PdfOptions::default()) {
+        Ok(pdf) => TypstRenderResult {
+            succeeded: true,
+            output: pdf,
+            diagnostics,
+        },
+        Err(errors) => {
+            diagnostics.extend(to_diagnostics(&world, errors.iter()));
+            failed_result(diagnostics)
+        }
+    }
+}
+
+fn failed_result(diagnostics: Vec<TypstDiagnostic>) -> TypstRenderResult {
+    TypstRenderResult {
+        succeeded: false,
+        output: vec![],
+        diagnostics,
+    }
+}
+
+fn font_diagnostics(font_errors: &[(String, String)]) -> Vec<TypstDiagnostic> {
+    font_errors
+        .iter()
+        .map(|(file, message)| TypstDiagnostic {
+            severity: "Warning".to_string(),
+            message: message.clone(),
+            file: file.clone(),
+            line: None,
+            column: None,
+            hints: vec![],
+        })
+        .collect()
+}
+
+fn to_diagnostics<'a>(
+    world: &TypstWrapperWorld,
+    diagnostics: impl Iterator<Item = &'a SourceDiagnostic>,
+) -> Vec<TypstDiagnostic> {
+    diagnostics
+        .map(|diagnostic| {
+            let location = diagnostic.span.id().and_then(|file_id| {
+                let source = world.source(file_id).ok()?;
+                let range = world.range(diagnostic.span)?;
+                let (line, column) = source.lines().byte_to_line_column(range.start)?;
+                Some((
+                    file_id
+                        .vpath()
+                        .as_rootless_path()
+                        .display()
+                        .to_string(),
+                    u32::try_from(line + 1).ok()?,
+                    u32::try_from(column + 1).ok()?,
+                ))
+            });
+
+            TypstDiagnostic {
+                severity: match diagnostic.severity {
+                    Severity::Error => "Error".to_string(),
+                    Severity::Warning => "Warning".to_string(),
+                },
+                message: diagnostic.message.to_string(),
+                file: location
+                    .as_ref()
+                    .map(|(file, _, _)| file.clone())
+                    .unwrap_or_default(),
+                line: location.as_ref().map(|(_, line, _)| *line),
+                column: location.as_ref().map(|(_, _, column)| *column),
+                hints: diagnostic.hints.iter().map(ToString::to_string).collect(),
+            }
+        })
+        .collect()
 }
 
 /// Main interface that determines the environment for Typst.
@@ -61,6 +222,9 @@ pub struct TypstWrapperWorld {
     /// Metadata about all known fonts.
     fonts: Vec<Font>,
 
+    /// Invalid font files bundled by the template, reported as warnings after compilation.
+    font_errors: Vec<(String, String)>,
+
     /// Map of all known files.
     files: Arc<Mutex<HashMap<FileId, FileEntry>>>,
 
@@ -77,7 +241,7 @@ pub struct TypstWrapperWorld {
 impl TypstWrapperWorld {
     pub fn new(root: &str, source: &str, additional_files: HashMap<String, Vec<u8>>) -> Self {
         let root = PathBuf::from(root);
-        let (font_book, fonts) = load_fonts();
+        let (font_book, fonts, font_errors) = load_fonts(&additional_files);
         let mut files = HashMap::new();
         for (name, content) in additional_files {
             files.insert(
@@ -104,6 +268,7 @@ impl TypstWrapperWorld {
             book: LazyHash::new(font_book),
             root,
             fonts,
+            font_errors,
             source: Source::detached(source),
             time: time::OffsetDateTime::now_utc(),
             cache_directory: std::env::var_os("CACHE_DIRECTORY")
@@ -290,18 +455,58 @@ fn fonts() -> Vec<Font> {
         .collect()
 }
 
-pub fn load_fonts() -> (FontBook, Vec<Font>) {
+pub fn load_fonts(
+    additional_files: &HashMap<String, Vec<u8>>,
+) -> (FontBook, Vec<Font>, Vec<(String, String)>) {
+    let mut bundled_fonts = Vec::new();
+    let mut font_errors = Vec::new();
+    let mut font_files = additional_files
+        .iter()
+        .filter(|(path, _)| is_bundled_font_path(path))
+        .collect::<Vec<_>>();
+    font_files.sort_by(|(left, _), (right, _)| left.cmp(right));
+
+    for (path, bytes) in font_files {
+        let data = Bytes::new(bytes.clone());
+        let parsed = Font::iter(data).collect::<Vec<_>>();
+        if parsed.is_empty() {
+            font_errors.push((
+                path.clone(),
+                "File is not a supported TrueType or OpenType font".to_string(),
+            ));
+        } else {
+            bundled_fonts.extend(parsed);
+        }
+    }
+
+    let mut fonts = bundled_fonts;
+    fonts.extend(default_fonts());
+    let book = FontBook::from_fonts(&fonts);
+    (book, fonts, font_errors)
+}
+
+fn is_bundled_font_path(path: &str) -> bool {
+    let Some(relative_path) = path.strip_prefix("fonts/") else {
+        return false;
+    };
+    let path = PathBuf::from(relative_path);
+    let extension = path
+        .extension()
+        .and_then(|extension| extension.to_str());
+    extension.is_some_and(|extension| {
+        extension.eq_ignore_ascii_case("ttf")
+            || extension.eq_ignore_ascii_case("otf")
+            || extension.eq_ignore_ascii_case("ttc")
+    })
+}
+
+fn default_fonts() -> Vec<Font> {
     let mut fonts = fonts();
 
     let mut db = fontdb::Database::new();
     db.load_system_fonts();
 
-    let mut book = FontBook::from_fonts(&fonts);
     for font_face in db.faces() {
-        let info = db
-            .with_face_data(font_face.id, FontInfo::new)
-            .expect("database must contain this font");
-
         let path = match &font_face.source {
             fontdb::Source::File(path) | fontdb::Source::SharedFile(path, _) => path,
             // We never add binary sources to the database, so there
@@ -311,19 +516,17 @@ pub fn load_fonts() -> (FontBook, Vec<Font>) {
         let font_data = std::fs::read(path).unwrap();
         if let Some(font) = Font::new(typst::foundations::Bytes::new(font_data), font_face.index) {
             fonts.push(font);
-            book.push(info.unwrap());
         } else {
             println!("{:?} not found", path);
         }
     }
     for data in typst_assets::fonts() {
         let buffer = typst::foundations::Bytes::new(data);
-        for (_, font) in Font::iter(buffer).enumerate() {
-            book.push(font.info().clone());
+        for font in Font::iter(buffer) {
             fonts.push(font);
         }
     }
-    (book, fonts)
+    fonts
 }
 
 fn retry<T, E>(mut f: impl FnMut() -> Result<T, E>) -> Result<T, E> {
