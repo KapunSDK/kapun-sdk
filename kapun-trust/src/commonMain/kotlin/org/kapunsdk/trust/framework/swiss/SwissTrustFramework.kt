@@ -59,14 +59,7 @@ class SwissTrustFramework(
             return trustRepository.getIssuerInformationFromSignedMetadata(credentialIssuerMetadata, configuration)
         }
 
-		val trustData = trustRepository.getIssuanceTrustData(
-			baseUrl,
-			credentialConfigurationIds,
-			credentialIssuerMetadata.claims.credentialConfigurationsSupported,
-			configuration,
-		) ?: return null
-
-		return fromTrustData(trustData)
+		return null
 	}
 
 	override suspend fun getVerifierInformation(requestUri: String, presentationRequest: PresentationRequest, originalRequest: String?): AgentInformation? {

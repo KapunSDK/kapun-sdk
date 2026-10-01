@@ -538,17 +538,7 @@ pub fn get_requested_attributes(
         Value::Object(HashMap::new())
     } else {
         let mut key_value_match = HashMap::new();
-        let Some(claims) = credential_query.claims.as_ref() else {
-            return Value::Null;
-        };
         for cq in claims_queries {
-            let Some(claim) = claims
-                .iter()
-                .find(|a| a.id().unwrap_or_default() == cq.id().unwrap_or_default())
-            else {
-                continue;
-            };
-
             let body = match &credential {
                 Credential::SdJwtCredential(sdjwt) => sdjwt.get_body(),
                 Credential::MdocCredential(mdoc) => mdoc.get_body(),
@@ -558,7 +548,11 @@ pub fn get_requested_attributes(
                 Credential::Other(credential_like) => credential_like.get_body(),
             };
 
-            let all_ptrs = claim.path.resolve_ptr(body.clone()).unwrap_or(vec![]);
+            // `id` is optional for claims queries. `is_satisfied` already returns the
+            // queries that matched, so resolve the returned query's path directly
+            // instead of looking it up again by ID. Looking up missing IDs as an
+            // empty string makes every ID-less claim resolve to the first claim.
+            let all_ptrs = cq.path.resolve_ptr(body.clone()).unwrap_or(vec![]);
             for p in all_ptrs {
                 let key = p
                     .iter()
@@ -1160,6 +1154,81 @@ mod tests {
         let result = select_credentials_with_info(query.clone(), vec![sdjwt_str.to_string()]);
         let _sdjwt = decode_sdjwt(sdjwt_str).unwrap();
         println!("{:?}", result.set_options);
+    }
+}
+
+#[cfg(test)]
+mod get_requested_attributes_tests {
+    use super::*;
+    use crate::models::{CredentialLike, Meta};
+    use kapun_credential_core_rust::claims_pointer::Selector;
+    use kapun_util_rust::value::Value;
+    use std::sync::Arc;
+
+    #[derive(Debug)]
+    struct TestCredential {
+        body: Value,
+    }
+
+    impl CredentialLike for TestCredential {
+        fn get_body(&self) -> Value {
+            self.body.clone()
+        }
+
+        fn serialize(&self) -> String {
+            "test-credential".to_string()
+        }
+
+        fn format_specifiers(&self) -> Vec<String> {
+            vec!["test".to_string()]
+        }
+
+        fn matches_meta(&self, _meta: Option<Meta>) -> Option<MetaMismatch> {
+            None
+        }
+
+        fn get(self: Arc<Self>, selector: Arc<dyn Selector>) -> Option<Vec<Value>> {
+            selector.select(self.body.clone()).ok()
+        }
+    }
+
+    fn claim(path: &str) -> ClaimsQuery {
+        ClaimsQuery {
+            id: None,
+            path: vec![PointerPart::String(path.to_string())],
+            values: None,
+        }
+    }
+
+    #[test]
+    fn requested_attributes_support_claims_without_ids() {
+        let body = Value::Object(HashMap::from([
+            ("family_name".to_string(), Value::String("Doe".to_string())),
+            ("given_name".to_string(), Value::String("Jane".to_string())),
+        ]));
+        let credential = Credential::Other(Arc::new(TestCredential { body }));
+        let query = CredentialQuery {
+            id: "test-query".to_string(),
+            format: "test".to_string(),
+            multiple: None,
+            meta: None,
+            trusted_authorities: None,
+            require_cryptographic_holder_binding: None,
+            claims: Some(vec![claim("family_name"), claim("given_name")]),
+            claim_sets: None,
+        };
+
+        let result = get_requested_attributes(&query, credential);
+        let attributes = result.as_object().expect("requested attributes object");
+
+        assert_eq!(
+            attributes.get("family_name"),
+            Some(&Value::String("Doe".to_string()))
+        );
+        assert_eq!(
+            attributes.get("given_name"),
+            Some(&Value::String("Jane".to_string()))
+        );
     }
 }
 

@@ -56,11 +56,11 @@ mod issuance {
     use crate::issuance::helper::base64_encode_bytes;
     use crate::issuance::models::{
         self, AuthorizationRequestReference, CredentialConfigurationsSupportedObject,
-        CredentialIssuerMetadata, CredentialOffer, CredentialOfferParameters, CredentialProofs,
-        CredentialRequestEncryption, CredentialResponseEncryption, CredentialResponseType,
-        ErrorDetails, InputMode, KeyAttestationMetadata, KeyProofsType, NonceResponse,
-        PreAuthorizedCode, ProofType, PushedAuthorizationRequest, StringOrInt, TokenRequest,
-        TokenResponse, credential_formats,
+        CredentialErrorResponse, CredentialIssuerMetadata, CredentialOffer,
+        CredentialOfferParameters, CredentialProofs, CredentialRequestEncryption,
+        CredentialResponseEncryption, CredentialResponseType, ErrorDetails, InputMode,
+        KeyAttestationMetadata, KeyProofsType, NonceResponse, PreAuthorizedCode, ProofType,
+        PushedAuthorizationRequest, StringOrInt, TokenRequest, TokenResponse, credential_formats,
     };
     use crate::issuance::requests::{
         get_access_token, get_credential, get_credential_with_proofs, get_proof_body,
@@ -88,6 +88,71 @@ mod issuance {
     use kapun_util_rust::{log_debug, log_warn};
 
     const RESPONSE_TYPE_CODE: &str = "code";
+
+    fn should_retry_credential_request(error: &CredentialErrorResponse) -> bool {
+        if error.c_nonce.is_some() {
+            return true;
+        }
+
+        match error.error.as_str() {
+            "use_dpop_nonce" | "invalid_nonce" | "invalid_or_missing_nonce" => true,
+            "invalid_dpop_proof" | "invalid_or_missing_proof" | "invalid_proof" => error
+                .error_description
+                .as_deref()
+                .map(|description| description.to_ascii_lowercase().contains("nonce"))
+                .unwrap_or(false),
+            _ => false,
+        }
+    }
+
+    async fn build_batch_credential_proofs(
+        subjects: Vec<Arc<SecureSubject>>,
+        credential_issuer_metadata: CredentialIssuerMetadata,
+        credential_configuration_id: String,
+        c_nonce: Option<String>,
+        client_id: String,
+        is_for_pre_authorized: bool,
+        batch_subject: &dyn BatchSigner,
+    ) -> Result<CredentialProofs, ApiError> {
+        let proof_bodies = get_proof_body(
+            subjects,
+            credential_issuer_metadata,
+            credential_configuration_id,
+            c_nonce,
+            client_id,
+            is_for_pre_authorized,
+        )
+        .await
+        .map_err(|e| anyhow::anyhow!("failed to get proof: {e}"))?;
+        let proof_signatures = batch_subject
+            .batch_sign(proof_bodies.clone())
+            .map_err(|e| anyhow::anyhow!("failed to get cred: {e}"))?;
+        let proofs = proof_bodies
+            .into_iter()
+            .zip(proof_signatures.into_iter())
+            .map(|(body, signature)| {
+                let signature_encoded = base64_encode_bytes(&signature);
+                format!("{body}.{signature_encoded}")
+            })
+            .collect::<Vec<_>>();
+
+        Ok(CredentialProofs::Proofs(KeyProofsType::Jwt(proofs)))
+    }
+
+    fn swiss_profile_compression(
+        profile_version: Option<&str>,
+        zip_values_supported: Option<&Vec<String>>,
+    ) -> Option<String> {
+        if profile_version
+            .is_some_and(|version| version.starts_with("swiss-profile-issuance:"))
+        {
+            zip_values_supported
+                .and_then(|values| values.iter().find(|value| value.as_str() == "DEF"))
+                .cloned()
+        } else {
+            None
+        }
+    }
 
     #[derive(Serialize, Deserialize)]
     #[cfg_attr(feature = "uniffi", derive(uniffi::Object))]
@@ -275,6 +340,16 @@ mod issuance {
     }
 
     impl OID4VciIssuance {
+        fn store_credential_issuer_metadata(
+            &self,
+            metadata: CredentialIssuerMetadata,
+        ) -> Result<(), ApiError> {
+            self._dpop_auth
+                .set_profile_version(metadata.profile_version.clone())?;
+            *self.credential_issuer_metadata.lock()? = Some(metadata);
+            Ok(())
+        }
+
         async fn request_nonce(
             &self,
             c_nonce: Option<String>,
@@ -299,6 +374,25 @@ mod issuance {
             } else {
                 Err(anyhow::anyhow!("failed to get nonce:").into())
             }
+        }
+
+        async fn request_fresh_nonce(
+            &self,
+            error: &CredentialErrorResponse,
+            fallback_c_nonce: Option<String>,
+            subjects: &Vec<Arc<SecureSubject>>,
+            cred_issuer_meta: &CredentialIssuerMetadata,
+            client: Arc<ClientWithMiddleware>,
+        ) -> Result<Option<String>, ApiError> {
+            if error.c_nonce.is_some() {
+                return Ok(error.c_nonce.clone());
+            }
+            if cred_issuer_meta.nonce_endpoint.is_some() {
+                return self
+                    .request_nonce(None, subjects, cred_issuer_meta, client)
+                    .await;
+            }
+            Ok(fallback_c_nonce)
         }
     }
     #[uniffi::export(async_runtime = "tokio")]
@@ -378,9 +472,10 @@ mod issuance {
             .with(DpopWrapper(dpop_auth.clone()))
             .build();
             let metadata_fetcher = MetadataFetcher::new(client.clone());
-            let credential_issuer_metadata =
+            let credential_issuer_metadata: CredentialIssuerMetadata =
                 serde_json::from_str(&oidc_metadata.credential_issuer_metadata)
                     .map_err(|e| anyhow!(e))?;
+            dpop_auth.set_profile_version(credential_issuer_metadata.profile_version.clone())?;
 
             let credential_configuration_ids =
                 serde_json::from_str(&oidc_metadata.credential_configuration_ids)?;
@@ -442,6 +537,12 @@ mod issuance {
         /// Update the dpop client used by the wallet. This needs to be done after changing the pin e.g.
         #[allow(clippy::unwrap_used, clippy::expect_used)]
         pub fn update_dpop(self: &Arc<Self>, dpop_auth: Arc<DpopAuth>) -> Result<(), ApiError> {
+            let profile_version = self
+                .credential_issuer_metadata
+                .lock()?
+                .as_ref()
+                .and_then(|metadata| metadata.profile_version.clone());
+            dpop_auth.set_profile_version(profile_version)?;
             let retry_policy = ExponentialBackoff::builder().build_with_max_retries(1);
             let mut client = self.dpop_client.lock()?;
             let dpop_client = ClientBuilder::new(
@@ -480,10 +581,7 @@ mod issuance {
                 .await
                 .map_err(|e| anyhow::anyhow!(e))?;
 
-            {
-                let mut cred_meta = self.credential_issuer_metadata.lock()?;
-                *cred_meta = Some(credential_issuer_metadata.clone());
-            }
+            self.store_credential_issuer_metadata(credential_issuer_metadata.clone())?;
 
             let par_url = pushed_authorization_request_endpoint
                 .and_then(|url| Url::parse(&url).ok())
@@ -567,7 +665,7 @@ mod issuance {
                 };
                 meta_data.clone()
             };
-            let Some((credential_configuration_id, credential_configuration)) = cred_issuer_meta
+            let Some((credential_configuration_id, _credential_configuration)) = cred_issuer_meta
                 .credential_configurations_supported
                 .iter()
                 .find(|(_, value)| {
@@ -603,55 +701,64 @@ mod issuance {
             let Some(access_token) = device_bound_tokens.access_token.as_ref() else {
                 return Err(anyhow!("No accesstoken").into());
             };
-            let proof_bodys = get_proof_body(
+            let proofs = build_batch_credential_proofs(
                 subjects.clone(),
                 cred_issuer_meta.clone(),
                 credential_configuration_id.clone(),
                 device_bound_tokens.c_nonce.clone(),
                 self.oidc_settings.client_id.clone(),
                 is_for_pre_authorized_code,
+                batch_subject.as_ref(),
             )
-            .await
-            .map_err(|e| anyhow::anyhow!("failed to get proof: {e}"))?;
-            let proof_signatures = batch_subject
-                .batch_sign(proof_bodys.clone())
-                .map_err(|e| anyhow::anyhow!("failed to get cred: {e}"))?;
-            let proofs = proof_bodys
-                .into_iter()
-                .zip(proof_signatures.into_iter())
-                .map(|(body, signature)| {
-                    let signature_encoded = base64_encode_bytes(&signature);
-                    format!("{body}.{signature_encoded}")
-                })
-                .collect::<Vec<_>>();
+            .await?;
 
             let credential = match get_credential_with_proofs(
                 dpop_client.clone(),
                 cred_issuer_meta.clone(),
                 access_token.clone(),
                 credential_configuration_id.clone(),
-                credential_configuration.credential_format.clone(),
                 None,
                 None,
-                CredentialProofs::Proofs(KeyProofsType::Jwt(proofs.clone())),
+                proofs,
             )
             .await
             {
                 Ok(c) => c,
-                Err(_) => {
-                    let mut cred_issuer_meta = cred_issuer_meta.clone();
-                    // hacky workaround to try old RFC
-                    cred_issuer_meta.nonce_endpoint = None;
+                Err(e) => {
+                    if !should_retry_credential_request(&e) {
+                        return Err(anyhow::anyhow!(
+                            "failed to get cred (get_batch_credentials_with_dpop): {e:?}"
+                        )
+                        .into());
+                    }
+                    let retry_c_nonce = self
+                        .request_fresh_nonce(
+                            &e,
+                            device_bound_tokens.c_nonce.clone(),
+                            &subjects,
+                            &cred_issuer_meta,
+                            dpop_client.clone(),
+                        )
+                        .await?;
+                    let retry_proofs = build_batch_credential_proofs(
+                        subjects.clone(),
+                        cred_issuer_meta.clone(),
+                        credential_configuration_id.clone(),
+                        retry_c_nonce.clone(),
+                        self.oidc_settings.client_id.clone(),
+                        is_for_pre_authorized_code,
+                        batch_subject.as_ref(),
+                    )
+                    .await?;
 
                     get_credential_with_proofs(
                         dpop_client,
                         cred_issuer_meta.clone(),
                         access_token.clone(),
                         credential_configuration_id.clone(),
-                        credential_configuration.credential_format.clone(),
                         None,
                         None,
-                        CredentialProofs::Proofs(KeyProofsType::Jwt(proofs)),
+                        retry_proofs,
                     )
                     .await
                     .map_err(|e| {
@@ -902,7 +1009,7 @@ mod issuance {
                 };
                 meta_data.clone()
             };
-            let Some((credential_configuration_id, credential_configuration)) = cred_issuer_meta
+            let Some((credential_configuration_id, _credential_configuration)) = cred_issuer_meta
                 .credential_configurations_supported
                 .iter()
                 .find(|(_, value)| {
@@ -946,9 +1053,8 @@ mod issuance {
                 subjects.clone(),
                 cred_issuer_meta.clone(),
                 access_token.clone(),
-                c_nonce,
+                c_nonce.clone(),
                 credential_configuration_id.clone(),
-                credential_configuration.credential_format.clone(),
                 None,
                 None,
                 self.oidc_settings.client_id.clone(),
@@ -957,25 +1063,26 @@ mod issuance {
             .await
             {
                 Ok(c) => c,
-                Err(_) => {
-                    let c_nonce = self
-                        .request_nonce(
-                            device_bound_tokens.c_nonce.clone(),
+                Err(e) => {
+                    if !should_retry_credential_request(&e) {
+                        return Err(anyhow::anyhow!("failed to get cred: {e:?}").into());
+                    }
+                    let retry_c_nonce = self
+                        .request_fresh_nonce(
+                            &e,
+                            c_nonce.clone(),
                             &subjects,
                             &cred_issuer_meta,
                             dpop_client.clone(),
                         )
                         .await?;
-                    let mut cred_issuer_meta = cred_issuer_meta.clone();
-                    cred_issuer_meta.nonce_endpoint = None;
                     get_credential(
                         dpop_client.clone(),
                         subjects.clone(),
                         cred_issuer_meta.clone(),
                         access_token.clone(),
-                        c_nonce,
+                        retry_c_nonce.clone(),
                         credential_configuration_id.clone(),
-                        credential_configuration.credential_format.clone(),
                         None,
                         None,
                         self.oidc_settings.client_id.clone(),
@@ -1369,6 +1476,31 @@ mod issuance {
                         meta_data.clone()
                     };
 
+                    // BCS answers the first token request with `use_dpop_nonce` but omits the
+                    // DPoP-Nonce response header. Its advertised nonce endpoint is the only way
+                    // to obtain the DPoP nonce before exchanging a pre-authorized code.
+                    let initial_c_nonce = if use_dpop {
+                        let no_subjects: Vec<Arc<SecureSubject>> = Vec::new();
+                        match self
+                            .request_nonce(None, &no_subjects, &meta_data, client.clone())
+                            .await
+                        {
+                            Ok(c_nonce) => c_nonce,
+                            Err(e) => {
+                                // The endpoint is optional in issuer metadata. If an issuer
+                                // advertises a stale or unavailable endpoint, retain the normal
+                                // DPoP flow so a nonce from the token response can still be used.
+                                log_warn!(
+                                    "ISSUANCE",
+                                    &format!("failed to prime DPoP nonce: {e:?}")
+                                );
+                                None
+                            }
+                        }
+                    } else {
+                        None
+                    };
+
                     let Some(token_endpoint) = token_endpoint
                         .and_then(|url| Url::parse(&url).ok())
                         .or_else(|| meta_data.token_endpoint.and_then(|a| Url::parse(&a).ok()))
@@ -1385,7 +1517,7 @@ mod issuance {
                         .finish()
                         .clone();
 
-                    get_access_token(
+                    let mut token_response = get_access_token(
                         client.clone(),
                         if allow_anonymous_request {
                             token_endpoint.clone()
@@ -1412,7 +1544,11 @@ mod issuance {
                             }
                         }
                         _ => e.into(),
-                    })?
+                    })?;
+                    if token_response.c_nonce.is_none() {
+                        token_response.c_nonce = initial_c_nonce;
+                    }
+                    token_response
                 } else if let Some(auth_code) = code {
                     let auth_state = {
                         let state = self.auth_state.lock()?;
@@ -1549,13 +1685,7 @@ mod issuance {
                 .await
                 .map_err(|e| anyhow::anyhow!(e))?;
 
-            {
-                let mut cred_meta = self
-                    .credential_issuer_metadata
-                    .lock()
-                    .map_err(|_| ApiError::from(anyhow::anyhow!("lock error")))?;
-                *cred_meta = Some(credential_issuer_metadata.clone());
-            }
+            self.store_credential_issuer_metadata(credential_issuer_metadata.clone())?;
 
             //TODO: don't unwrap url parse
             let auth_server = get_authorization_server(
@@ -1603,10 +1733,7 @@ mod issuance {
                 .get_credential_issuer_metadata(credential_issuer_url.clone())
                 .await
                 .map_err(|e| anyhow::anyhow!(e))?;
-            {
-                let mut cred_meta = self.credential_issuer_metadata.lock()?;
-                *cred_meta = Some(credential_issuer_metadata.clone());
-            }
+            self.store_credential_issuer_metadata(credential_issuer_metadata.clone())?;
 
             // Select all supported credential configurations and as a byproduct determine necessary "scopes" for authorization
             let mut scopes = HashSet::new();
@@ -2048,7 +2175,6 @@ mod issuance {
             key_attestations_required: Option<&KeyAttestationMetadata>,
             credential_issuer_metadata: CredentialIssuerMetadata,
             credential_configuration_id: String,
-            // credential_format only kept here for backwards compatibility with pre-draft15 issuer. Remove.
             credential_format: Value,
             token_response: &TokenResponse,
             key_type: KeyType,
@@ -2060,12 +2186,20 @@ mod issuance {
                     Some(CredentialResponseEncryption {
                         alg_values_supported,
                         enc_values_supported,
+                        zip_values_supported,
                         encryption_required: _,
                     }) => {
-                        let decryption_parameters = EncryptionParameters::new_decryptor(
-                            &alg_values_supported[0],
-                            &enc_values_supported[0],
+                        // Swiss Profile requires DEF whenever the issuer advertises compression.
+                        let compression = swiss_profile_compression(
+                            credential_issuer_metadata.profile_version.as_deref(),
+                            zip_values_supported.as_ref(),
                         );
+                        let decryption_parameters =
+                            EncryptionParameters::new_decryptor_with_compression(
+                                &alg_values_supported[0],
+                                &enc_values_supported[0],
+                                compression,
+                            );
                         decryption_parameters.map(|a| Box::new(a) as Box<dyn CloneableDecryptor<_>>)
                     }
                     _ => None,
@@ -2075,14 +2209,22 @@ mod issuance {
                     Some(CredentialRequestEncryption {
                         jwks,
                         enc_values_supported,
-                        zip_values_supported: _,
+                        zip_values_supported,
                         encryption_required,
                     }) => {
                         // Only activate request/response encryption if required...
                         // Too many issues out there, and we still have TLS
                         if *encryption_required && let Some(jwk) = jwks.keys[0].transform() {
+                            let compression = swiss_profile_compression(
+                                credential_issuer_metadata.profile_version.as_deref(),
+                                zip_values_supported.as_ref(),
+                            );
                             let encryption_parameters =
-                                EncryptionParameters::new_encryptor(jwk, &enc_values_supported[0]);
+                                EncryptionParameters::new_encryptor_with_compression(
+                                    jwk,
+                                    &enc_values_supported[0],
+                                    compression,
+                                );
                             encryption_parameters.map(|a| {
                                 Box::new(a) as Box<dyn CloneableEncryptor<EncryptionParameters>>
                             })
@@ -2101,8 +2243,10 @@ mod issuance {
             let c_nonce = if let Some(nonce_endpoint) =
                 credential_issuer_metadata.nonce_endpoint.clone()
             {
-                let nonce_response: serde_json::Value = self
-                    .client
+                // Use the same client that will call the credential endpoint. When DPoP is
+                // enabled, its middleware captures the DPoP-Nonce response header here so the
+                // following credential request carries a fresh proof nonce as well.
+                let nonce_response: serde_json::Value = client
                     .post(nonce_endpoint)
                     .header(CONTENT_LENGTH, 0) // Required for some issuers
                     .send()
@@ -2151,7 +2295,6 @@ mod issuance {
                         credential_issuer_metadata.clone(),
                         token_response.access_token.clone(),
                         credential_configuration_id.clone(),
-                        credential_format.clone(),
                         content_encryptor.map(|a| a.clone_inner()),
                         content_decryptor.map(|a| a.clone_inner()),
                         proof,
@@ -2179,7 +2322,6 @@ mod issuance {
                         token_response.access_token.clone(),
                         c_nonce.clone(),
                         credential_configuration_id.clone(),
-                        credential_format.clone(),
                         content_encryptor.as_ref().map(|a| a.clone_inner()),
                         content_decryptor.as_ref().map(|a| a.clone_inner()),
                         self.oidc_settings.client_id.clone(),
@@ -2193,6 +2335,9 @@ mod issuance {
                                 "ISSUANCE",
                                 &format!("failed to get cred on first try: {e:?}")
                             );
+                            if !should_retry_credential_request(&e) {
+                                return Err(anyhow::anyhow!("failed to get cred: {e:?}").into());
+                            }
                             log_warn!(
                                 "ISSUANCE",
                                 &format!(
@@ -2201,32 +2346,25 @@ mod issuance {
                                 )
                             );
 
-                            let mut credential_issuer_metadata = credential_issuer_metadata.clone();
-                            credential_issuer_metadata.nonce_endpoint = None;
-
                             if content_encryptor.is_none() {
                                 content_decryptor = None
                             }
-                            let c_nonce = if let Some(nonce) = e.c_nonce {
-                                Some(nonce)
-                            } else {
-                                self.request_nonce(
-                                    token_response.c_nonce.clone(),
+                            let retry_c_nonce = self
+                                .request_fresh_nonce(
+                                    &e,
+                                    c_nonce.clone(),
                                     &subjects,
                                     &credential_issuer_metadata,
                                     client.clone(),
                                 )
-                                .await?
-                            };
-
+                                .await?;
                             get_credential(
-                                client,
-                                subjects,
+                                client.clone(),
+                                subjects.clone(),
                                 credential_issuer_metadata.clone(),
                                 token_response.access_token.clone(),
-                                c_nonce,
+                                retry_c_nonce.clone(),
                                 credential_configuration_id.clone(),
-                                credential_format.clone(),
                                 content_encryptor.as_ref().map(|a| a.clone_inner()),
                                 content_decryptor.as_ref().map(|a| a.clone_inner()),
                                 self.oidc_settings.client_id.clone(),
@@ -2770,6 +2908,49 @@ mod issuance {
                 uri_expected
             );
             server.join().unwrap();
+        }
+
+        #[test]
+        fn only_nonce_errors_trigger_the_credential_retry() {
+            let duplicate_proof = CredentialErrorResponse {
+                error: "invalid_proof".to_string(),
+                error_description: Some(
+                    "Proofs should not be duplicated for the same credential request".to_string(),
+                ),
+                c_nonce: None,
+                c_nonce_expires_in: None,
+            };
+            assert!(!should_retry_credential_request(&duplicate_proof));
+
+            let missing_nonce = CredentialErrorResponse {
+                error: "invalid_dpop_proof".to_string(),
+                error_description: Some("Missing DPoP nonce".to_string()),
+                c_nonce: None,
+                c_nonce_expires_in: None,
+            };
+            assert!(should_retry_credential_request(&missing_nonce));
+        }
+
+        #[test]
+        fn swiss_profile_uses_deflate_only_when_advertised() {
+            let deflate = vec!["DEF".to_string()];
+            let other = vec!["GZIP".to_string()];
+
+            assert_eq!(
+                swiss_profile_compression(
+                    Some("swiss-profile-issuance:1.0.0"),
+                    Some(&deflate)
+                ),
+                Some("DEF".to_string())
+            );
+            assert_eq!(
+                swiss_profile_compression(
+                    Some("swiss-profile-issuance:1.0.0"),
+                    Some(&other)
+                ),
+                None
+            );
+            assert_eq!(swiss_profile_compression(None, Some(&deflate)), None);
         }
     }
 }

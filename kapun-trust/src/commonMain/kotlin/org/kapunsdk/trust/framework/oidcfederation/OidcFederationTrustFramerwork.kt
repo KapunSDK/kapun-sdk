@@ -14,7 +14,6 @@ import org.kapunsdk.trust.model.AgentInformation
 import org.kapunsdk.trust.model.AgentType
 import org.kapunsdk.trust.model.TrustAnchorInfo
 import org.kapunsdk.util.log.Logger
-import uniffi.kapun_trust_rust.FederationException
 import uniffi.kapun_trust_rust.oidcfTrustChainFromPresentationRequest
 import uniffi.kapun_trust_rust.oidcfTrustChainFromUrl
 import kotlin.io.encoding.Base64
@@ -37,15 +36,13 @@ class OidcFederationTrustFramerwork(
 		credentialIssuerMetadata: CredentialIssuerMetadata
 	): AgentInformation? {
 		// TODO: get credentialIssuerMetadata from here instead of fetching it earlier.
-		val trustInfo = try {
+		val trustInfo = runCatching {
 			oidcfTrustChainFromUrl(
 				credentialIssuerMetadata.claims.credentialIssuer,
 				lenientTrustChainVerification(),
-			);
-		} catch (e: FederationException) {
-			Logger("Federation").error("Federation failed, skipping it", e)
-			return null
-		}
+			)
+		}.onFailure { Logger("Federation").error("Federation failed, skipping it", it) }
+			.getOrNull() ?: return null
 
 		val invalidTrustAnchors = trustInfo.trustAnchorKeys.filterNot {
 			val isTrusted = oidfTrustAnchorProvider.isTrusted(it)
@@ -77,17 +74,14 @@ class OidcFederationTrustFramerwork(
 	override suspend fun getVerifierInformation(
 		requestUri: String, presentationRequest: PresentationRequest, originalRequest: String?
 	): AgentInformation? {
-		if (originalRequest == null) {
-			return null
-		}
-		val trustInfo = try {
+		val request = originalRequest ?: return null
+		val trustInfo = runCatching {
 			oidcfTrustChainFromPresentationRequest(
-				originalRequest!!,
+				request,
 				lenientTrustChainVerification(),
-			);
-		} catch (e: FederationException.FetchingFailed) {
-			return null
-		}
+			)
+		}.onFailure { Logger("Federation").error("Federation failed, skipping it", it) }
+			.getOrNull() ?: return null
 
 		val invalidTrustAnchors = trustInfo.trustAnchorKeys.filterNot {
 			val isTrusted = oidfTrustAnchorProvider.isTrusted(it)

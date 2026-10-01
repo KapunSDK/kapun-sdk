@@ -38,7 +38,7 @@ class StaticDidWebTrustAnchorProvider(
     private val httpClient by lazy { KapunTrustKoinContext.koin.get<HttpClient>() }
 
     private fun resolveUrl(kid: String): Url? = runCatching {
-        if (!kid.startsWith("did:web")) {
+        if (!kid.startsWith("did:web:")) {
             return null
         }
         val kid = kid.removePrefix("did:web:")
