@@ -17,8 +17,6 @@ under the License.
 package org.kapunsdk.trust.framework.swiss
 
 import org.kapunsdk.trust.did.DidResolver
-import org.kapunsdk.trust.framework.swiss.dto.IssuanceTrustStatementsDto
-import org.kapunsdk.trust.framework.swiss.dto.VerificationTrustStatementsDto
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.get
@@ -27,7 +25,6 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpHeaders
 import io.ktor.http.URLBuilder
 import io.ktor.http.appendPathSegments
-import kotlinx.serialization.json.Json
 import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.module
 import uniffi.kapun_crypto_rust.DidVerificationDocument
@@ -41,27 +38,9 @@ internal class SwissTrustService(
 			singleOf(::SwissTrustService)
 		}
 
-		private const val WELL_KNOWN_PATH = "/.well-known"
-		private const val TRUST_STATEMENT_PATH = "$WELL_KNOWN_PATH/trust-statement"
-		private const val TRUST_API_PATH = "/api/v1/truststatements"
+		private const val IDENTITY_TRUST_STATEMENT_API_PATH = "/api/v2/identity-trust-statement"
 		private const val TRUST_API_V2_NON_COMPLIANCE_PATH = "/api/v2/non-compliance-trust-list"
 		private val DID_REGEX = Regex("did:(tdw|webvh):(?<integrity>[^:]+):(?<domain>[A-z0-9-_.]+)(:(?<path>[^#]+))?(#(?<fragment>.*))?")
-	}
-
-	suspend fun getIssuanceTrustStatements(baseUrl: String): IssuanceTrustStatementsDto {
-		val url = URLBuilder(baseUrl).apply {
-			appendPathSegments(TRUST_STATEMENT_PATH)
-		}.build()
-
-		return httpClient.get(url).body<IssuanceTrustStatementsDto>()
-	}
-
-	suspend fun getVerificationTrustStatements(baseUrl: String): VerificationTrustStatementsDto {
-		val url = URLBuilder(baseUrl).apply {
-			appendPathSegments(TRUST_STATEMENT_PATH)
-		}.build()
-
-		return httpClient.get(url).body<VerificationTrustStatementsDto>()
 	}
 
 	suspend fun getTrustFromDid(
@@ -69,16 +48,17 @@ internal class SwissTrustService(
 		configuration: SwissTrustConfiguration,
 	): List<String> {
 		return kotlin.runCatching {
-			val apiBaseUrl = deriveTrustStatementApiBaseUrl(did)
+			val normalizedDid = normalizeDid(did)
+			val apiBaseUrl = deriveTrustStatementApiBaseUrl(normalizedDid)
 				?.takeIf { configuration.allowsApiBaseUrl(it) }
 				?: return@runCatching emptyList<String>()
 			val url = URLBuilder(apiBaseUrl).apply {
-				appendPathSegments(TRUST_API_PATH)
-				appendPathSegments(did, encodeSlash = true)
+				appendPathSegments(IDENTITY_TRUST_STATEMENT_API_PATH)
+				appendPathSegments(normalizedDid, encodeSlash = true)
 			}.build()
 
 			val result = httpClient.get(url).bodyAsText()
-			return Json.Default.decodeFromString(result)
+			return listOf(result)
 		}.getOrDefault(emptyList())
 	}
 
@@ -103,7 +83,7 @@ internal class SwissTrustService(
 	}
 
 	internal fun deriveTrustStatementApiBaseUrl(did: String): String? {
-		val matches = DID_REGEX.matchEntire(did) ?: return null
+		val matches = DID_REGEX.matchEntire(normalizeDid(did)) ?: return null
 		val domain = matches.groups["domain"]?.value ?: return null
 		val trustRegistryDomain = if (domain.startsWith("identifier-reg.")) {
 			"trust-reg.${domain.removePrefix("identifier-reg.")}"
@@ -115,7 +95,7 @@ internal class SwissTrustService(
 
 	suspend fun getDidDocument(did: String): DidVerificationDocument? {
 		return runCatching {
-			val matches = DID_REGEX.matchEntire(did) ?: return@runCatching null
+			val matches = DID_REGEX.matchEntire(normalizeDid(did)) ?: return@runCatching null
 			val url = matches.groups["domain"]?.value ?: return@runCatching null
 			val path = matches.groups["path"]?.value?.replace(":", "/")?.let {
 				"$it/did.jsonl"
@@ -144,5 +124,8 @@ internal class SwissTrustService(
 			resolver.resolveLatest().doc()
 		}.getOrNull()
 	}
+
+	private fun normalizeDid(value: String): String =
+		value.removePrefix("decentralized_identifier:")
 
 }

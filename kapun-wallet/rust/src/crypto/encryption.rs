@@ -63,6 +63,7 @@ impl ContentDecryptor for EncryptionParameters {
                 .public_jwk()
                 .expect("somethings terribly wrong with the jwk"),
             enc: self.authorization_encrypted_response_enc.clone(),
+            zip: self.compression.clone(),
         }
     }
 

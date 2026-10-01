@@ -18,6 +18,7 @@ package org.kapunsdk.trust.revocation
 
 import org.kapunsdk.trust.framework.swiss.SwissTrustService
 import org.kapunsdk.trust.di.KapunTrustKoinComponent
+import org.kapunsdk.trust.did.getDidFromAbsoluteKid
 import org.kapunsdk.util.log.Logger
 import io.ktor.client.HttpClient
 import io.ktor.client.request.accept
@@ -99,4 +100,4 @@ class RevocationCheck : KapunTrustKoinComponent {
 internal fun extractStatusListIssuer(statusListToken: String, json: Json): String? =
     parseEncodedJwtHeader(statusListToken)?.let {
         json.decodeFromString<JsonObject>(it)["kid"]?.jsonPrimitive?.contentOrNull
-    }?.removePrefix("decentralized_identifier:")?.substringBefore('#')
+    }?.let(::getDidFromAbsoluteKid)

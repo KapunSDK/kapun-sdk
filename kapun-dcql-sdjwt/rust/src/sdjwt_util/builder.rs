@@ -41,8 +41,6 @@ use kapun_credential_core_rust::{
     models::{Pointer, PointerPart, SpecVersion},
 };
 
-const UNDISCLOSABLE_CLAIMS: [&str; 5] = ["iss", "iat", "exp", "nbf", "vct"];
-
 #[derive(Debug, uniffi::Error, Clone)]
 pub enum BuilderError {
     InvalidPath(String),
@@ -85,7 +83,10 @@ impl BuilderImpl {
             "SDJWT_BUILDER",
             &format!("Disclosures: {:?}", current),
         );
-
+        // `claims` is the reconstructed JWT, so a path can be present there
+        // without having a disclosure. In that case the claim is already in
+        // the original JWT and no disclosure needs to be added.
+        let contained_in_jwt = ptr.select(self.claims.clone()).is_ok();
         let ptr_len = ptr.len();
         let mut it = ptr.into_iter().peekable();
         while let Some(p) = it.next() {
@@ -97,6 +98,9 @@ impl BuilderImpl {
                 }
             };
             let Some(node) = current.get(&index) else {
+                if contained_in_jwt {
+                    return Ok(vec![]);
+                }
                 return Err(BuilderError::InvalidPath(format!(
                     "No disclosure found for index: {index:?} in path: {ptr_str}"
                 )));
@@ -374,15 +378,8 @@ impl SdJwtBuilder {
             return Err(BuilderError::Lock);
         };
 
-        let Some(first) = p.first() else {
+        if p.is_empty() {
             return Err(BuilderError::InvalidPath("Empty pointer path".to_string()));
-        };
-
-        if UNDISCLOSABLE_CLAIMS
-            .iter()
-            .any(|uc| matches!(first, PointerPart::String(c) if &c == uc))
-        {
-            return Err(BuilderError::InvalidDisclosure);
         }
 
         let Ok(resolver) = p.resolve_ptr(this.claims.clone()) else {
@@ -479,5 +476,45 @@ impl SdJwtBuilder {
     pub fn is_w3c(&self) -> bool {
         let this = self.inner.lock().unwrap();
         this.is_w3c
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn claims_already_in_the_jwt_are_not_added_as_disclosures() {
+        let claims: Value = serde_json::json!({
+            "iss": "issuer",
+            "vct": "credential-type",
+            "nested": { "claim": "value" }
+        })
+        .into();
+        let builder = SdJwtBuilder::from_parts(
+            claims,
+            "header.payload.signature".to_string(),
+            HashMap::new(),
+            HashMap::new(),
+        );
+
+        assert!(
+            builder
+                .add_disclosure(vec![PointerPart::String("iss".to_string())])
+                .is_ok()
+        );
+        assert!(
+            builder
+                .add_disclosure(vec![
+                    PointerPart::String("nested".to_string()),
+                    PointerPart::String("claim".to_string()),
+                ])
+                .is_ok()
+        );
+        assert!(
+            builder
+                .add_disclosure(vec![PointerPart::String("missing".to_string())])
+                .is_err()
+        );
     }
 }

@@ -64,19 +64,37 @@ pub struct EncryptionParameters {
     pub jwk: Jwk,
     pub authorization_encrytped_response_alg: String,
     pub authorization_encrypted_response_enc: String,
+    pub compression: Option<String>,
 }
 
 impl EncryptionParameters {
     pub fn new_encryptor(jwk: Jwk, enc: &str) -> Option<Self> {
+        Self::new_encryptor_with_compression(jwk, enc, None)
+    }
+
+    pub fn new_encryptor_with_compression(
+        jwk: Jwk,
+        enc: &str,
+        compression: Option<String>,
+    ) -> Option<Self> {
         let alg = jwk.algorithm()?.to_string();
         Some(Self {
             jwk,
             authorization_encrytped_response_alg: alg,
             authorization_encrypted_response_enc: enc.to_string(),
+            compression,
         })
     }
 
     pub fn new_decryptor(alg: &str, enc: &str) -> Option<Self> {
+        Self::new_decryptor_with_compression(alg, enc, None)
+    }
+
+    pub fn new_decryptor_with_compression(
+        alg: &str,
+        enc: &str,
+        compression: Option<String>,
+    ) -> Option<Self> {
         let mut jwk = match alg {
             "ECDH-ES" | "ECDH-ES+A128KW" | "ECDH-ES+A192KW" | "ECDH-ES+A256KW" => {
                 josekit::jwe::ECDH_ES
@@ -111,6 +129,7 @@ impl EncryptionParameters {
             jwk,
             authorization_encrytped_response_alg: alg.to_string(),
             authorization_encrypted_response_enc: enc.to_string(),
+            compression,
         })
     }
 
@@ -139,7 +158,7 @@ impl EncryptionParameters {
         apv: Option<Vec<u8>>,
         token_type: Option<&str>,
     ) -> Result<String, JweError> {
-        self.encrypt_with_options(claims, apu, apv, token_type, None)
+        self.encrypt_with_options(claims, apu, apv, token_type, self.compression.as_deref())
     }
 
     pub fn encrypt_with_options(
@@ -192,12 +211,26 @@ impl TryFrom<&KapunValue> for EncryptionParameters {
     type Error = JweError;
 
     fn try_from(value: &KapunValue) -> Result<Self, Self::Error> {
-        let jwks: serde_json::Value = value
+        let mut jwks: serde_json::Value = value
             .get("jwks")
             .ok_or_else(|| invalid("No jwks in encryption metadata"))?
             .to_owned()
             .transform()
             .ok_or_else(|| invalid("Failed to transform jwks"))?;
+
+        // Some verifiers serialize optional JWK members as JSON null instead
+        // of omitting them (for example `use`, or RSA-only `n`/`e` on an EC
+        // key). josekit correctly rejects null for typed JWK parameters, so
+        // remove only those null-valued optional members before parsing. The
+        // JWK parser still validates all required members and their types.
+        if let Some(keys) = jwks.get_mut("keys").and_then(|keys| keys.as_array_mut()) {
+            for key in keys {
+                if let Some(key) = key.as_object_mut() {
+                    key.retain(|_, value| !value.is_null());
+                }
+            }
+        }
+
         let jwks = JwkSet::from_map(
             jwks.as_object()
                 .ok_or_else(|| invalid("jwks is not a JSON object"))?
@@ -227,6 +260,7 @@ impl TryFrom<&KapunValue> for EncryptionParameters {
             jwk,
             authorization_encrytped_response_alg: alg,
             authorization_encrypted_response_enc: enc,
+            compression: None,
         })
     }
 }
@@ -290,6 +324,7 @@ pub fn decrypt_jwe(jwk_json: String, compact_jwe: String) -> Result<String, JweE
         jwk,
         authorization_encrytped_response_alg: header.algorithm,
         authorization_encrypted_response_enc: header.content_encryption,
+        compression: None,
     };
     let (payload, _) = parameters.decrypt(&compact_jwe)?;
     serde_json::to_string(payload.as_ref()).map_err(|error| {
@@ -336,40 +371,47 @@ fn parse_jwe_header_internal(payload: &str) -> Result<JweHeaderParameters, JweEr
 }
 
 fn decrypter(jwk: &Jwk, algorithm: &str) -> Result<Box<dyn JweDecrypter>, JweError> {
+    // `kid` is optional in a compact JWE. The credential response has exactly one
+    // configured decryption key, so do not make josekit require the issuer to echo
+    // the client's optional key id in the protected header.
+    let mut decryption_jwk = jwk.clone();
+    decryption_jwk
+        .set_parameter("kid", None)
+        .map_err(|error| invalid(format!("could not prepare JWE decryption key: {error}")))?;
     let result: Result<Box<dyn JweDecrypter>, josekit::JoseError> = match algorithm {
         "ECDH-ES" => josekit::jwe::ECDH_ES
-            .decrypter_from_jwk(jwk)
+            .decrypter_from_jwk(&decryption_jwk)
             .map(|value| Box::new(value) as Box<dyn JweDecrypter>),
         "ECDH-ES+A128KW" => josekit::jwe::ECDH_ES_A128KW
-            .decrypter_from_jwk(jwk)
+            .decrypter_from_jwk(&decryption_jwk)
             .map(|value| Box::new(value) as Box<dyn JweDecrypter>),
         "ECDH-ES+A192KW" => josekit::jwe::ECDH_ES_A192KW
-            .decrypter_from_jwk(jwk)
+            .decrypter_from_jwk(&decryption_jwk)
             .map(|value| Box::new(value) as Box<dyn JweDecrypter>),
         "ECDH-ES+A256KW" => josekit::jwe::ECDH_ES_A256KW
-            .decrypter_from_jwk(jwk)
+            .decrypter_from_jwk(&decryption_jwk)
             .map(|value| Box::new(value) as Box<dyn JweDecrypter>),
         "RSA1_5" =>
         {
             #[allow(deprecated)]
             josekit::jwe::RSA1_5
-                .decrypter_from_jwk(jwk)
+                .decrypter_from_jwk(&decryption_jwk)
                 .map(|value| Box::new(value) as Box<dyn JweDecrypter>)
         }
         "RSA-OAEP" => josekit::jwe::RSA_OAEP
-            .decrypter_from_jwk(jwk)
+            .decrypter_from_jwk(&decryption_jwk)
             .map(|value| Box::new(value) as Box<dyn JweDecrypter>),
         "RSA-OAEP-256" => josekit::jwe::RSA_OAEP_256
-            .decrypter_from_jwk(jwk)
+            .decrypter_from_jwk(&decryption_jwk)
             .map(|value| Box::new(value) as Box<dyn JweDecrypter>),
         "A128KW" => josekit::jwe::A128KW
-            .decrypter_from_jwk(jwk)
+            .decrypter_from_jwk(&decryption_jwk)
             .map(|value| Box::new(value) as Box<dyn JweDecrypter>),
         "A192KW" => josekit::jwe::A192KW
-            .decrypter_from_jwk(jwk)
+            .decrypter_from_jwk(&decryption_jwk)
             .map(|value| Box::new(value) as Box<dyn JweDecrypter>),
         "A256KW" => josekit::jwe::A256KW
-            .decrypter_from_jwk(jwk)
+            .decrypter_from_jwk(&decryption_jwk)
             .map(|value| Box::new(value) as Box<dyn JweDecrypter>),
         _ => return Err(invalid(format!("Unsupported JWE algorithm: {algorithm}"))),
     };
@@ -434,6 +476,31 @@ mod tests {
     use super::*;
 
     #[test]
+    fn accepts_null_optional_jwk_parameters() {
+        let metadata: KapunValue = serde_json::json!({
+            "jwks": {
+                "keys": [{
+                    "kty": "EC",
+                    "kid": "e73888de-0eaf-44b4-8fb6-ee73aaf88c1f",
+                    "use": null,
+                    "alg": "ECDH-ES",
+                    "n": null,
+                    "e": null,
+                    "crv": "P-256",
+                    "x": "nEHGT6HADzzHuJwrf073Qln-zqmt4kTEUFpBNfqtHUg",
+                    "y": "6Pwzf2Z-TE5BLCPZ_FTEkcBYVwKCGnqmmE6CXkyg2UM"
+                }]
+            }
+        })
+        .into();
+
+        let parameters = EncryptionParameters::try_from(&metadata).unwrap();
+        assert_eq!(parameters.jwk.key_type(), "EC");
+        assert_eq!(parameters.jwk.algorithm(), Some("ECDH-ES"));
+        assert_eq!(parameters.authorization_encrytped_response_alg, "ECDH-ES");
+    }
+
+    #[test]
     fn ecdh_round_trip_with_compression() {
         let key = generate_jwe_key("ECDH-ES+A256KW".to_string()).unwrap();
         let encrypted = encrypt_jwe(
@@ -449,6 +516,28 @@ mod tests {
         let header = parse_jwe_header(encrypted.clone()).unwrap();
         assert_eq!(header.algorithm, "ECDH-ES+A256KW");
         assert_eq!(header.compression.as_deref(), Some("DEF"));
+        assert_eq!(
+            decrypt_jwe(key.private_jwk, encrypted).unwrap(),
+            r#"{"credential":"example"}"#
+        );
+    }
+
+    #[test]
+    fn ecdh_decrypts_without_optional_kid_header() {
+        let key = generate_jwe_key("ECDH-ES".to_string()).unwrap();
+        let mut public_jwk = Jwk::from_bytes(key.public_jwk.as_bytes()).unwrap();
+        public_jwk.set_parameter("kid", None).unwrap();
+        let encrypted = encrypt_jwe(
+            public_jwk.to_string(),
+            r#"{"credential":"example"}"#.to_string(),
+            "A256GCM".to_string(),
+            None,
+            None,
+            Some("JWT".to_string()),
+            None,
+        )
+        .unwrap();
+        assert_eq!(parse_jwe_header(encrypted.clone()).unwrap().key_id, None);
         assert_eq!(
             decrypt_jwe(key.private_jwk, encrypted).unwrap(),
             r#"{"credential":"example"}"#
