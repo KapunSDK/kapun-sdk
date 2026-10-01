@@ -12,6 +12,8 @@ uniffi.workspace = true
 typst = "0.14.0"
 typst-assets = {version = "0.14.0", features = ["fonts"]}
 typst-pdf = "0.14.0"
+typst-render = "0.14.0"
+tiny-skia = { version = "0.11.4", features = ["png-format"] }
 ureq.workspace = true
 kapun-util-rust = { path = "../../kapun-util/rust", default-features = false }
 fontdb = "0.16.2"
