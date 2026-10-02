@@ -59,6 +59,7 @@ p384.workspace = true
 web-time = "1.1.0"
 http = "0.2.12"
 kapun-util-rust = { path = "../../kapun-util/rust", default-features = false }
+kapun-federation-rust = { path = "../../kapun-federation/rust", default-features = false }
 kapun-crypto-rust = { path = "../../kapun-crypto/rust", default-features = false }
 kapun-credential-core-rust = { path = "../../kapun-credential-core/rust", default-features = false }
 kapun-dcql-rust = { path = "../../kapun-dcql/rust", default-features = false }
