@@ -80,12 +80,12 @@ pub fn oidcf_trust_chain_from_url(
     lenient_leaf_entity_config: bool,
 ) -> Result<OidcfTrustChainInfo, FederationError> {
     if ALLOW_UNTRUSTED_TLS.load(Ordering::Relaxed) {
-        oidcf_trust_chain_from_url_with_config::<kapun_util_rust::network::SdkNoVerifyConfig>(
+        oidcf_trust_chain_from_url_with_config::<kapun_federation_rust::network::SdkNoVerifyConfig>(
             url,
             lenient_leaf_entity_config,
         )
     } else {
-        oidcf_trust_chain_from_url_with_config::<kapun_util_rust::network::SdkDefaultConfig>(
+        oidcf_trust_chain_from_url_with_config::<kapun_federation_rust::network::SdkDefaultConfig>(
             url,
             lenient_leaf_entity_config,
         )
@@ -114,11 +114,11 @@ pub fn oidcf_trust_chain_from_presentation_request(
 ) -> Result<OidcfTrustChainInfo, FederationError> {
     if ALLOW_UNTRUSTED_TLS.load(Ordering::Relaxed) {
         oidcf_trust_chain_from_presentation_request_with_config::<
-            kapun_util_rust::network::SdkNoVerifyConfig,
+            kapun_federation_rust::network::SdkNoVerifyConfig,
         >(presentation_request_jwt, lenient_leaf_entity_config)
     } else {
         oidcf_trust_chain_from_presentation_request_with_config::<
-            kapun_util_rust::network::SdkDefaultConfig,
+            kapun_federation_rust::network::SdkDefaultConfig,
         >(presentation_request_jwt, lenient_leaf_entity_config)
     }
 }

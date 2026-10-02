@@ -12,6 +12,7 @@ members = [
     "kapun-issuance/rust",
     "kapun-presentation/rust",
     "kapun-trust/rust",
+    "kapun-federation/rust",
     "kapun-util/rust",
     "kapun-wallet/rust",
     "kapun-pdf/rust",
