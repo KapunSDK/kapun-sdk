@@ -1,7 +1,17 @@
+mod revocation;
+mod validation;
+pub use revocation::validate_chain_crls_with;
+use validation::{
+    ChainChecks, ConstraintCheck, RootSignature, StructureCheck, validate_chain_inner,
+};
+pub use validation::{
+    ChainEnd, ChainKind, ChainPolicy, IssuerUsage, ValidationError, has_self_signature,
+    is_self_issued, is_valid_at, validate_chain_with,
+};
+
 use kapun_crypto_provider::KapunCryptoProvider;
 use whitespace_sifter::WhitespaceSifter;
 use x509_parser::{
-    parse_x509_certificate,
     prelude::{
         ParsedExtension, TbsCertificateStructureValidator, Validator, VecLogger,
         X509ExtensionsValidator,
@@ -10,12 +20,31 @@ use x509_parser::{
     x509::X509Name,
 };
 
-use crate::{X509Error, crypto::verify_signature};
+use crate::{X509Error, crypto::verify_signature, parse_certificate};
+
+/// Provider-backed offline validation with explicit CRLs and chain policy.
+pub fn validate_chain_crls<Provider: KapunCryptoProvider>(
+    chain: &[Vec<u8>],
+    policy: &ChainPolicy,
+    crls: &[Vec<u8>],
+) -> Result<(), ValidationError> {
+    validate_chain_crls_with(
+        chain,
+        policy,
+        crls,
+        |issuer, subject, _| {
+            verify_signature::<Provider>(issuer, subject).map_err(|e| format!("{e:?}"))
+        },
+        |issuer, crl| {
+            crate::crypto::verify_crl::<Provider>(issuer, crl).map_err(|e| format!("{e:?}"))
+        },
+    )
+}
 
 pub fn select_root<T: AsRef<[u8]>>(cert: T, root_store: &Vec<Vec<u8>>) -> Option<Vec<u8>> {
-    let (_, cert) = x509_parser::parse_x509_certificate(cert.as_ref()).ok()?;
+    let cert = parse_certificate(cert.as_ref()).ok()?;
     for c in root_store {
-        let Ok((_, root)) = parse_x509_certificate(c.as_slice()) else {
+        let Ok(root) = parse_certificate(c.as_slice()) else {
             continue;
         };
         if are_x509_name_equal(&cert.issuer, &root.subject) {
@@ -45,20 +74,24 @@ pub fn complete_simple_chain<Provider: KapunCryptoProvider>(
 /// This function checks integrity of a self signed certificate used to sign
 /// user signatures. If Basic Constraint is available it MUST be false
 pub fn is_self_signed_user_cert<T: AsRef<[u8]>, Provider: KapunCryptoProvider>(cert: T) -> bool {
-    check_self_signed::<_, Provider>(cert, false, false)
+    check_self_signed::<_, Provider>(cert, CertificateRole::Leaf, ExtensionPresence::Optional)
 }
 /// This function checks, if the provided certificate is a valid CA (BasicConstrain cA = true).
 /// A CA MUST have the Basic Constraint extension!
 pub fn is_valid_ca<T: AsRef<[u8]>, Provider: KapunCryptoProvider>(cert: T) -> bool {
-    check_self_signed::<_, Provider>(cert, true, true)
+    check_self_signed::<_, Provider>(
+        cert,
+        CertificateRole::Authority,
+        ExtensionPresence::Required,
+    )
 }
 
 fn check_self_signed<T: AsRef<[u8]>, Provider: KapunCryptoProvider>(
     cert: T,
-    ca: bool,
-    critical: bool,
+    role: CertificateRole,
+    presence: ExtensionPresence,
 ) -> bool {
-    let Ok((_, issuer_cert)) = x509_parser::parse_x509_certificate(cert.as_ref()) else {
+    let Ok(issuer_cert) = parse_certificate(cert.as_ref()) else {
         return false;
     };
     let mut logger = VecLogger::default();
@@ -72,12 +105,15 @@ fn check_self_signed<T: AsRef<[u8]>, Provider: KapunCryptoProvider>(
         tracing::error!("{:?}", logger);
         return false;
     }
-    if !is_key_usage_correct(&issuer_cert) {
+    if !is_key_usage_correct(&issuer_cert, IssuerUsage::IfPresent) {
         tracing::error!("issuer cert has incorrect key usage");
         return false;
     }
 
-    let is_valid = verify_signature::<Provider>(&issuer_cert, &issuer_cert).is_ok();
+    let is_valid = has_self_signature(&issuer_cert, |cert| {
+        verify_signature::<Provider>(cert, cert)
+    })
+    .unwrap_or(false);
     if !is_valid {
         tracing::error!("signature invalid");
         return false;
@@ -91,15 +127,10 @@ fn check_self_signed<T: AsRef<[u8]>, Provider: KapunCryptoProvider>(
         // network error or not on the list
         _ => {}
     }
-    match is_basic_constraint_fulfilled(&issuer_cert, 0, 0, ca, critical) {
+    match is_basic_constraint_fulfilled(&issuer_cert, 0, role, presence) {
         Ok(fulfilled) => fulfilled,
         Err(_) => false,
     }
-}
-
-enum AnchorTrust {
-    Explicit,
-    SelfSigned,
 }
 
 pub fn verify_chain_at_with_trust_anchors<Provider: KapunCryptoProvider>(
@@ -109,174 +140,53 @@ pub fn verify_chain_at_with_trust_anchors<Provider: KapunCryptoProvider>(
     check_basic_constraint: bool,
     trust_store: Option<&Vec<Vec<u8>>>,
 ) -> bool {
-    let Some(last_cert) = certs.last() else {
-        return false;
+    let end = if trust_store.is_some() {
+        ChainEnd::Trusted
+    } else {
+        ChainEnd::Complete
     };
-
-    let Some(trust_store) = trust_store else {
-        return verify_chain_at_with_anchor::<Provider>(
-            certs,
-            time,
-            #[cfg(feature = "crl")]
-            check_crl,
-            check_basic_constraint,
-            AnchorTrust::SelfSigned,
-        );
+    let policy = ChainPolicy {
+        kind: ChainKind::Signing,
+        end,
+        issuer_usage: IssuerUsage::IfPresent,
+        time: time.timestamp(),
+        trusted_anchors: trust_store.cloned().unwrap_or_default(),
+        expected_spki: None,
     };
-
-    if trust_store.contains(last_cert) {
-        return verify_chain_at_with_anchor::<Provider>(
-            certs,
-            time,
-            #[cfg(feature = "crl")]
-            check_crl,
-            check_basic_constraint,
-            AnchorTrust::Explicit,
-        );
-    }
-
-    let Ok((_, last_cert)) = parse_x509_certificate(last_cert) else {
-        return false;
+    let checks = ChainChecks {
+        constraints: if check_basic_constraint {
+            ConstraintCheck::Required
+        } else {
+            ConstraintCheck::Unchecked
+        },
+        structure: StructureCheck::Required,
+        root_signature: RootSignature::UnlessTrusted,
+        minimum_length: 2,
     };
-
-    // A matching issuer name only identifies candidates; validate each completed chain.
-    trust_store.iter().any(|anchor| {
-        let Ok((_, parsed_anchor)) = parse_x509_certificate(anchor) else {
-            return false;
-        };
-        if !are_x509_name_equal(&last_cert.issuer, &parsed_anchor.subject) {
-            return false;
+    let verify = |issuer: &x509_parser::prelude::X509Certificate,
+                  subject: &x509_parser::prelude::X509Certificate,
+                  _: &[u8]| {
+        verify_signature::<Provider>(issuer, subject).map_err(|e| format!("{e:?}"))?;
+        #[cfg(feature = "crl")]
+        if check_crl
+            && (matches!(check_revocation(subject), Ok(true) | Err(_))
+                || matches!(check_revocation(issuer), Ok(true) | Err(_)))
+        {
+            return Err("Certificate revocation check failed".into());
         }
-
-        let mut candidate_chain = certs.clone();
-        candidate_chain.push(anchor.clone());
-        verify_chain_at_with_anchor::<Provider>(
-            candidate_chain,
-            time,
-            #[cfg(feature = "crl")]
-            check_crl,
-            check_basic_constraint,
-            AnchorTrust::Explicit,
-        )
-    })
-}
-
-fn verify_chain_at_with_anchor<Provider: KapunCryptoProvider>(
-    certs: Vec<Vec<u8>>,
-    time: ASN1Time,
-    #[cfg(feature = "crl")] check_crl: bool,
-    check_basic_constraint: bool,
-    anchor_trust: AnchorTrust,
-) -> bool {
-    // first certificate is the leaf certificate
-    let mut certs = certs;
-
-    // An explicitly trusted anchor need not be self signed.
-    if matches!(anchor_trust, AnchorTrust::SelfSigned) {
-        let Some(last_cert) = certs.last() else {
-            return false;
-        };
-        if !is_valid_ca::<_, Provider>(last_cert) {
-            tracing::error!("trust anchor MUST be valid");
-            return false;
-        }
-    }
-    // a valid chain requires at least two certificates (leaf + issuer)
-    if certs.len() < 2 {
-        tracing::error!("chain must contain at least two certificates");
+        Ok(())
+    };
+    if validate_chain_inner(&certs, &policy, &checks, &verify).is_err() {
         return false;
     }
-    // This should not move up, as we insert certificates in the case of a trust-chain
-    // the last (or rather first) certificate is not an intermediate and is not counted towards the path len
-    let total_path_len = certs.len() - 1;
-    let mut prev_cert = certs.pop();
-    let mut current_position = 1;
-    while let Some(issuer_cert) = prev_cert {
-        prev_cert = certs.pop();
-        if let Some(subject_cert) = prev_cert.as_ref() {
-            let Ok((_, issuer_cert)) = x509_parser::parse_x509_certificate(issuer_cert.as_slice())
-            else {
-                return false;
-            };
-            let mut logger = VecLogger::default();
-            let structure_validity =
-                TbsCertificateStructureValidator.validate(&issuer_cert, &mut logger);
-            let x509_extensions_validity =
-                X509ExtensionsValidator.validate(&issuer_cert.extensions(), &mut logger);
-            if !(structure_validity && x509_extensions_validity) {
-                tracing::error!("subject cert has invalid structure");
-                return false;
-            }
-            let (_, subject_cert) =
-                x509_parser::parse_x509_certificate(subject_cert.as_slice()).unwrap();
-            let structure_validity =
-                TbsCertificateStructureValidator.validate(&subject_cert, &mut logger);
-            let x509_extensions_validity =
-                X509ExtensionsValidator.validate(&subject_cert.extensions(), &mut logger);
-            if !(structure_validity && x509_extensions_validity) {
-                tracing::error!("issuer cert has invalid structure");
-                return false;
-            }
-            if !is_key_usage_correct(&issuer_cert) {
-                tracing::error!("issuer cert has incorrect key usage");
-                return false;
-            }
-            if check_basic_constraint {
-                match is_basic_constraint_true(&issuer_cert, current_position, total_path_len) {
-                    Ok(false) | Err(_) => {
-                        tracing::error!("basic constraint not fullfileld");
-                        return false;
-                    }
-                    _ => {}
-                }
-            }
 
-            let is_valid = verify_signature::<Provider>(&issuer_cert, &subject_cert).is_ok();
-            if !is_valid {
-                tracing::error!("signature invalid");
-                return false;
-            }
-            if !are_x509_name_equal(&subject_cert.issuer, &issuer_cert.subject) {
-                tracing::error!(
-                    "issuer name and subject name missmatch {}/{}",
-                    &subject_cert.issuer.to_string(),
-                    &issuer_cert.subject.to_string()
-                );
-                return false;
-            }
-
-            let issuer_validity = issuer_cert.validity();
-            if !issuer_validity.is_valid_at(time) {
-                tracing::error!("subject certificate is not valid");
-                return false;
-            }
-            let subject_validity = subject_cert.validity();
-            if !subject_validity.is_valid_at(time) {
-                tracing::error!("issuer certificate is not valid");
-                return false;
-            }
-            #[cfg(feature = "crl")]
-            if check_crl {
-                match check_revocation(&subject_cert) {
-                    // certificate is revoked (on the CRL)
-                    Ok(true) => return false,
-                    // something went wrong
-                    Err(_) => return false,
-                    // network error or not on the list
-                    _ => {}
-                }
-                #[cfg(feature = "crl")]
-                match check_revocation(&issuer_cert) {
-                    // certificate is revoked (on the CRL)
-                    Ok(true) => return false,
-                    // something went wrong
-                    Err(_) => return false,
-                    // network error or not on the list
-                    _ => {}
-                }
-            }
-            current_position += 1;
-        }
+    // Preserve the legacy self-signed root check, including its CRL policy.
+    if matches!(end, ChainEnd::Complete)
+        && !certs
+            .last()
+            .is_some_and(|root| is_valid_ca::<_, Provider>(root))
+    {
+        return false;
     }
     true
 }
@@ -321,82 +231,98 @@ pub fn verify_chain_with_trust_anchor<Provider: KapunCryptoProvider>(
     )
 }
 
-// key usage should be parsable and if present be certSign
-fn is_key_usage_correct(cert: &x509_parser::prelude::X509Certificate) -> bool {
+pub fn is_key_usage_correct(
+    cert: &x509_parser::prelude::X509Certificate,
+    policy: IssuerUsage,
+) -> bool {
+    if matches!(policy, IssuerUsage::Unchecked) {
+        return true;
+    }
     let Ok(key_usage) = cert.key_usage() else {
-        // log_error!("X509", "Failed to parse keyusage");
         return false;
     };
-    let Some(key_usage) = key_usage else {
-        // no key usage, everything fine
-        return true;
-    };
-    key_usage.value.key_cert_sign()
+    match key_usage {
+        Some(usage) => usage.value.key_cert_sign(),
+        None => matches!(policy, IssuerUsage::IfPresent),
+    }
 }
 
-/// Make sure signing certificates have cA true
-fn is_basic_constraint_true(
-    cert: &x509_parser::prelude::X509Certificate,
-    current_path_len: usize,
-    total_path_len: usize,
-) -> Result<bool, ()> {
-    is_basic_constraint_fulfilled(cert, current_path_len, total_path_len, true, true)
+#[derive(Clone, Copy, Debug)]
+pub enum CertificateRole {
+    Authority,
+    Leaf,
 }
-fn is_basic_constraint_fulfilled(
-    cert: &x509_parser::prelude::X509Certificate,
-    current_path_len: usize,
-    total_path_len: usize,
-    ca: bool,
-    critical: bool,
-) -> Result<bool, ()> {
-    let Ok(basic_constraints) = cert.basic_constraints() else {
-        tracing::error!("Invalid basic constraints");
-        return Err(());
-    };
-    // It was parsed successfully but no basic constriants was found
-    let Some(basic_constraints) = basic_constraints else {
-        if critical {
-            tracing::error!("No basic constraint found");
-        } else {
-            tracing::info!("No basic constraint found");
-        }
-        return Ok(!critical);
-    };
+#[derive(Clone, Copy, Debug)]
+pub enum ExtensionPresence {
+    Required,
+    Optional,
+}
 
-    let basic_constraints = basic_constraints.value;
-    // all intermediate have to have ca = true
-    if basic_constraints.ca != ca {
-        tracing::error!("Ca is {} but should be {}", basic_constraints.ca, ca);
+pub fn basic_constraints<'a>(
+    cert: &'a x509_parser::prelude::X509Certificate<'_>,
+) -> Result<Option<&'a x509_parser::extensions::BasicConstraints>, ()> {
+    use x509_parser::der_parser::oid;
+    let Some(extension) = cert
+        .get_extension_unique(&oid!(2.5.29.19))
+        .map_err(|_| ())?
+    else {
+        return Ok(None);
+    };
+    match extension.parsed_extension() {
+        ParsedExtension::BasicConstraints(value) => Ok(Some(value)),
+        _ => Err(()),
+    }
+}
+
+/// Check the role and number of subordinate, non-self-issued CAs.
+pub fn is_basic_constraint_fulfilled(
+    cert: &x509_parser::prelude::X509Certificate,
+    depth: usize,
+    role: CertificateRole,
+    presence: ExtensionPresence,
+) -> Result<bool, ()> {
+    let Some(constraints) = basic_constraints(cert)? else {
+        return Ok(matches!(presence, ExtensionPresence::Optional));
+    };
+    let authority = matches!(role, CertificateRole::Authority);
+    if constraints.ca != authority {
         return Ok(false);
     }
-    if ca {
-        let remaining_path_len = total_path_len.saturating_sub(current_path_len);
-        if let Some(path_constraint) = basic_constraints.path_len_constraint {
-            if remaining_path_len > path_constraint as usize {
-                tracing::error!(
-                    "Too many certificates in the path {} [{}]",
-                    remaining_path_len,
-                    path_constraint
-                );
-                return Ok(false);
-            }
-        }
-    }
-    Ok(true)
+    Ok(!authority
+        || constraints
+            .path_len_constraint
+            .is_none_or(|limit| depth <= limit as usize))
 }
 
-/// compare x509 name removing trailing/leading bits and lowercasing
+/// Compare RDN groups, including attribute OIDs, with normalized textual values.
 pub fn are_x509_name_equal(left: &X509Name, right: &X509Name) -> bool {
-    left.iter().count() == right.iter().count()
-        && left.iter().zip(right.iter()).all(|(l, r)| {
-            l.iter().count() == r.iter().count()
-                && l.iter()
-                    .zip(r.iter())
-                    .all(|(lc, rc)| match (lc.as_str(), rc.as_str()) {
-                        (Ok(ls), Ok(rs)) => ls.sift().to_lowercase() == rs.sift().to_lowercase(),
-                        _ => lc.as_slice() == rc.as_slice(),
+    use x509_parser::x509::AttributeTypeAndValue;
+    let canonical = |name: &X509Name| {
+        name.iter_rdn()
+            .map(|rdn| {
+                let mut values: Vec<_> = rdn
+                    .iter()
+                    .map(|value: &AttributeTypeAndValue| {
+                        let text = value.as_str().ok().map(|v| v.sift().to_lowercase());
+                        let tag = if text.is_some() {
+                            None
+                        } else {
+                            Some(value.attr_value().tag().0)
+                        };
+                        let raw = if text.is_some() {
+                            Vec::new()
+                        } else {
+                            value.as_slice().to_vec()
+                        };
+                        (value.attr_type().to_id_string(), text, tag, raw)
                     })
-        })
+                    .collect();
+                values.sort();
+                values
+            })
+            .collect::<Vec<_>>()
+    };
+    canonical(left) == canonical(right)
 }
 
 pub fn get_crl_uri(cert: &x509_parser::prelude::X509Certificate) -> Result<Option<String>, ()> {
@@ -460,17 +386,19 @@ pub fn check_revocation(cert: &x509_parser::prelude::X509Certificate) -> Result<
     };
     // Fetch the revocation list using the same opt-in TLS policy as the SDK's other Rust
     // networking paths. Certificate validation remains enabled by default.
-    let mut config = ureq::Agent::config_builder();
-    if let Some(user_agent) = kapun_util_rust::network::user_agent() {
-        config = config.user_agent(user_agent);
-    }
-    if kapun_util_rust::network::untrusted_tls_allowed() {
-        config = config.tls_config(
-            ureq::tls::TlsConfig::builder()
-                .disable_verification(true)
-                .build(),
-        );
-    }
+    //
+    // TODO: we need to fix this in another way, as the dependency onto kapun-util introduces an unnecessary cycle
+    let config = ureq::Agent::config_builder();
+    // if let Some(user_agent) = kapun_util_rust::network::user_agent() {
+    //     config = config.user_agent(user_agent);
+    // }
+    // if kapun_util_rust::network::untrusted_tls_allowed() {
+    //     config = config.tls_config(
+    //         ureq::tls::TlsConfig::builder()
+    //             .disable_verification(true)
+    //             .build(),
+    //     );
+    // }
     let agent = ureq::Agent::new_with_config(config.build());
     let Ok(mut response) = agent.get(&uri).call() else {
         // failed network requests are ignored
@@ -518,7 +446,9 @@ mod tests {
 
     use crate::x509::{is_valid_ca, verify_chain_at, verify_chain_at_with_trust_anchors};
 
-    use super::{are_x509_name_equal, verify_chain};
+    use super::{
+        ChainEnd, ChainKind, ChainPolicy, IssuerUsage, are_x509_name_equal, validate_chain_crls,
+    };
 
     #[test]
     /// Test if intermediate can act as an trust anchor
@@ -647,10 +577,35 @@ mod tests {
         )
     }
 
+    type NistSuite = BTreeMap<String, Vec<(String, Vec<u8>)>>;
+
+    const NIST_TIME: i64 = 1790351645;
+
+    fn nist_suite() -> NistSuite {
+        let test_suite_bytes = include_bytes!("../x509tests.tgz");
+        let test_suite_bytes = GzDecoder::new(Cursor::new(test_suite_bytes));
+        let mut test_suite_archive = tar::Archive::new(test_suite_bytes);
+        let mut test_map = BTreeMap::<String, Vec<(String, Vec<u8>)>>::new();
+        for entry in test_suite_archive.entries().unwrap() {
+            let Ok(mut entry) = entry else {
+                continue;
+            };
+            let path = entry.path().unwrap();
+            if path.extension().is_some() {
+                let testfile = path.strip_prefix("X509tests").unwrap();
+                let test_name = testfile.parent().unwrap().to_str().unwrap().to_string();
+                let file_name = testfile.file_name().unwrap().to_str().unwrap().to_string();
+                let directory = test_map.entry(test_name).or_default();
+                let mut file_bytes = Vec::with_capacity(entry.size() as usize);
+                entry.read_to_end(&mut file_bytes).unwrap();
+                directory.push((file_name, file_bytes));
+            }
+        }
+        test_map
+    }
+
     #[test]
     /// Tests from https://csrc.nist.gov/Projects/pki-testing/x-509-path-validation-test-suite Version 1.07
-    /// Tests regarding the CRL are currently ignored, as the certificates do not contain distribution points.
-    ///
     fn test_x509_path_validation() {
         use tracing_subscriber::{EnvFilter, fmt, prelude::*};
         let _ = tracing_subscriber::registry()
@@ -676,6 +631,9 @@ mod tests {
             ("test16", true),
             ("test17", true),
             ("test18", true),
+            ("test19", false),
+            ("test20", false),
+            ("test21", false),
             ("test22", false),
             ("test23", false),
             ("test24", true),
@@ -684,6 +642,9 @@ mod tests {
             ("test27", true),
             ("test28", false),
             ("test29", false),
+            ("test30", true),
+            ("test31", false),
+            ("test32", false),
             ("test33", true),
             ("test54", false),
             ("test55", false),
@@ -695,36 +656,26 @@ mod tests {
             ("test61", false),
             ("test62", true),
             ("test63", true),
+            ("test64", false),
+            ("test65", false),
+            ("test66", false),
+            ("test67", true),
+            ("test68", false),
+            ("test69", false),
+            ("test70", false),
+            ("test71", false),
+            ("test72", false),
+            ("test73", false),
+            ("test74", true),
+            ("test75", false),
+            ("test76", false),
         ]
         .into_iter()
         .collect();
-        let test_suite_bytes = include_bytes!("../x509tests.tgz");
-        let test_suite_bytes = GzDecoder::new(Cursor::new(test_suite_bytes));
-        let mut test_suite_archive = tar::Archive::new(test_suite_bytes);
-        let mut test_map = BTreeMap::<String, Vec<(String, Vec<u8>)>>::new();
-        let mut test_vec = Vec::new();
-        for entry in test_suite_archive.entries().unwrap() {
-            let Ok(mut entry) = entry else {
-                continue;
-            };
-            let path = entry.path().unwrap();
-            if path.extension().is_some() {
-                let testfile = path.strip_prefix("X509tests").unwrap();
-                let test_name = testfile.parent().unwrap().to_str().unwrap().to_string();
-                let file_name = testfile.file_name().unwrap().to_str().unwrap().to_string();
-                if !test_vec.contains(&test_name) {
-                    test_vec.push(test_name.clone());
-                }
-                let directory = test_map.entry(test_name).or_default();
-                let mut file_bytes = Vec::with_capacity(entry.size() as usize);
-                entry.read_to_end(&mut file_bytes).unwrap();
-                directory.push((file_name, file_bytes));
-            }
-        }
+        let test_map = nist_suite();
         let mut correct = 0;
         let mut total = 0;
-        for test in test_vec {
-            let test_files = &test_map[&test];
+        for (test, test_files) in &test_map {
             let mut certs = test_files
                 .iter()
                 .filter(|a| a.0.ends_with(".crt"))
@@ -732,7 +683,21 @@ mod tests {
                 .collect::<Vec<_>>();
             certs.reverse();
 
-            let result = verify_chain::<JosekitCryptoProvider>(certs);
+            let crls = test_files
+                .iter()
+                .filter(|(name, _)| name.ends_with(".crl"))
+                .map(|(_, der)| der.clone())
+                .collect::<Vec<_>>();
+            let policy = ChainPolicy {
+                kind: ChainKind::Signing,
+                end: ChainEnd::Complete,
+                issuer_usage: IssuerUsage::IfPresent,
+                time: NIST_TIME,
+                trusted_anchors: vec![],
+                expected_spki: None,
+            };
+            let validation = validate_chain_crls::<JosekitCryptoProvider>(&certs, &policy, &crls);
+            let result = validation.is_ok();
             let matches = if let Some(expected) = truth_table.get(&test.as_str()) {
                 total += 1;
                 if expected == &result {
@@ -744,6 +709,12 @@ mod tests {
             } else {
                 "-"
             };
+            if truth_table
+                .get(test.as_str())
+                .is_some_and(|expected| *expected != result)
+            {
+                println!("{test}: {validation:?}");
+            }
             println!(
                 "{}: {} [{}] -> {matches}",
                 test,
@@ -756,6 +727,49 @@ mod tests {
         }
         println!("{correct}/{total}");
         assert_eq!(correct, total);
+    }
+
+    #[test]
+    fn test_target_ca_path_length() {
+        let suite = nist_suite();
+        for case in ["test57", "test63"] {
+            let mut chain: Vec<_> = suite[case]
+                .iter()
+                .filter(|(name, _)| name.ends_with(".crt"))
+                .map(|(_, der)| der.clone())
+                .collect();
+            chain.reverse();
+
+            // A CA used as the target is excluded from the issuer's path length.
+            assert!(
+                verify_chain_at::<JosekitCryptoProvider>(
+                    chain.clone(),
+                    ASN1Time::from_timestamp(NIST_TIME).unwrap(),
+                    #[cfg(feature = "crl")]
+                    false,
+                    true,
+                ),
+                "{case}"
+            );
+
+            // An issuing-CA chain reserves space for every subordinate CA.
+            let policy = ChainPolicy {
+                kind: ChainKind::Authorities,
+                end: ChainEnd::Complete,
+                issuer_usage: IssuerUsage::IfPresent,
+                time: NIST_TIME,
+                trusted_anchors: vec![],
+                expected_spki: None,
+            };
+            assert!(
+                super::validate_chain_with(&chain, &policy, |issuer, subject, _| {
+                    crate::crypto::verify_signature::<JosekitCryptoProvider>(issuer, subject)
+                        .map_err(|error| format!("{error:?}"))
+                })
+                .is_err(),
+                "{case}"
+            );
+        }
     }
 
     fn make_rdn<'a>(oid_parts: &[u64], value: &'a [u8]) -> RelativeDistinguishedName<'a> {

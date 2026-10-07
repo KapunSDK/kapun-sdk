@@ -5333,10 +5333,11 @@ name = "kapun-x509"
 version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
+ "const-oid 0.10.2",
+ "der 0.8.2",
  "flate2",
  "josekit",
  "kapun-crypto-provider",
- "kapun-util-rust",
  "p12 0.6.3 (git+https://github.com/heidiverse/p12.git)",
  "pem",
  "rand 0.8.8",
@@ -5344,6 +5345,7 @@ dependencies = [
  "signature 3.0.0",
  "simple_x509",
  "tar",
+ "thiserror 2.0.20",
  "tracing",
  "tracing-subscriber 0.3.23",
  "ureq 3.4.2",

@@ -1,10 +1,13 @@
+pub(crate) mod encoding;
+pub use encoding::{SignatureAlgorithm, SignatureEncoding, signature_algorithm};
+mod certificate;
+pub use certificate::{complete_certificate, prepare_certificate, san_extension};
+
 use std::{str::FromStr, time::Duration};
 
 use kapun_crypto_provider::{Signer as KapunSigner, Verifier as KapunVerifier};
 
 use x509_cert::der::Encode;
-use x509_cert::der::asn1::Ia5String;
-use x509_cert::ext::pkix::name::GeneralName;
 use x509_cert::{
     SubjectPublicKeyInfo,
     builder::{Builder, CertificateBuilder, profile},
@@ -51,12 +54,9 @@ pub fn new_cert<V: KapunVerifier + ?Sized, S: KapunSigner + ?Sized>(
             CertificateBuilder::new(profile, serial_number, validity, spki).unwrap();
 
         if let Some(san_dns) = san_dns {
-            let mut gn = vec![];
-            for s in san_dns {
-                gn.push(GeneralName::DnsName(Ia5String::new(s).unwrap()));
-            }
+            let dns = san_dns.into_iter().map(str::to_owned).collect::<Vec<_>>();
             cert_builder
-                .add_extension(&x509_cert::ext::pkix::SubjectAltName(gn))
+                .add_extension(&san_extension(&dns, &[]).unwrap())
                 .unwrap();
         }
 
@@ -96,18 +96,11 @@ fn signing_algorithm_from_spki(
     const P384: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.132.0.34");
     const P521: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.132.0.35");
     const SECP256K1: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.132.0.10");
-    const ECDSA_SHA256: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.10045.4.3.2");
-    const ECDSA_SHA384: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.10045.4.3.3");
-    const ECDSA_SHA512: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.10045.4.3.4");
     const RSA_ENCRYPTION: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.1");
-    const RSA_SHA256: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.11");
     const ED25519: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.101.112");
     const ED448: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.101.113");
-    const ML_DSA_44: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.16.840.1.101.3.4.3.17");
-    const ML_DSA_65: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.16.840.1.101.3.4.3.18");
-    const ML_DSA_87: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.16.840.1.101.3.4.3.19");
 
-    let signature_oid = match algorithm.oid {
+    let signature = match algorithm.oid {
         EC_PUBLIC_KEY => {
             let curve = algorithm
                 .parameters
@@ -115,23 +108,23 @@ fn signing_algorithm_from_spki(
                 .ok_or(x509_cert::spki::Error::AlgorithmParametersMissing)?
                 .decode_as::<ObjectIdentifier>()?;
             match curve {
-                P256 | SECP256K1 => ECDSA_SHA256,
-                P384 => ECDSA_SHA384,
-                P521 => ECDSA_SHA512,
+                P256 | SECP256K1 => SignatureAlgorithm::Es256,
+                P384 => SignatureAlgorithm::Es384,
+                P521 => SignatureAlgorithm::Es512,
                 oid => return Err(x509_cert::spki::Error::OidUnknown { oid }),
             }
         }
         // A generic RSA SPKI does not identify the hash. Use RS256 as the
         // baseline JWA algorithm until josekit exposes its signing algorithm.
-        RSA_ENCRYPTION => RSA_SHA256,
-        ED25519 | ED448 | ML_DSA_44 | ML_DSA_65 | ML_DSA_87 => algorithm.oid,
+        RSA_ENCRYPTION => SignatureAlgorithm::Rs256,
+        ED25519 => SignatureAlgorithm::Ed25519,
+        ED448 => SignatureAlgorithm::Ed448,
         _ => return Ok(algorithm),
     };
 
-    Ok(x509_cert::AlgorithmIdentifier {
-        oid: signature_oid,
-        parameters: None,
-    })
+    Ok(x509_cert::AlgorithmIdentifier::from_der(
+        &signature_algorithm(signature)?,
+    )?)
 }
 
 pub struct KapunSignature(Vec<u8>);
@@ -141,49 +134,18 @@ impl SignatureBitStringEncoding for KapunSignature {
     }
 }
 
-fn ecdsa_signature_to_der(signature: &[u8]) -> Option<Vec<u8>> {
+pub(crate) fn ecdsa_signature_to_der(signature: &[u8]) -> Option<Vec<u8>> {
+    use x509_cert::der::asn1::Uint;
     if signature.is_empty() || signature.len() % 2 != 0 {
         return None;
     }
-
-    fn encode_length(output: &mut Vec<u8>, length: usize) {
-        if length < 128 {
-            output.push(length as u8);
-            return;
-        }
-
-        let bytes = length.to_be_bytes();
-        let first = bytes.iter().position(|byte| *byte != 0).unwrap();
-        output.push(0x80 | (bytes.len() - first) as u8);
-        output.extend_from_slice(&bytes[first..]);
-    }
-
-    fn encode_integer(output: &mut Vec<u8>, value: &[u8]) {
-        let first = value
-            .iter()
-            .position(|byte| *byte != 0)
-            .unwrap_or(value.len() - 1);
-        let value = &value[first..];
-        let needs_sign_padding = value[0] & 0x80 != 0;
-
-        output.push(0x02);
-        encode_length(output, value.len() + usize::from(needs_sign_padding));
-        if needs_sign_padding {
-            output.push(0);
-        }
-        output.extend_from_slice(value);
-    }
-
     let (r, s) = signature.split_at(signature.len() / 2);
-    let mut integers = Vec::with_capacity(signature.len() + 6);
-    encode_integer(&mut integers, r);
-    encode_integer(&mut integers, s);
-
-    let mut der = Vec::with_capacity(integers.len() + 3);
-    der.push(0x30);
-    encode_length(&mut der, integers.len());
-    der.extend_from_slice(&integers);
-    Some(der)
+    encoding::EcdsaSignature {
+        r: Uint::new(r).ok()?,
+        s: Uint::new(s).ok()?,
+    }
+    .to_der()
+    .ok()
 }
 
 fn is_ecdsa_signature_oid(oid: &[u8]) -> bool {
