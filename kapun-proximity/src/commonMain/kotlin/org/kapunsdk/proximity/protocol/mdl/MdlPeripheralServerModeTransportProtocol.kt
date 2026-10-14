@@ -113,7 +113,7 @@ internal class MdlPeripheralServerModeTransportProtocol(
 		reportDisconnected()
 		inhibitCallbacks()
 
-		sendTransportSpecificTerminationMessage()
+		runCatching { sendTransportSpecificTerminationMessage() }
 
 		gattServer?.apply {
 			stopAdvertising()
