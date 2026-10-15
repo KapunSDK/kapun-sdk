@@ -97,12 +97,8 @@ internal class MdlTransportProtocol(
     }
 
     override fun disconnect() {
-        if(centralClientModeTransportProtocol?.isConnected == true) {
             centralClientModeTransportProtocol?.disconnect()
-        }
-        if(peripheralServerModeTransportProtocol?.isConnected == true) {
             peripheralServerModeTransportProtocol?.disconnect()
-        }
     }
 
     override fun sendMessage(data: ByteArray, onProgress: ((sent: Int, total: Int) -> Unit)?) {
