@@ -116,10 +116,12 @@ class EuTrustFramework(private val documentProvider: org.kapunsdk.trust.framewor
         presentationRequest: PresentationRequest,
         originalRequest: String?
     ): AgentInformation? {
-        val certs = getX509FromJwt(originalRequest!!)
+        // A request passed by value carries no certificate to check.
+        val request = originalRequest ?: return null
+        val certs = getX509FromJwt(request)
         val isChainValid = certs?.let { trustAnchorProvider.verifyChain(it)  } ?: false
         val isSigned = certs?.getOrNull(0)?.publicKey?.let {
-            validateJwtWithPubKey(originalRequest, it)
+            validateJwtWithPubKey(request, it)
         } ?: false
         val isTrusted = isSigned and isChainValid
         val san = if (presentationRequest.clientId.startsWith("x509_san_uri")){

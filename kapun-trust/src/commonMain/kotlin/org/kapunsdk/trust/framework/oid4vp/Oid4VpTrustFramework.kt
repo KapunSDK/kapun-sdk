@@ -137,7 +137,7 @@ class Oid4VpTrustFramework(
             put(
                 "entityName", Value.Object(
                     mapOf(
-                        "de" to Value.String(presentationRequest.clientMetadata?.clientName ?: x509Trust!!.san)
+                        "de" to Value.String(presentationRequest.clientMetadata?.clientName ?: x509Trust?.san ?: presentationRequest.clientId)
                     )
                 ),
             )
@@ -163,7 +163,7 @@ class Oid4VpTrustFramework(
         return AgentInformation(
             type = AgentType.VERIFIER,
             domain = baseUrl,
-            displayName = presentationRequest.clientMetadata?.clientName ?: x509Trust!!.san,
+            displayName = presentationRequest.clientMetadata?.clientName ?: x509Trust?.san ?: presentationRequest.clientId,
             logoUri = presentationRequest.clientMetadata?.logoUri,
             isTrusted = isTrusted,
             isVerified = isValid,
