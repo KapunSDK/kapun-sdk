@@ -47,7 +47,7 @@ jsonschema = { version = "0.17", default-features = false }
 openid-federation = { git = "https://github.com/heidiverse/openid-federation.git", branch = "main" }
 rand_core = { version = "0.6.4", features = ["getrandom"] }
 ark-serialize = "0.4.2"
-josekit = { git = "https://github.com/heidiverse/josekit-rs.git", default-features = false, features = [
+josekit = { git = "https://github.com/heidiverse/josekit-rs.git", branch = "codex/extended-rustcrypto-algorithms",default-features = false, features = [
     "rustcrypto",
 ]}
 

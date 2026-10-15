@@ -3803,7 +3803,7 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "itertools 0.14.0",
- "josekit",
+ "josekit 0.11.0 (git+https://github.com/heidiverse/josekit-rs.git)",
  "kapun-x509 0.1.0 (git+https://github.com/KapunSDK/kapun-sdk.git)",
  "serde",
  "serde_json",
@@ -4704,6 +4704,52 @@ dependencies = [
 [[package]]
 name = "josekit"
 version = "0.11.0"
+source = "git+https://github.com/heidiverse/josekit-rs.git?branch=codex%2Fextended-rustcrypto-algorithms#eae524b64b00192aa069276062d73bdb5a29920a"
+dependencies = [
+ "aes 0.8.4",
+ "aes-gcm 0.10.3",
+ "aes-kw",
+ "anyhow",
+ "base64 0.22.1",
+ "base64ct",
+ "cbc 0.1.2",
+ "crypto-bigint 0.7.5",
+ "crypto-primes",
+ "cx448",
+ "der 0.8.2",
+ "digest 0.11.3",
+ "ed25519-dalek 3.0.0",
+ "flate2",
+ "getrandom 0.2.17",
+ "getrandom 0.3.4",
+ "hmac 0.13.0",
+ "k256",
+ "kapun-crypto-provider",
+ "ml-dsa",
+ "p256 0.13.2",
+ "p384",
+ "p521",
+ "pbkdf2 0.13.0",
+ "pem",
+ "pkcs1 0.8.0-rc.4",
+ "pkcs8 0.11.0",
+ "rand 0.10.2",
+ "regex",
+ "rsa 0.10.0-rc.18",
+ "serde",
+ "serde_json",
+ "sha1 0.11.0",
+ "sha2 0.11.0",
+ "signature 3.0.0",
+ "spki 0.8.0",
+ "thiserror 2.0.20",
+ "time",
+ "x25519-dalek 2.0.1",
+]
+
+[[package]]
+name = "josekit"
+version = "0.11.0"
 source = "git+https://github.com/heidiverse/josekit-rs.git#d8659fa1eb1331f4f009da736d21f9f61090715e"
 dependencies = [
  "aes 0.8.4",
@@ -5054,7 +5100,7 @@ dependencies = [
  "ed25519-dalek 2.2.0",
  "heidi-jwt",
  "hkdf 0.12.4",
- "josekit",
+ "josekit 0.11.0 (git+https://github.com/heidiverse/josekit-rs.git?branch=codex%2Fextended-rustcrypto-algorithms)",
  "kapun-util-rust",
  "kapun-x509 0.1.0",
  "multibase",
@@ -5221,7 +5267,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "heidi-jwt",
- "josekit",
+ "josekit 0.11.0 (git+https://github.com/heidiverse/josekit-rs.git?branch=codex%2Fextended-rustcrypto-algorithms)",
  "kapun-util-rust",
  "openid-federation",
  "reqwest 0.11.27",
@@ -5272,7 +5318,7 @@ dependencies = [
  "hkdf 0.12.4",
  "http 0.2.12",
  "is_empty",
- "josekit",
+ "josekit 0.11.0 (git+https://github.com/heidiverse/josekit-rs.git?branch=codex%2Fextended-rustcrypto-algorithms)",
  "jsonpath_lib",
  "jsonschema",
  "kapun-credential-core-rust",
@@ -5334,7 +5380,7 @@ version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
  "flate2",
- "josekit",
+ "josekit 0.11.0 (git+https://github.com/heidiverse/josekit-rs.git)",
  "kapun-crypto-provider",
  "kapun-util-rust",
  "p12 0.6.3 (git+https://github.com/heidiverse/p12.git)",
@@ -5376,7 +5422,7 @@ version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
  "clap",
- "josekit",
+ "josekit 0.11.0 (git+https://github.com/heidiverse/josekit-rs.git?branch=codex%2Fextended-rustcrypto-algorithms)",
  "kapun-x509 0.1.0",
  "oid-registry",
  "pem",

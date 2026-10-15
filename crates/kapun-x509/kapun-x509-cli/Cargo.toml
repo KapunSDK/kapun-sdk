@@ -13,7 +13,8 @@ josekit = { workspace = true, default-features = false, features = [
     "rustcrypto",
     "pqc",
     "legacy-crypto",
-    "kapun-provider"
+    "kapun-provider",
+    "extended-algorithms"
 ]}
 serde_json.workspace = true
 rsa = { version = "0.10.0-rc.9", features = [
