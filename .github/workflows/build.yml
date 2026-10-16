@@ -102,7 +102,7 @@ jobs:
       - name: Setup rust Tool Chain
         uses: actions-rust-lang/setup-rust-toolchain@v2.0.0
         with:
-          toolchain: "1.97.1"
+          toolchain: "1.99.1"
           # Cache Cargo's registry/git data, but not target outputs. The latter are shared within
           # this job through cargo-target and are not portable between matrix jobs.
           cache-targets: false
