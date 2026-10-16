@@ -23,7 +23,6 @@ use std::{
     io::Read,
 };
 pub mod log;
-pub mod metadata;
 pub mod network;
 pub mod value;
 

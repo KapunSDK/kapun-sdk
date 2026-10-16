@@ -26,6 +26,7 @@ include(":examples:android-verifier")
 include(":examples:android-wallet")
 
 include(":kapun-util")
+include(":kapun-federation")
 include(":kapun-credential-core")
 include(":kapun-credentials")
 include(":kapun-crypto")

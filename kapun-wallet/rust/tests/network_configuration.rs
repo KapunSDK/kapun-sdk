@@ -164,7 +164,7 @@ async fn federation_fetch_applies_tls_policy_and_user_agent() {
     kapun_wallet_rust::uniffi_reqwest::set_untrusted_tls(false);
     let verified_result = openid_federation::fetch_jwt_async::<
         serde_json::Value,
-        kapun_util_rust::network::SdkDefaultConfig,
+        kapun_federation_rust::network::SdkDefaultConfig,
     >(&url)
     .await;
     assert!(
@@ -175,7 +175,7 @@ async fn federation_fetch_applies_tls_policy_and_user_agent() {
     kapun_wallet_rust::uniffi_reqwest::set_untrusted_tls(true);
     let jwt = openid_federation::fetch_jwt_async::<
         serde_json::Value,
-        kapun_util_rust::network::SdkNoVerifyConfig,
+        kapun_federation_rust::network::SdkNoVerifyConfig,
     >(&url)
     .await
     .expect("federation should accept a self-signed certificate when enabled");
@@ -190,7 +190,9 @@ async fn federation_fetch_applies_tls_policy_and_user_agent() {
     let request = request_receiver
         .await
         .expect("server should capture a federation request");
-    assert!(request.lines().any(|line| {
-        line.eq_ignore_ascii_case(&format!("user-agent: {TEST_USER_AGENT}"))
-    }));
+    assert!(
+        request
+            .lines()
+            .any(|line| { line.eq_ignore_ascii_case(&format!("user-agent: {TEST_USER_AGENT}")) })
+    );
 }

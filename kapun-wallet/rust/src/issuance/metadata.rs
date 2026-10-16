@@ -26,8 +26,8 @@ use crate::{
 
 use super::auth::{ClientAttestation, build_pushed_authorization_request};
 
-use openid_federation::models::trust_chain::FederationRelation;
 use openid_federation::FetchConfig;
+use openid_federation::models::trust_chain::FederationRelation;
 use reqwest::Url;
 use reqwest_middleware::ClientWithMiddleware;
 use serde::{Deserialize, Serialize};
@@ -54,12 +54,12 @@ fn federation_metadata_for_url(
     metadata_key: &str,
 ) -> Option<serde_json::Value> {
     if crate::UNSAFE_TLS.load(std::sync::atomic::Ordering::Relaxed) {
-        federation_metadata::<kapun_util_rust::network::SdkNoVerifyConfig>(
+        federation_metadata::<kapun_federation_rust::network::SdkNoVerifyConfig>(
             credential_issuer_url,
             metadata_key,
         )
     } else {
-        federation_metadata::<kapun_util_rust::network::SdkDefaultConfig>(
+        federation_metadata::<kapun_federation_rust::network::SdkDefaultConfig>(
             credential_issuer_url,
             metadata_key,
         )
