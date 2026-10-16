@@ -17,6 +17,9 @@ josekit.workspace = true
 heidi-jwt.workspace = true
 kapun-util-rust = { path = "../../kapun-util/rust" }
 
+[dev-dependencies]
+base64.workspace = true
+
 [target.'cfg(target_arch = "arm")'.dependencies]
 kapun-util-rust = { path = "../../kapun-util/rust" }
 
