@@ -141,45 +141,29 @@ fn oidcf_trust_chain_from_presentation_request_with_config<Config: oidcf::FetchC
         .parse::<heidi_jwt::jwt::Jwt<serde_json::Value>>()
         .map_err(wrap_parse_error)?;
 
+    // OpenID4VP 1.0 §5: the wallet MUST ignore `iss`; the client id names the verifier.
+    let entity_id = federation_entity_id(jwt.payload_unverified().insecure())?;
     let oidf_trust_chain = jwt
         .payload_unverified()
         .insecure()
         .get("trust_chain")
         .and_then(as_vec_string);
-    let iss = jwt
-        .payload_unverified()
-        .insecure()
-        .get("iss")
-        .and_then(|v| v.as_str())
-        .map(|s| s.to_string());
 
     let mut trust_chain = if let Some(oidf_trust_chain) = oidf_trust_chain {
-        dbg!(&oidf_trust_chain);
         FederationRelation::<Config>::from_trust_cache(&oidf_trust_chain).or(Err(
             FederationError::ValidationFailed(anyhow::anyhow!("invalid trust_chain")),
         ))?
-    } else if let Some(iss) = iss {
-        // OIDC Federation resolves the issuer as an HTTP(S) entity identifier. Swiss
-        // Profile requests may use a DID issuer instead, for example
-        // `decentralized_identifier:did:webvh:...`. Passing that value to the
-        // federation URL resolver makes it interpret the nested `did:` component as
-        // a network host and results in errors such as "unable to resolve host 'did'".
-        // Let the DID/Swiss trust framework handle those requests instead.
-        federation_issuer_url(&iss)?;
-        FederationRelation::<Config>::new_from_url(&iss).map_err(wrap_fetch_error)?
     } else {
-        return Err(FederationError::FetchingFailed(anyhow::anyhow!(
-            "no trust_chain nor iss in presentation request"
-        )));
+        FederationRelation::<Config>::new_from_url(&entity_id).map_err(wrap_fetch_error)?
     };
+    bind_leaf(&mut trust_chain, &entity_id)?;
 
     validate_oidf_trust_chain(&mut trust_chain, lenient_leaf_entity_config)?;
 
     let leaf = trust_chain
-        .trust_entities
-        .values()
-        .flat_map(|e| e.entity_config.as_ref())
-        .find(|e| matches!(e, EntityConfig::Leaf(_)))
+        .leaf
+        .entity_config
+        .as_ref()
         .ok_or(FederationError::ValidationFailed(anyhow::anyhow!(
             "invalid trust chain, no leaf found"
         )))?;
@@ -189,15 +173,72 @@ fn oidcf_trust_chain_from_presentation_request_with_config<Config: oidcf::FetchC
     to_oidf_trust_chain_info(trust_chain, lenient_leaf_entity_config)
 }
 
-fn federation_issuer_url(issuer: &str) -> Result<reqwest::Url, FederationError> {
-    let url = reqwest::Url::parse(issuer)
+/// OpenID4VP 1.0 §5.9.3: the client id of a verifier using OpenID Federation is
+/// `openid_federation:<entity id>`.
+const OPENID_FEDERATION_CLIENT_ID_PREFIX: &str = "openid_federation:";
+
+/// Drafts before OpenID4VP 1.0 sent the bare entity id as `client_id`, with one of these as
+/// `client_id_scheme`.
+const OPENID_FEDERATION_CLIENT_ID_SCHEMES: [&str; 2] = ["entity_id", "openid_federation"];
+
+/// The entity identifier of the verifier a request's `client_id` names, if it names one through
+/// OpenID Federation. Requests with any other client id (`x509_san_dns:`,
+/// `decentralized_identifier:`, …) are left to the other trust frameworks, whatever their `iss`.
+fn federation_entity_id(request: &serde_json::Value) -> Result<String, FederationError> {
+    let not_federation = || {
+        FederationError::FetchingFailed(anyhow::anyhow!(
+            "client_id does not name an OpenID Federation entity"
+        ))
+    };
+    let client_id = request
+        .get("client_id")
+        .and_then(|v| v.as_str())
+        .ok_or_else(not_federation)?;
+    let entity_id = match client_id.strip_prefix(OPENID_FEDERATION_CLIENT_ID_PREFIX) {
+        Some(entity_id) => entity_id,
+        None => {
+            let scheme = request.get("client_id_scheme").and_then(|v| v.as_str());
+            if !scheme.is_some_and(|s| OPENID_FEDERATION_CLIENT_ID_SCHEMES.contains(&s)) {
+                return Err(not_federation());
+            }
+            client_id
+        }
+    };
+    let url = reqwest::Url::parse(entity_id)
         .map_err(|e| FederationError::FetchingFailed(anyhow::anyhow!(e)))?;
     if !matches!(url.scheme(), "http" | "https") || url.host_str().is_none() {
         return Err(FederationError::FetchingFailed(anyhow::anyhow!(
-            "OIDC Federation issuer is not an HTTP(S) entity identifier"
+            "OIDC Federation entity identifier is not an HTTP(S) URL"
         )));
     }
-    Ok(url)
+    // as given: a parsed URL is normalized (e.g. a trailing slash added) and would no longer
+    // equal the entity's `sub`
+    Ok(entity_id.to_string())
+}
+
+/// Makes the entity the client id names the chain's leaf, so that the chain validated and the
+/// key the request is verified with are that entity's. Neither a fetched entity configuration nor
+/// a `trust_chain` passed by value is otherwise tied to it: the latter could carry any member of
+/// a trusted federation, whose key would then vouch for someone else's client id.
+fn bind_leaf<Config: oidcf::FetchConfig>(
+    trust_chain: &mut FederationRelation<Config>,
+    entity_id: &str,
+) -> Result<(), FederationError> {
+    let leaf = trust_chain
+        .trust_entities
+        .get(entity_id)
+        .filter(|e| {
+            e.entity_config
+                .as_ref()
+                .is_some_and(|config| config.sub() == entity_id)
+        })
+        .ok_or_else(|| {
+            FederationError::ValidationFailed(anyhow::anyhow!(
+                "trust chain has no entity configuration for {entity_id}"
+            ))
+        })?;
+    trust_chain.leaf = leaf.clone();
+    Ok(())
 }
 
 fn validate_oidf_trust_chain<Config: oidcf::FetchConfig>(
@@ -290,20 +331,118 @@ fn as_vec_string(v: &serde_json::Value) -> Option<Vec<String>> {
 
 #[cfg(test)]
 mod tests {
-    use super::federation_issuer_url;
+    use super::{bind_leaf, federation_entity_id};
+    use base64::Engine;
+    use openid_federation::models::trust_chain::FederationRelation;
+    use serde_json::json;
 
     #[test]
-    fn rejects_did_issuer_from_url_based_federation_resolution() {
-        assert!(
-            federation_issuer_url("decentralized_identifier:did:webvh:example.com:verifier")
-                .is_err()
+    fn takes_entity_id_from_prefixed_client_id() {
+        let request = json!({ "client_id": "openid_federation:https://verifier.example.com/test" });
+        assert_eq!(
+            federation_entity_id(&request).unwrap(),
+            "https://verifier.example.com/test"
         );
     }
 
     #[test]
-    fn accepts_http_issuer_for_federation_resolution() {
-        let url = federation_issuer_url("https://verifier.example.com").unwrap();
-        assert_eq!(url.host_str(), Some("verifier.example.com"));
+    fn keeps_entity_id_as_given() {
+        let request = json!({ "client_id": "openid_federation:https://verifier.example.com" });
+        assert_eq!(
+            federation_entity_id(&request).unwrap(),
+            "https://verifier.example.com"
+        );
+    }
+
+    #[test]
+    fn takes_bare_client_id_with_pre_final_client_id_scheme() {
+        for scheme in ["entity_id", "openid_federation"] {
+            let request = json!({
+                "client_id": "https://verifier.example.com",
+                "client_id_scheme": scheme,
+            });
+            assert_eq!(
+                federation_entity_id(&request).unwrap(),
+                "https://verifier.example.com"
+            );
+        }
+    }
+
+    #[test]
+    fn ignores_iss() {
+        let request = json!({
+            "client_id": "x509_san_dns:verifier.example.com",
+            "iss": "https://other.example.com",
+        });
+        assert!(federation_entity_id(&request).is_err());
+        let request = json!({
+            "client_id": "openid_federation:https://verifier.example.com",
+            "iss": "https://other.example.com",
+        });
+        assert_eq!(
+            federation_entity_id(&request).unwrap(),
+            "https://verifier.example.com"
+        );
+    }
+
+    #[test]
+    fn rejects_other_client_ids() {
+        for client_id in [
+            "decentralized_identifier:did:webvh:example.com:verifier",
+            "x509_san_dns:verifier.example.com",
+            "https://verifier.example.com",
+            "openid_federation:did:web:verifier.example.com",
+        ] {
+            assert!(federation_entity_id(&json!({ "client_id": client_id })).is_err());
+        }
+        assert!(federation_entity_id(&json!({})).is_err());
+    }
+
+    /// An entity statement as found in a `trust_chain`; its signature is not checked here.
+    fn statement(iss: &str, sub: &str, authority_hints: Option<&str>) -> String {
+        let b64 = |v: serde_json::Value| {
+            base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(v.to_string())
+        };
+        let mut claims = json!({
+            "iss": iss, "sub": sub, "iat": 0, "exp": 4_102_444_800i64,
+            "jwks": { "keys": [] },
+        });
+        if let Some(hint) = authority_hints {
+            claims["authority_hints"] = json!([hint]);
+        }
+        format!(
+            "{}.{}.{}",
+            b64(json!({ "alg": "ES256", "typ": "entity-statement+jwt" })),
+            b64(claims),
+            base64::engine::general_purpose::URL_SAFE_NO_PAD.encode([0u8; 64]),
+        )
+    }
+
+    const ANCHOR: &str = "https://anchor.example.com";
+
+    fn chain_for(leaf: &str) -> FederationRelation {
+        FederationRelation::from_trust_cache(&[
+            statement(leaf, leaf, Some(ANCHOR)),
+            statement(ANCHOR, leaf, None),
+            statement(ANCHOR, ANCHOR, None),
+        ])
+        .unwrap()
+    }
+
+    #[test]
+    fn binds_leaf_named_by_client_id() {
+        let mut chain = chain_for("https://verifier.example.com");
+        bind_leaf(&mut chain, "https://verifier.example.com").unwrap();
+        assert_eq!(
+            chain.leaf.entity_config.unwrap().sub(),
+            "https://verifier.example.com"
+        );
+    }
+
+    #[test]
+    fn rejects_trust_chain_of_another_entity() {
+        let mut chain = chain_for("https://attacker.example.com");
+        assert!(bind_leaf(&mut chain, "https://verifier.example.com").is_err());
     }
 }
 
