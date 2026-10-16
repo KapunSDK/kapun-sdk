@@ -216,7 +216,13 @@ abstract class IssuanceProcess(
 				return null
 			}
 		}
-		val ocaBundle = ocaServiceController.getOcaFromMetadata("de", credentialIssuerMetadata, credential, metadata) ?: return null
+		val ocaBundle = ocaServiceController.getOcaFromMetadata(
+			// Same language the OcaProcessor uses to pick the localized overlays when rendering
+			ocaServiceController.stringResourceProvider.getString("language_key"),
+			credentialIssuerMetadata,
+			credential,
+			metadata,
+		) ?: return null
 		val ocaUrl = "metadata://$docType"
 		ocaRepository.insertOrUpdateOca(ocaUrl, ocaBundle)
 		return ocaUrl

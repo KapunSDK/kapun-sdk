@@ -57,6 +57,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.ExperimentalTime
+import org.kapunsdk.util.locale.LocaleMatcher
 import kotlin.time.Instant
 
 @OptIn(ExperimentalTime::class)
@@ -71,6 +72,11 @@ class OcaProcessor(
 
 	// Overlays that are either non-localized or match the users device language
 	private val matchingOverlays = ocaBundle.overlays.filter { it !is Localized || it.matches(userLanguage) }
+
+	// Overlays whose language matches regardless of the region (e.g. "en-US" for the user language "en")
+	private val languageMatchingOverlays = ocaBundle.overlays.filter {
+		it is Localized && LocaleMatcher.matches(it.language, userLanguage, allowLanguageOnlyMatch = true)
+	}
 
 	fun process(layoutType: LayoutType): LayoutData {
 		val metaOverlay = getOverlay<MetaOverlay>()
@@ -343,6 +349,7 @@ class OcaProcessor(
 
 	private inline fun <reified T : Overlay> getOverlay(): T? {
 		return matchingOverlays.filterIsInstance<T>().firstOrNull()
+			?: languageMatchingOverlays.filterIsInstance<T>().firstOrNull()
 			?: ocaBundle.overlays.filterIsInstance<T>().firstOrNull()
 	}
 

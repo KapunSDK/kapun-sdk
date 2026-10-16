@@ -16,6 +16,7 @@ under the License.
 
 package org.kapunsdk.wallet.credentials.mapping.defaults
 
+import org.kapunsdk.issuance.extensions.getLabelForLocale
 import org.kapunsdk.issuance.extensions.getLocalizedLabel
 import org.kapunsdk.issuance.metadata.data.CredentialConfiguration
 import org.kapunsdk.issuance.metadata.data.CredentialIssuerMetadataClaims
@@ -113,24 +114,26 @@ object OcaBundleFactory {
 		if (cardColor.and(0xFF000000) == 0L) {
 			cardColor = cardColor.or(0xFF000000)
 		}
-		val attributeNames = propertyType.mapValues { it.key }.toMutableMap()
-		attributeNames.putAll(
-			mapOf(
-				"/given_name" to stringResourceProvider.getString("id_first_name"),
-				"/family_name" to stringResourceProvider.getString("id_last_name"),
-				"/birthdate" to stringResourceProvider.getString("id_date_of_birth"),
-				"/birth_family_name" to stringResourceProvider.getString("id_birth_family_name"),
-				"/place_of_birth/locality" to stringResourceProvider.getString("id_place_of_birth"),
-				"/nationalities" to stringResourceProvider.getString("id_nationality"),
-				"/address/formatted" to stringResourceProvider.getString("id_address"),
-				"/issuing_country" to stringResourceProvider.getString("id_issuing_country"),
-				"/issuing_authority" to stringResourceProvider.getString("id_issuing_authority"),
-				"/iat" to stringResourceProvider.getString("id_issued_on"),
-				"/exp" to stringResourceProvider.getString("id_valid_until"),
-			)
+		val builtInLabels = mapOf(
+			"/given_name" to stringResourceProvider.getString("id_first_name"),
+			"/family_name" to stringResourceProvider.getString("id_last_name"),
+			"/birthdate" to stringResourceProvider.getString("id_date_of_birth"),
+			"/birth_family_name" to stringResourceProvider.getString("id_birth_family_name"),
+			"/place_of_birth/locality" to stringResourceProvider.getString("id_place_of_birth"),
+			"/nationalities" to stringResourceProvider.getString("id_nationality"),
+			"/address/formatted" to stringResourceProvider.getString("id_address"),
+			"/issuing_country" to stringResourceProvider.getString("id_issuing_country"),
+			"/issuing_authority" to stringResourceProvider.getString("id_issuing_authority"),
+			"/iat" to stringResourceProvider.getString("id_issued_on"),
+			"/exp" to stringResourceProvider.getString("id_valid_until"),
 		)
-		val credentialMetadataClusterOrderingOverlay =
-			getCredentialMetadataClusterOrderingOverlay(metadata, vct, locale, captureBaseSaid)
+		// OID4VCI 1.0 defines the claims per credential configuration, older issuers define them at the top level
+		val claims = credentialMetadata?.credentialMetadata?.claims ?: metadata?.credentialMetadata?.claims
+		val clusterClaims = metadata?.credentialMetadata?.claims
+		val locales = getLocales(locale, claims.orEmpty() + clusterClaims.orEmpty())
+		val labelOverlays = getLabelOverlays(claims, propertyType.keys, builtInLabels, locale, locales, captureBaseSaid)
+		val credentialMetadataClusterOrderingOverlays =
+			getCredentialMetadataClusterOrderingOverlays(clusterClaims, locales, captureBaseSaid)
 
 		val mainGroupOrdering = mapOf(
 			"/given_name" to 1,
@@ -195,13 +198,7 @@ object OcaBundleFactory {
 				captureBase = captureBaseSaid,
 				language = locale,
 			),
-			LabelOverlay(
-				attributeLabels = attributeNames,
-				attributeCategories = emptyList(),
-				categoryLabels = emptyMap(),
-				captureBase = captureBaseSaid,
-				language = locale,
-			),
+			*labelOverlays.toTypedArray(),
 			TemplateOverlay(
 				attributeTemplates = mapOf(
 					"/address/formatted" to "{{ /address/street_address }}, {{ /address/postal_code }}, {{ /address/locality }}, {{ /address/country }}",
@@ -219,23 +216,64 @@ object OcaBundleFactory {
 				language = locale,
 				frontOverlays = null,
 			),
-			credentialMetadataClusterOrderingOverlay ?: defaultClusterOrderingOverlay
+			*(credentialMetadataClusterOrderingOverlays ?: listOf(defaultClusterOrderingOverlay)).toTypedArray(),
 		)
 		return OcaBundleJson(captureBase, overlays)
 	}
 
-	private fun getCredentialMetadataClusterOrderingOverlay(
-        metadata: CredentialIssuerMetadataClaims?,
-        vct: String,
-        locale: String,
-        captureBaseSaid: String,
-	): ClusterOrderingOverlay? {
+	/**
+	 * Returns the locales for which localized overlays are created: the device locale first (it is the most complete
+	 * one and the fallback if no overlay matches the user language), followed by all locales provided by the issuer.
+	 */
+	private fun getLocales(deviceLocale: String, claims: List<CredentialMetadataClaim>): List<String> {
+		val issuerLocales = claims.flatMap { claim -> claim.display.orEmpty().mapNotNull { it.locale } }
+		return (listOf(deviceLocale) + issuerLocales).distinctBy { it.lowercase() }
+	}
 
-		if (metadata == null || metadata.credentialMetadata?.claims == null) {
+	/**
+	 * Creates a label overlay per locale. Each overlay contains a label for every attribute, resolved in the following order:
+	 * the issuer label for the locale, the built-in label (only for the device locale), the issuer label in any other
+	 * language and finally the attribute name itself.
+	 */
+	private fun getLabelOverlays(
+		claims: List<CredentialMetadataClaim>?,
+		attributeNames: Set<String>,
+		builtInLabels: Map<String, String>,
+		deviceLocale: String,
+		locales: List<String>,
+		captureBaseSaid: String,
+	): List<LabelOverlay> {
+		val claimDisplays = claims.orEmpty()
+			.filter { !it.display.isNullOrEmpty() }
+			.associate { it.attributeName() to it.display }
+		val allAttributeNames = attributeNames + builtInLabels.keys
+
+		return locales.map { locale ->
+			val isDeviceLocale = locale.equals(deviceLocale, ignoreCase = true)
+			LabelOverlay(
+				attributeLabels = allAttributeNames.associateWith { attributeName ->
+					val displays = claimDisplays[attributeName]
+					displays.getLabelForLocale(locale)
+						?: builtInLabels[attributeName]?.takeIf { isDeviceLocale }
+						?: displays.getLocalizedLabel(locale)
+						?: attributeName
+				},
+				attributeCategories = emptyList(),
+				categoryLabels = emptyMap(),
+				captureBase = captureBaseSaid,
+				language = locale,
+			)
+		}
+	}
+
+	private fun getCredentialMetadataClusterOrderingOverlays(
+		claims: List<CredentialMetadataClaim>?,
+		locales: List<String>,
+		captureBaseSaid: String,
+	): List<ClusterOrderingOverlay>? {
+		if (claims == null) {
 			return null
 		}
-
-		val claims: List<CredentialMetadataClaim> = metadata.credentialMetadata?.claims ?: return null
 
 		val clusterFirstIndex = linkedMapOf<String, Int>()
 		val attributeOrderByCluster = linkedMapOf<String, LinkedHashMap<String, Int>>()
@@ -254,7 +292,7 @@ object OcaBundleFactory {
 					clusterFirstIndex[cluster] = clusterFirstIndex.size + 1
 				}
 
-				val attr: String = "/" + claim.path.drop(1).joinToString("/")
+				val attr = claim.attributeName()
 				val perCluster = attributeOrderByCluster.getOrPut(cluster) { linkedMapOf() }
 				if (attr !in perCluster) {
 					perCluster[attr] = perCluster.size + 1
@@ -287,22 +325,28 @@ object OcaBundleFactory {
 		val topLevelByName: Map<String, CredentialMetadataClaim> =
 			claims.filter { it.path.size == 1 }.associateBy { it.path.firstNotNullOf { elem -> elem.jsonPrimitiveOrNull()?.content } }
 
-		val clusterLabels: Map<String, String?> =
-			clusterFirstIndex.keys.associateWith { cluster ->
-				topLevelByName[cluster]?.display.getLocalizedLabel(locale)
-			}
-
 		val attributeClusterOrder: Map<String, Map<String, Int>> =
 			attributeOrderByCluster.mapValues { (_, v) -> v.toMap() }
 
-		return ClusterOrderingOverlay(
-			clusterOrder = clusterFirstIndex.toMap(),
-			clusterLabels = clusterLabels,
-			attributeClusterOrder = attributeClusterOrder,
-			captureBase = captureBaseSaid,
-			language = locale,
-		)
+		return locales.map { locale ->
+			ClusterOrderingOverlay(
+				clusterOrder = clusterFirstIndex.toMap(),
+				clusterLabels = clusterFirstIndex.keys.associateWith { cluster ->
+					topLevelByName[cluster]?.display.getLocalizedLabel(locale)
+				},
+				attributeClusterOrder = attributeClusterOrder,
+				captureBase = captureBaseSaid,
+				language = locale,
+			)
+		}
 	}
+
+	/**
+	 * Converts the claim path to the attribute name used in the capture base, e.g. ["address", "street_address"] becomes
+	 * "/address/street_address". Array wildcards (null) and indices are dropped, as arrays are a single attribute.
+	 */
+	private fun CredentialMetadataClaim.attributeName(): String =
+		"/" + path.mapNotNull { it.jsonPrimitiveOrNull()?.takeIf { p -> p.isString }?.content }.joinToString("/")
 
 	private fun addKeysAndTypesForObject(
 		obj: JsonObject,
