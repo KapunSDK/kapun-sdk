@@ -338,11 +338,12 @@ pub fn decrypt_jwe(jwk_json: String, compact_jwe: String) -> Result<String, JweE
 pub fn encrypt_jwe_direct(
     key: &[u8],
     payload: &[u8],
+    content_encryption: String,
     content_type: Option<String>,
 ) -> Result<String, JweError> {
     let mut header = JweHeader::new();
     header.set_algorithm("dir");
-    header.set_content_encryption("A256GCM");
+    header.set_content_encryption(content_encryption);
     if let Some(content_type) = content_type {
         header.set_content_type(content_type);
     }
@@ -516,13 +517,13 @@ mod tests {
 
     #[test]
     fn direct_round_trip() {
-        let key = [0x42; 32];
+        let key = [0x42; 16];
         let payload = b"\x00\xffbackup";
-        let encrypted = encrypt_jwe_direct(&key, payload, None).unwrap();
+        let encrypted = encrypt_jwe_direct(&key, payload, "A128GCM".to_string(), None).unwrap();
         let header = parse_jwe_header(encrypted.clone()).unwrap();
         assert_eq!(header.algorithm, "dir");
-        assert_eq!(header.content_encryption, "A256GCM");
-        assert!(decrypt_jwe_direct(&[0x43; 32], encrypted.clone()).is_err());
+        assert_eq!(header.content_encryption, "A128GCM");
+        assert!(decrypt_jwe_direct(&[0x43; 16], encrypted.clone()).is_err());
         assert_eq!(decrypt_jwe_direct(&key, encrypted).unwrap(), payload);
     }
 
