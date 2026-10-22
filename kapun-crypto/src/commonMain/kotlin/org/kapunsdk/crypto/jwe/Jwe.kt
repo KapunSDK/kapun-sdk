@@ -84,8 +84,12 @@ fun encryptJwe(
 fun decryptJwe(jwk: JsonObject, compactJwe: String): JsonObject =
 	Json.parseToJsonElement(decryptJweRaw(jwk.toString(), compactJwe)).jsonObject
 
-fun encryptJweDirect(key: ByteArray, payload: ByteArray, contentType: String? = null): String =
-	encryptJweDirectRaw(key, payload, contentType)
+fun encryptJweDirect(
+	key: ByteArray,
+	payload: ByteArray,
+	contentType: String? = null,
+	contentEncryption: JweContentEncryptionAlgorithm = JweContentEncryptionAlgorithm.A256GCM,
+): String = encryptJweDirectRaw(key, payload, contentEncryption.identifier, contentType)
 
 fun decryptJweDirect(key: ByteArray, compactJwe: String): ByteArray =
 	decryptJweDirectRaw(key, compactJwe)
