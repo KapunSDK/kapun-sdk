@@ -22,7 +22,9 @@ import kotlinx.serialization.json.jsonObject
 import uniffi.kapun_crypto_rust.JweHeaderParameters
 import uniffi.kapun_crypto_rust.JweKey
 import uniffi.kapun_crypto_rust.decryptJwe as decryptJweRaw
+import uniffi.kapun_crypto_rust.decryptJweDirect as decryptJweDirectRaw
 import uniffi.kapun_crypto_rust.encryptJwe as encryptJweRaw
+import uniffi.kapun_crypto_rust.encryptJweDirect as encryptJweDirectRaw
 import uniffi.kapun_crypto_rust.generateJweKey as generateJweKeyRaw
 import uniffi.kapun_crypto_rust.parseJweHeader as parseJweHeaderRaw
 import uniffi.kapun_crypto_rust.publicJweJwk as publicJweJwkRaw
@@ -81,3 +83,9 @@ fun encryptJwe(
 
 fun decryptJwe(jwk: JsonObject, compactJwe: String): JsonObject =
 	Json.parseToJsonElement(decryptJweRaw(jwk.toString(), compactJwe)).jsonObject
+
+fun encryptJweDirect(key: ByteArray, payload: ByteArray, contentType: String? = null): String =
+	encryptJweDirectRaw(key, payload, contentType)
+
+fun decryptJweDirect(key: ByteArray, compactJwe: String): ByteArray =
+	decryptJweDirectRaw(key, compactJwe)

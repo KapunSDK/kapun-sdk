@@ -24,6 +24,7 @@ pub mod iso180135;
 pub mod jws;
 pub mod jwt;
 pub mod jwx;
+pub mod symmetric;
 
 kapun_util_rust::export_log_sink_bridge!();
 

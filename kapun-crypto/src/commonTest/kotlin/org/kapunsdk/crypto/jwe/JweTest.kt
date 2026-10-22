@@ -22,8 +22,17 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertContentEquals
 
 class JweTest {
+	@Test
+	fun kotlinFacedeRoundtripDirect() {
+		val key = ByteArray(32) { it.toByte() }
+		val payload = byteArrayOf(0, 1, -1, -128)
+		val compactJwe = encryptJweDirect(key, payload)
+		assertContentEquals(payload, decryptJweDirect(key, compactJwe))
+	}
+
 	@Test
 	fun kotlinFacadeRoundTrip() {
 		val key = generateJweKey(JweKeyManagementAlgorithm.ECDH_ES_A256KW)
