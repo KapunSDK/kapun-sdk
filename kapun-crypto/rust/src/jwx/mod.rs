@@ -334,6 +334,40 @@ pub fn decrypt_jwe(jwk_json: String, compact_jwe: String) -> Result<String, JweE
     })
 }
 
+#[uniffi::export]
+pub fn encrypt_jwe_direct(
+    key: &[u8],
+    payload: &[u8],
+    content_encryption: String,
+    content_type: Option<String>,
+) -> Result<String, JweError> {
+    let mut header = JweHeader::new();
+    header.set_algorithm("dir");
+    header.set_content_encryption(content_encryption);
+    if let Some(content_type) = content_type {
+        header.set_content_type(content_type);
+    }
+    let encrypter = josekit::jwe::Dir
+        .encrypter_from_bytes(key)
+        .map_err(|error| invalid(format!("Invalid direct encryption key: {error}")))?;
+    josekit::jwe::serialize_compact(payload, &header, &encrypter)
+        .map_err(|error| operation(format!("Failed to encrypt JWE: {error}")))
+}
+
+#[uniffi::export]
+pub fn decrypt_jwe_direct(key: &[u8], compact_jwe: String) -> Result<Vec<u8>, JweError> {
+    let header = parse_jwe_header_internal(&compact_jwe)?;
+    if header.algorithm != "dir" {
+        return Err(invalid("Expected a dir JWE"));
+    }
+    let decrypter = josekit::jwe::Dir
+        .decrypter_from_bytes(key)
+        .map_err(|error| invalid(format!("Invalid direct decryption key: {error}")))?;
+    josekit::jwe::deserialize_compact(&compact_jwe, &decrypter)
+        .map(|(payload, _)| payload)
+        .map_err(|error| operation(format!("Failed to decrypt JWE: {error}")))
+}
+
 fn parse_jwk(value: &str) -> Result<Jwk, JweError> {
     Jwk::from_bytes(value.as_bytes()).map_err(|error| invalid(format!("Invalid JWK: {error}")))
 }
@@ -379,6 +413,9 @@ fn decrypter(jwk: &Jwk, algorithm: &str) -> Result<Box<dyn JweDecrypter>, JweErr
         .set_parameter("kid", None)
         .map_err(|error| invalid(format!("could not prepare JWE decryption key: {error}")))?;
     let result: Result<Box<dyn JweDecrypter>, josekit::JoseError> = match algorithm {
+        "dir" => josekit::jwe::Dir
+            .decrypter_from_jwk(&decryption_jwk)
+            .map(|value| Box::new(value) as Box<dyn JweDecrypter>),
         "ECDH-ES" => josekit::jwe::ECDH_ES
             .decrypter_from_jwk(&decryption_jwk)
             .map(|value| Box::new(value) as Box<dyn JweDecrypter>),
@@ -420,6 +457,9 @@ fn decrypter(jwk: &Jwk, algorithm: &str) -> Result<Box<dyn JweDecrypter>, JweErr
 
 fn encrypter(jwk: &Jwk, algorithm: &str) -> Result<Box<dyn JweEncrypter>, JweError> {
     let result: Result<Box<dyn JweEncrypter>, josekit::JoseError> = match algorithm {
+        "dir" => josekit::jwe::Dir
+            .encrypter_from_jwk(jwk)
+            .map(|value| Box::new(value) as Box<dyn JweEncrypter>),
         "ECDH-ES" => josekit::jwe::ECDH_ES
             .encrypter_from_jwk(jwk)
             .map(|value| Box::new(value) as Box<dyn JweEncrypter>),
@@ -474,6 +514,39 @@ fn operation(reason: impl Into<String>) -> JweError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn direct_round_trip() {
+        let key = [0x42; 16];
+        let payload = b"\x00\xffbackup";
+        let encrypted = encrypt_jwe_direct(&key, payload, "A128GCM".to_string(), None).unwrap();
+        let header = parse_jwe_header(encrypted.clone()).unwrap();
+        assert_eq!(header.algorithm, "dir");
+        assert_eq!(header.content_encryption, "A128GCM");
+        assert!(decrypt_jwe_direct(&[0x43; 16], encrypted.clone()).is_err());
+        assert_eq!(decrypt_jwe_direct(&key, encrypted).unwrap(), payload);
+    }
+
+    #[test]
+    fn direct_jwk_round_trip() {
+        let jwk = serde_json::json!({
+            "kty": "oct",
+            "alg": "dir",
+            "k": BASE64_URL_SAFE_NO_PAD.encode([0x42; 32]),
+        })
+        .to_string();
+        let encrypted = encrypt_jwe(
+            jwk.clone(),
+            r#"{"backup":[]}"#.to_string(),
+            "A256GCM".to_string(),
+            None,
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+        assert_eq!(decrypt_jwe(jwk, encrypted).unwrap(), r#"{"backup":[]}"#);
+    }
 
     #[test]
     fn accepts_null_optional_jwk_parameters() {
