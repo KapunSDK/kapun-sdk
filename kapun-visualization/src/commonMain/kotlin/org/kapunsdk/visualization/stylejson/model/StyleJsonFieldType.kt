@@ -20,14 +20,14 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 enum class StyleJsonFieldType {
-	STRING,
-	NUMBER,
-	BOOLEAN,
-	DATE,
-	TIME,
-	DATETIME,
-	LOCATION,
-	DATEOFBIRTH,
-	IMAGE,
-	OTHER
+    STRING,
+    NUMBER,
+    BOOLEAN,
+    DATE,
+    TIME,
+    DATETIME,
+    LOCATION,
+    DATEOFBIRTH,
+    IMAGE,
+    OTHER,
 }

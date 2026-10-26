@@ -36,57 +36,63 @@ import kotlin.test.assertTrue
  * JVM once [KapunTrust.initialize] has run, as they do on Android and iOS.
  */
 class KapunTrustJvmTest {
+    private val noDocuments =
+        object : DocumentProvider {
+            override suspend fun getAllCredentials(): List<CredentialModel> = emptyList()
 
-	private val noDocuments = object : DocumentProvider {
-		override suspend fun getAllCredentials(): List<CredentialModel> = emptyList()
+            override suspend fun getCredentialsByDocType(
+                docType: String,
+                includeUsedCredentials: Boolean,
+            ): List<CredentialModel> = emptyList()
+        }
 
-		override suspend fun getCredentialsByDocType(
-			docType: String,
-			includeUsedCredentials: Boolean,
-		): List<CredentialModel> = emptyList()
-	}
+    @BeforeTest
+    fun initialize() {
+        KapunTrust().initialize()
+    }
 
-	@BeforeTest
-	fun initialize() {
-		KapunTrust().initialize()
-	}
+    @Test
+    fun `swiss framework resolves its repository from the Koin context`() =
+        runTest {
+            val framework = SwissTrustFramework(noDocuments)
 
-	@Test
-	fun `swiss framework resolves its repository from the Koin context`() = runTest {
-		val framework = SwissTrustFramework(noDocuments)
+            val validation =
+                framework.validatePresentationRequest(
+                    PresentationRequest(clientId = "redirect_uri:https://verifier.example"),
+                )
 
-		val validation = framework.validatePresentationRequest(
-			PresentationRequest(clientId = "redirect_uri:https://verifier.example"),
-		)
+            assertTrue(validation.isValid)
+        }
 
-		assertTrue(validation.isValid)
-	}
+    @Test
+    fun `basic framework names a verifier without client name or signed request by its client id`() =
+        runTest {
+            val framework =
+                Oid4VpTrustFramework(
+                    documentProvider = noDocuments,
+                    didWebTrustAnchorProvider = StaticDidWebTrustAnchorProvider(),
+                    trustedDomains = emptyList(),
+                )
+            val clientId = "redirect_uri:https://verifier.example"
 
-	@Test
-	fun `basic framework names a verifier without client name or signed request by its client id`() = runTest {
-		val framework = Oid4VpTrustFramework(
-			documentProvider = noDocuments,
-			didWebTrustAnchorProvider = StaticDidWebTrustAnchorProvider(),
-			trustedDomains = emptyList(),
-		)
-		val clientId = "redirect_uri:https://verifier.example"
+            val agent = framework.getVerifierInformation("", PresentationRequest(clientId = clientId), null)
 
-		val agent = framework.getVerifierInformation("", PresentationRequest(clientId = clientId), null)
+            assertEquals(clientId, agent.displayName)
+            assertFalse(agent.isTrusted)
+        }
 
-		assertEquals(clientId, agent.displayName)
-		assertFalse(agent.isTrusted)
-	}
+    @Test
+    fun `eu framework leaves a request passed by value to the other frameworks`() =
+        runTest {
+            val framework = EuTrustFramework(noDocuments, trustedDomains = emptyList())
 
-	@Test
-	fun `eu framework leaves a request passed by value to the other frameworks`() = runTest {
-		val framework = EuTrustFramework(noDocuments, trustedDomains = emptyList())
+            val agent =
+                framework.getVerifierInformation(
+                    "",
+                    PresentationRequest(clientId = "redirect_uri:https://verifier.example"),
+                    null,
+                )
 
-		val agent = framework.getVerifierInformation(
-			"",
-			PresentationRequest(clientId = "redirect_uri:https://verifier.example"),
-			null,
-		)
-
-		assertNull(agent)
-	}
+            assertNull(agent)
+        }
 }

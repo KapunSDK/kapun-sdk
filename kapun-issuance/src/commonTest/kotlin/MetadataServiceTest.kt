@@ -1,7 +1,7 @@
+import kotlinx.serialization.json.Json
 import org.kapunsdk.issuance.metadata.MetadataService
 import org.kapunsdk.issuance.metadata.data.CredentialConfiguration
 import org.kapunsdk.issuance.metadata.data.CredentialIssuerMetadataClaims
-import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -45,29 +45,31 @@ class MetadataServiceTest {
 
     @Test
     fun testBbsCredentialConfiguration() {
-        val metadata = Json { ignoreUnknownKeys = true }.decodeFromString<CredentialIssuerMetadataClaims>(
-            """
-            {
-              "credential_issuer": "https://issuer.example",
-              "credential_endpoint": "https://issuer.example/credential",
-              "credential_configurations_supported": {
-                "bbs": {
-                  "format": "zkp_vc",
-                  "vct": "urn:example:bbs",
-                  "credential_metadata": {
-                    "display": [
-                      { "name": "BBS credential", "locale": "en-US" }
-                    ]
+        val metadata =
+            Json { ignoreUnknownKeys = true }.decodeFromString<CredentialIssuerMetadataClaims>(
+                """
+                {
+                  "credential_issuer": "https://issuer.example",
+                  "credential_endpoint": "https://issuer.example/credential",
+                  "credential_configurations_supported": {
+                    "bbs": {
+                      "format": "zkp_vc",
+                      "vct": "urn:example:bbs",
+                      "credential_metadata": {
+                        "display": [
+                          { "name": "BBS credential", "locale": "en-US" }
+                        ]
+                      }
+                    }
                   }
                 }
-              }
-            }
-            """.trimIndent()
-        )
+                """.trimIndent(),
+            )
 
-        val configuration = assertIs<CredentialConfiguration.Bbs>(
-            metadata.credentialConfigurationsSupported.getValue("bbs")
-        )
+        val configuration =
+            assertIs<CredentialConfiguration.Bbs>(
+                metadata.credentialConfigurationsSupported.getValue("bbs"),
+            )
         assertEquals("urn:example:bbs", configuration.vct)
         assertEquals("BBS credential", configuration.getDisplayMetadata()?.single()?.name)
     }

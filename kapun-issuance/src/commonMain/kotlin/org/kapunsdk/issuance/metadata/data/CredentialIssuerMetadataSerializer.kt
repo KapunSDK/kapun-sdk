@@ -23,41 +23,49 @@ import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.*
 
 object CredentialIssuerMetadataSerializer : KSerializer<CredentialIssuerMetadata> {
+    override val descriptor = CredentialIssuerMetadataClaims.serializer().descriptor
 
-	override val descriptor = CredentialIssuerMetadataClaims.serializer().descriptor
+    override fun deserialize(decoder: Decoder): CredentialIssuerMetadata {
+        val jsonDecoder = decoder as JsonDecoder
+        val element = jsonDecoder.decodeJsonElement()
+        val jsonObject = element.jsonObject
 
-	override fun deserialize(decoder: Decoder): CredentialIssuerMetadata {
-		val jsonDecoder = decoder as JsonDecoder
-		val element = jsonDecoder.decodeJsonElement()
-		val jsonObject = element.jsonObject
+        val claims = jsonDecoder.json.decodeFromJsonElement(CredentialIssuerMetadataClaims.serializer(), element)
 
-		val claims = jsonDecoder.json.decodeFromJsonElement(CredentialIssuerMetadataClaims.serializer(), element)
+        return if ("originalJwt" in jsonObject) {
+            val originalJwt = jsonObject["originalJwt"]!!.jsonPrimitive.content
+            val originalUrl = jsonObject["originalUrl"]!!.jsonPrimitive.content
+            CredentialIssuerMetadata.Signed(claims, originalJwt, originalUrl)
+        } else {
+            CredentialIssuerMetadata.Unsigned(claims)
+        }
+    }
 
-		return if ("originalJwt" in jsonObject) {
-			val originalJwt = jsonObject["originalJwt"]!!.jsonPrimitive.content
-			val originalUrl = jsonObject["originalUrl"]!!.jsonPrimitive.content
-			CredentialIssuerMetadata.Signed(claims, originalJwt, originalUrl)
-		} else {
-			CredentialIssuerMetadata.Unsigned(claims)
-		}
-	}
+    override fun serialize(
+        encoder: Encoder,
+        value: CredentialIssuerMetadata,
+    ) {
+        val jsonEncoder = encoder as JsonEncoder
+        val claimsElement =
+            jsonEncoder.json.encodeToJsonElement(
+                CredentialIssuerMetadataClaims.serializer(),
+                value.claims,
+            )
 
-	override fun serialize(encoder: Encoder, value: CredentialIssuerMetadata) {
-		val jsonEncoder = encoder as JsonEncoder
-		val claimsElement = jsonEncoder.json.encodeToJsonElement(CredentialIssuerMetadataClaims.serializer(), value.claims)
+        when (value) {
+            is CredentialIssuerMetadata.Signed -> {
+                val merged =
+                    buildJsonObject {
+                        claimsElement.jsonObject.forEach { (key, v) -> put(key, v) }
+                        put("originalJwt", value.originalJwt)
+                        put("originalUrl", value.originalUrl)
+                    }
+                jsonEncoder.encodeJsonElement(merged)
+            }
 
-		when (value) {
-			is CredentialIssuerMetadata.Signed -> {
-				val merged = buildJsonObject {
-					claimsElement.jsonObject.forEach { (key, v) -> put(key, v) }
-					put("originalJwt", value.originalJwt)
-					put("originalUrl", value.originalUrl)
-				}
-				jsonEncoder.encodeJsonElement(merged)
-			}
-			is CredentialIssuerMetadata.Unsigned -> {
-				jsonEncoder.encodeJsonElement(claimsElement)
-			}
-		}
-	}
+            is CredentialIssuerMetadata.Unsigned -> {
+                jsonEncoder.encodeJsonElement(claimsElement)
+            }
+        }
+    }
 }

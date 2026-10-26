@@ -16,8 +16,9 @@ under the License.
 
 package org.kapunsdk.wallet.process.issuance.eaa
 
-import org.kapunsdk.util.log.Logger
+import kotlinx.serialization.json.Json
 import org.kapunsdk.trust.TrustFrameworkController
+import org.kapunsdk.util.log.Logger
 import org.kapunsdk.wallet.KapunDatabase
 import org.kapunsdk.wallet.credentials.ViewModelFactory
 import org.kapunsdk.wallet.credentials.activity.ActivityRepository
@@ -34,125 +35,154 @@ import org.kapunsdk.wallet.process.ProcessEvent
 import org.kapunsdk.wallet.process.ProcessHandler
 import org.kapunsdk.wallet.process.ProcessStep
 import org.kapunsdk.wallet.process.presentation.remote.RemotePresentationProcessStep
-import kotlinx.serialization.json.Json
 import uniffi.kapun_wallet_rust.OidcSettings
 import uniffi.kapun_wallet_rust.WalletBackend
 
 open class EaaIssuanceProcessHandler(
-	private val walletBackend: WalletBackend,
-	private val signingProvider: SigningProvider,
-	private val trustController: TrustFrameworkController,
-	private val issuerRepository: IssuerRepository,
-	private val identityRepository: IdentityRepository,
-	private val credentialsRepository: CredentialsRepository,
-	private val deferredCredentialsRepository: DeferredCredentialsRepository,
-	private val activityRepository: ActivityRepository,
-	private val keyValueRepository: KeyValueRepository,
-	private val ocaRepository: OcaRepository,
-	private val ocaServiceController: OcaServiceController,
-	private val viewModelFactory: ViewModelFactory,
-	private val json: Json,
-	private val secureHardwareAccess: SecureHardwareAccess,
-	private val oidcSettings: OidcSettings,
-	private val db: KapunDatabase,
+    private val walletBackend: WalletBackend,
+    private val signingProvider: SigningProvider,
+    private val trustController: TrustFrameworkController,
+    private val issuerRepository: IssuerRepository,
+    private val identityRepository: IdentityRepository,
+    private val credentialsRepository: CredentialsRepository,
+    private val deferredCredentialsRepository: DeferredCredentialsRepository,
+    private val activityRepository: ActivityRepository,
+    private val keyValueRepository: KeyValueRepository,
+    private val ocaRepository: OcaRepository,
+    private val ocaServiceController: OcaServiceController,
+    private val viewModelFactory: ViewModelFactory,
+    private val json: Json,
+    private val secureHardwareAccess: SecureHardwareAccess,
+    private val oidcSettings: OidcSettings,
+    private val db: KapunDatabase,
 ) : ProcessHandler {
+    private var currentProcess: EaaIssuanceProcess? = null
 
-	private var currentProcess: EaaIssuanceProcess? = null
+    override suspend fun handleProcessStep(
+        current: ProcessStep?,
+        inputEvent: ProcessEvent,
+    ): ProcessStep? =
+        when {
+            // A new EAA issuance process is started
+            inputEvent is EaaIssuanceProcessEvent.CredentialOfferReceived -> {
+                currentProcess =
+                    EaaIssuanceProcess(
+                        walletBackend = walletBackend,
+                        signingProvider = signingProvider,
+                        issuerRepository = issuerRepository,
+                        identityRepository = identityRepository,
+                        activityRepository = activityRepository,
+                        keyValueRepository = keyValueRepository,
+                        viewModelFactory = viewModelFactory,
+                        secureHardwareAccess = secureHardwareAccess,
+                        json = json,
+                        trustController = trustController,
+                        credentialsRepository = credentialsRepository,
+                        deferredCredentialsRepository = deferredCredentialsRepository,
+                        ocaRepository = ocaRepository,
+                        ocaServiceController = ocaServiceController,
+                        db = db,
+                    )
+                currentProcess?.startIssuance(inputEvent.credentialOfferString)
+            }
 
-	override suspend fun handleProcessStep(current: ProcessStep?, inputEvent: ProcessEvent): ProcessStep? {
-		return when {
-			// A new EAA issuance process is started
-			inputEvent is EaaIssuanceProcessEvent.CredentialOfferReceived -> {
-				currentProcess = EaaIssuanceProcess(
-					walletBackend = walletBackend,
-					signingProvider = signingProvider,
-					issuerRepository = issuerRepository,
-					identityRepository = identityRepository,
-					activityRepository = activityRepository,
-					keyValueRepository = keyValueRepository,
-					viewModelFactory = viewModelFactory,
-					secureHardwareAccess = secureHardwareAccess,
-					json = json,
-					trustController = trustController,
-					credentialsRepository = credentialsRepository,
-					deferredCredentialsRepository = deferredCredentialsRepository,
-					ocaRepository = ocaRepository,
-					ocaServiceController = ocaServiceController,
-					db = db
-				)
-				currentProcess?.startIssuance(inputEvent.credentialOfferString)
-			}
-			inputEvent is EaaIssuanceProcessEvent.DeferredIssuance -> {
-				currentProcess = EaaIssuanceProcess(
-					walletBackend = walletBackend,
-					signingProvider = signingProvider,
-					issuerRepository = issuerRepository,
-					identityRepository = identityRepository,
-					activityRepository = activityRepository,
-					keyValueRepository = keyValueRepository,
-					viewModelFactory = viewModelFactory,
-					json = json,
-					trustController = trustController,
-					credentialsRepository = credentialsRepository,
-					deferredCredentialsRepository = deferredCredentialsRepository,
-					ocaRepository = ocaRepository,
-					ocaServiceController = ocaServiceController,
-					secureHardwareAccess = secureHardwareAccess,
-					db = db
-				)
-				currentProcess?.startDeferred(inputEvent.transactionId)
-			}
+            inputEvent is EaaIssuanceProcessEvent.DeferredIssuance -> {
+                currentProcess =
+                    EaaIssuanceProcess(
+                        walletBackend = walletBackend,
+                        signingProvider = signingProvider,
+                        issuerRepository = issuerRepository,
+                        identityRepository = identityRepository,
+                        activityRepository = activityRepository,
+                        keyValueRepository = keyValueRepository,
+                        viewModelFactory = viewModelFactory,
+                        json = json,
+                        trustController = trustController,
+                        credentialsRepository = credentialsRepository,
+                        deferredCredentialsRepository = deferredCredentialsRepository,
+                        ocaRepository = ocaRepository,
+                        ocaServiceController = ocaServiceController,
+                        secureHardwareAccess = secureHardwareAccess,
+                        db = db,
+                    )
+                currentProcess?.startDeferred(inputEvent.transactionId)
+            }
 
-			// Current step is part of the EAA issuance process
-			current is EaaIssuanceProcessStep -> {
-					if (currentProcess == null) {
-						Logger.error("currentProcess has to be initialized before handling EAA issuance process steps")
-					}
-					when (current) {
-						is EaaIssuanceProcessStep.ConnectionDetails -> currentProcess?.loadCredentialPreview(oidcSettings)
-						is EaaIssuanceProcessStep.CredentialOfferPreview -> currentProcess?.continueWithEaaIssuance()
-						is EaaIssuanceProcessStep.TransactionCode -> {
-							if (inputEvent is EaaIssuanceProcessEvent.TransactionCodeEntered) {
-								currentProcess?.finalizeEaaIssuance(transactionCode = inputEvent.transactionCode)
-							} else null
-						}
-						is EaaIssuanceProcessStep.PushedAuthorization -> {
-							if (inputEvent is EaaIssuanceProcessEvent.AuthorizationCodeReceived) {
-								currentProcess?.finalizeEaaIssuance(authorizationCode = inputEvent.authorizationCode)
-							} else null
-						}
-						is EaaIssuanceProcessStep.Presentation -> {
-							if (inputEvent is EaaIssuanceProcessEvent.PresentationSuccessful) {
-								currentProcess?.continueAfterPresentation(
-									inputEvent.authSession,
-									inputEvent.scope,
-									inputEvent.pdiSession
-								)
-							} else null
-						}
-						is EaaIssuanceProcessStep.CredentialOffer -> currentProcess?.acceptCredentialOffer()
-						is EaaIssuanceProcessStep.Error -> null
-						is EaaIssuanceProcessStep.Success -> null
-					}
-			}
+            // Current step is part of the EAA issuance process
+            current is EaaIssuanceProcessStep -> {
+                if (currentProcess == null) {
+                    Logger.error("currentProcess has to be initialized before handling EAA issuance process steps")
+                }
+                when (current) {
+                    is EaaIssuanceProcessStep.ConnectionDetails -> {
+                        currentProcess?.loadCredentialPreview(oidcSettings)
+                    }
 
-			// A presentation during issuance was successful
-			current is RemotePresentationProcessStep.Success -> {
-				if (inputEvent is EaaIssuanceProcessEvent.PresentationSuccessful) {
-					currentProcess?.continueAfterPresentation(
-						authSession = inputEvent.authSession,
-						scope = inputEvent.scope,
-						pdiSession = inputEvent.pdiSession,
-					)
-				} else null
-			}
+                    is EaaIssuanceProcessStep.CredentialOfferPreview -> {
+                        currentProcess?.continueWithEaaIssuance()
+                    }
 
-			else -> null
-		}
-	}
+                    is EaaIssuanceProcessStep.TransactionCode -> {
+                        if (inputEvent is EaaIssuanceProcessEvent.TransactionCodeEntered) {
+                            currentProcess?.finalizeEaaIssuance(transactionCode = inputEvent.transactionCode)
+                        } else {
+                            null
+                        }
+                    }
 
-	override suspend fun cleanupHandler() {
-		currentProcess = null
-	}
+                    is EaaIssuanceProcessStep.PushedAuthorization -> {
+                        if (inputEvent is EaaIssuanceProcessEvent.AuthorizationCodeReceived) {
+                            currentProcess?.finalizeEaaIssuance(authorizationCode = inputEvent.authorizationCode)
+                        } else {
+                            null
+                        }
+                    }
 
+                    is EaaIssuanceProcessStep.Presentation -> {
+                        if (inputEvent is EaaIssuanceProcessEvent.PresentationSuccessful) {
+                            currentProcess?.continueAfterPresentation(
+                                inputEvent.authSession,
+                                inputEvent.scope,
+                                inputEvent.pdiSession,
+                            )
+                        } else {
+                            null
+                        }
+                    }
+
+                    is EaaIssuanceProcessStep.CredentialOffer -> {
+                        currentProcess?.acceptCredentialOffer()
+                    }
+
+                    is EaaIssuanceProcessStep.Error -> {
+                        null
+                    }
+
+                    is EaaIssuanceProcessStep.Success -> {
+                        null
+                    }
+                }
+            }
+
+            // A presentation during issuance was successful
+            current is RemotePresentationProcessStep.Success -> {
+                if (inputEvent is EaaIssuanceProcessEvent.PresentationSuccessful) {
+                    currentProcess?.continueAfterPresentation(
+                        authSession = inputEvent.authSession,
+                        scope = inputEvent.scope,
+                        pdiSession = inputEvent.pdiSession,
+                    )
+                } else {
+                    null
+                }
+            }
+
+            else -> {
+                null
+            }
+        }
+
+    override suspend fun cleanupHandler() {
+        currentProcess = null
+    }
 }

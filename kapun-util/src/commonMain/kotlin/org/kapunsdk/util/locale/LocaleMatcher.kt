@@ -17,28 +17,30 @@ under the License.
 package org.kapunsdk.util.locale
 
 object LocaleMatcher {
+    fun matches(
+        inputLocale: String,
+        userLocale: String,
+        allowLanguageOnlyMatch: Boolean = false,
+    ): Boolean {
+        val inputLanguageParts = inputLocale.lowercase().split("-")
+        val userLanguageParts = userLocale.lowercase().split("-")
 
-	fun matches(inputLocale: String, userLocale: String, allowLanguageOnlyMatch: Boolean = false): Boolean {
-		val inputLanguageParts = inputLocale.lowercase().split("-")
-		val userLanguageParts = userLocale.lowercase().split("-")
+        val inputLanguage = inputLanguageParts.first()
+        val inputRegion = inputLanguageParts.getOrNull(1)
+        val userLanguage = userLanguageParts.first()
+        val userRegion = userLanguageParts.getOrNull(1)
 
-		val inputLanguage = inputLanguageParts.first()
-		val inputRegion = inputLanguageParts.getOrNull(1)
-		val userLanguage = userLanguageParts.first()
-		val userRegion = userLanguageParts.getOrNull(1)
+        return when {
+            // Exact match (e.g. de-CH == de-CH)
+            inputLocale == userLocale -> true
 
-		return when {
-			// Exact match (e.g. de-CH == de-CH)
-			inputLocale == userLocale -> true
+            // Input only defines language (e.g. de == de-CH)
+            inputRegion == null && inputLanguage == userLanguage -> true
 
-			// Input only defines language (e.g. de == de-CH)
-			inputRegion == null && inputLanguage == userLanguage -> true
+            // Input and user languages match, regardless of the region (e.g. de-DE == de-CH)
+            allowLanguageOnlyMatch && inputLanguage == userLanguage -> true
 
-			// Input and user languages match, regardless of the region (e.g. de-DE == de-CH)
-			allowLanguageOnlyMatch && inputLanguage == userLanguage -> true
-
-			else -> false
-		}
-	}
-
+            else -> false
+        }
+    }
 }

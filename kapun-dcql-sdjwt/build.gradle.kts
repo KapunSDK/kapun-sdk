@@ -14,8 +14,14 @@ kotlin {
     jvmToolchain(17)
     android {
         namespace = "org.kapunsdk.dcql.sdjwt"
-        compileSdk = libs.versions.android.compileSdk.get().toInt()
-        minSdk = libs.versions.android.minSdk.get().toInt()
+        compileSdk =
+            libs.versions.android.compileSdk
+                .get()
+                .toInt()
+        minSdk =
+            libs.versions.android.minSdk
+                .get()
+                .toInt()
         withHostTest {}
         optimization {
             consumerKeepRules.publish = true
@@ -24,7 +30,10 @@ kotlin {
     }
     jvm()
     listOf(iosArm64(), iosSimulatorArm64()).forEach { target ->
-        target.binaries.framework { baseName = "kapun-dcql-sdjwt"; isStatic = true }
+        target.binaries.framework {
+            baseName = "kapun-dcql-sdjwt"
+            isStatic = true
+        }
         target.compilations.configureEach { useRustUpLinker() }
     }
     sourceSets {
@@ -43,12 +52,26 @@ kotlin {
     }
 }
 
-skie { analytics { enabled = false; disableUpload = true } }
+skie {
+    analytics {
+        enabled = false
+        disableUpload = true
+    }
+}
 uniffi {
-    bindgenFromGitTag("https://github.com/UbiqueInnovation/uniffi-kotlin-multiplatform-bindings.git", libs.versions.uniffi.bindgen.get())
+    bindgenFromGitTag(
+        "https://github.com/UbiqueInnovation/uniffi-kotlin-multiplatform-bindings.git",
+        libs.versions.uniffi.bindgen
+            .get(),
+    )
     generateFromLibrary()
 }
-cargo { packageDirectory = layout.projectDirectory.dir("rust"); ndkVersion = libs.versions.android.ndk.get() }
+cargo {
+    packageDirectory = layout.projectDirectory.dir("rust")
+    ndkVersion =
+        libs.versions.android.ndk
+            .get()
+}
 mavenPublishing {
     coordinates(artifactId = property("ARTIFACT_ID").toString(), version = project.version.toString())
     publishToMavenCentral(true)

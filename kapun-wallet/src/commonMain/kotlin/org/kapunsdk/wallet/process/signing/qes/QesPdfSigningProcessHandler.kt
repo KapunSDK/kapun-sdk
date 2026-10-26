@@ -16,46 +16,49 @@ under the License.
 
 package org.kapunsdk.wallet.process.signing.qes
 
+import io.ktor.client.HttpClient
+import kotlinx.serialization.json.Json
 import org.kapunsdk.wallet.credentials.signeddocument.SignedDocumentsRepository
 import org.kapunsdk.wallet.process.ProcessEvent
 import org.kapunsdk.wallet.process.ProcessHandler
 import org.kapunsdk.wallet.process.ProcessStep
-import io.ktor.client.HttpClient
-import kotlinx.serialization.json.Json
 
 class QesPdfSigningProcessHandler(
-	private val client: HttpClient,
-	private val signedDocumentsRepository: SignedDocumentsRepository,
-	private val json: Json,
-	private val baseUrl: String,
+    private val client: HttpClient,
+    private val signedDocumentsRepository: SignedDocumentsRepository,
+    private val json: Json,
+    private val baseUrl: String,
 ) : ProcessHandler {
+    private var currentProcess: QesPdfSigningProcess? = null
 
-	private var currentProcess: QesPdfSigningProcess? = null
+    override suspend fun handleProcessStep(
+        current: ProcessStep?,
+        inputEvent: ProcessEvent,
+    ): ProcessStep? =
+        when {
+            // New QES PDF signing process is initiated
+            inputEvent is QesPdfSigningProcessEvent.InitiatePdfSigning -> {
+                currentProcess =
+                    QesPdfSigningProcess(
+                        client,
+                        signedDocumentsRepository,
+                        json,
+                        baseUrl,
+                    )
+                currentProcess?.initiatePdfSigning(inputEvent.pdfData, inputEvent.fileName)
+            }
 
-	override suspend fun handleProcessStep(current: ProcessStep?, inputEvent: ProcessEvent): ProcessStep? {
-		return when {
-			// New QES PDF signing process is initiated
-			inputEvent is QesPdfSigningProcessEvent.InitiatePdfSigning -> {
-				currentProcess = QesPdfSigningProcess(
-					client,
-					signedDocumentsRepository,
-					json,
-					baseUrl,
-				)
-				currentProcess?.initiatePdfSigning(inputEvent.pdfData, inputEvent.fileName)
-			}
+            // Handle presentation completion with redirect URI
+            inputEvent is QesPdfSigningProcessEvent.PresentationCompleted -> {
+                currentProcess?.handlePresentationCompleted(inputEvent.redirectUri)
+            }
 
-			// Handle presentation completion with redirect URI
-			inputEvent is QesPdfSigningProcessEvent.PresentationCompleted -> {
-				currentProcess?.handlePresentationCompleted(inputEvent.redirectUri)
-			}
+            else -> {
+                null
+            }
+        }
 
-			else -> null
-		}
-	}
-
-	override suspend fun cleanupHandler() {
-		currentProcess = null
-	}
-
+    override suspend fun cleanupHandler() {
+        currentProcess = null
+    }
 }

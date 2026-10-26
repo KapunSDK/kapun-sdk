@@ -16,8 +16,8 @@ under the License.
 
 package org.kapunsdk.visualization.test
 
-import org.kapunsdk.visualization.Res
 import org.jetbrains.compose.resources.ExperimentalResourceApi
+import org.kapunsdk.visualization.Res
 
 /**
  * Note:
@@ -26,6 +26,4 @@ import org.jetbrains.compose.resources.ExperimentalResourceApi
  * See: https://youtrack.jetbrains.com/issue/CMP-6612/Support-non-compose-UI-tests-with-resources
  */
 @OptIn(ExperimentalResourceApi::class)
-suspend fun readResourceAsString(resourcePath: String): String {
-	return Res.readBytes(resourcePath).decodeToString()
-}
+suspend fun readResourceAsString(resourcePath: String): String = Res.readBytes(resourcePath).decodeToString()

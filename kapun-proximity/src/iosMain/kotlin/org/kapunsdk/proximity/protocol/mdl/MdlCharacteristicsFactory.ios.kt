@@ -28,60 +28,64 @@ import platform.CoreBluetooth.CBUUID
 import kotlin.toString
 
 internal actual class MdlCharacteristicsFactory {
-	internal actual fun createServerWalletCharacteristics(): List<BleGattCharacteristic> {
-		var stateChar = CBMutableCharacteristic(
-			CBUUID.UUIDWithString(MdlPeripheralServerModeTransportProtocol.characteristicStateUuid.toString()),
-			CBCharacteristicPropertyWriteWithoutResponse or CBCharacteristicPropertyWrite,
-			null,
-			CBAttributePermissionsWriteable
-		)
+    internal actual fun createServerWalletCharacteristics(): List<BleGattCharacteristic> {
+        var stateChar =
+            CBMutableCharacteristic(
+                CBUUID.UUIDWithString(MdlPeripheralServerModeTransportProtocol.characteristicStateUuid.toString()),
+                CBCharacteristicPropertyWriteWithoutResponse or CBCharacteristicPropertyWrite,
+                null,
+                CBAttributePermissionsWriteable,
+            )
 
-		val serverToClientChar = CBMutableCharacteristic(
-			CBUUID.UUIDWithString(MdlPeripheralServerModeTransportProtocol.characteristicServer2ClientUuid.toString()),
-			CBCharacteristicPropertyNotify,
-			null,
-			CBAttributePermissionsReadable
-		)
+        val serverToClientChar =
+            CBMutableCharacteristic(
+                CBUUID.UUIDWithString(
+                    MdlPeripheralServerModeTransportProtocol.characteristicServer2ClientUuid.toString(),
+                ),
+                CBCharacteristicPropertyNotify,
+                null,
+                CBAttributePermissionsReadable,
+            )
 
-		return listOf(
-			stateChar,
-			CBMutableCharacteristic(
-				CBUUID.UUIDWithString(MdlPeripheralServerModeTransportProtocol.characteristicClient2ServerUuid.toString()),
-				CBCharacteristicPropertyWriteWithoutResponse or CBCharacteristicPropertyWrite,
-				null,
-				CBAttributePermissionsWriteable
-			),
-			serverToClientChar
-			,
-		).map { BleGattCharacteristic(it) }
-	}
+        return listOf(
+            stateChar,
+            CBMutableCharacteristic(
+                CBUUID.UUIDWithString(
+                    MdlPeripheralServerModeTransportProtocol.characteristicClient2ServerUuid.toString(),
+                ),
+                CBCharacteristicPropertyWriteWithoutResponse or CBCharacteristicPropertyWrite,
+                null,
+                CBAttributePermissionsWriteable,
+            ),
+            serverToClientChar,
+        ).map { BleGattCharacteristic(it) }
+    }
 
-	internal actual fun createServerVerifierCharacteristics(): List<BleGattCharacteristic> {
-		return listOf(
-			CBMutableCharacteristic(
-				CBUUID.UUIDWithString(MdlCentralClientModeTransportProtocol.characteristicStateUuid.toString()),
-				CBCharacteristicPropertyWriteWithoutResponse or CBCharacteristicPropertyNotify,
-				null,
-				CBAttributePermissionsWriteable or CBAttributePermissionsReadable
-			),
-			CBMutableCharacteristic(
-				CBUUID.UUIDWithString(MdlCentralClientModeTransportProtocol.characteristicClient2ServerUuid.toString()),
-				CBCharacteristicPropertyWriteWithoutResponse,
-				null,
-				CBAttributePermissionsWriteable or CBAttributePermissionsReadable
-			),
-			CBMutableCharacteristic(
-				CBUUID.UUIDWithString(MdlCentralClientModeTransportProtocol.characteristicServer2ClientUuid.toString()),
-				CBCharacteristicPropertyNotify,
-				null,
-				CBAttributePermissionsWriteable
-			),
-			CBMutableCharacteristic(
-				CBUUID.UUIDWithString(MdlCentralClientModeTransportProtocol.characteristicIdentUuid.toString()),
-				CBCharacteristicPropertyRead,
-				null,
-				CBAttributePermissionsWriteable
-			),
-		).map { BleGattCharacteristic(it) }
-	}
+    internal actual fun createServerVerifierCharacteristics(): List<BleGattCharacteristic> =
+        listOf(
+            CBMutableCharacteristic(
+                CBUUID.UUIDWithString(MdlCentralClientModeTransportProtocol.characteristicStateUuid.toString()),
+                CBCharacteristicPropertyWriteWithoutResponse or CBCharacteristicPropertyNotify,
+                null,
+                CBAttributePermissionsWriteable or CBAttributePermissionsReadable,
+            ),
+            CBMutableCharacteristic(
+                CBUUID.UUIDWithString(MdlCentralClientModeTransportProtocol.characteristicClient2ServerUuid.toString()),
+                CBCharacteristicPropertyWriteWithoutResponse,
+                null,
+                CBAttributePermissionsWriteable or CBAttributePermissionsReadable,
+            ),
+            CBMutableCharacteristic(
+                CBUUID.UUIDWithString(MdlCentralClientModeTransportProtocol.characteristicServer2ClientUuid.toString()),
+                CBCharacteristicPropertyNotify,
+                null,
+                CBAttributePermissionsWriteable,
+            ),
+            CBMutableCharacteristic(
+                CBUUID.UUIDWithString(MdlCentralClientModeTransportProtocol.characteristicIdentUuid.toString()),
+                CBCharacteristicPropertyRead,
+                null,
+                CBAttributePermissionsWriteable,
+            ),
+        ).map { BleGattCharacteristic(it) }
 }

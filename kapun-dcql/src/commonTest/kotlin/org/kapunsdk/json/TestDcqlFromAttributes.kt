@@ -25,69 +25,91 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class TestDcqlFromAttributes {
+    @Test
+    fun testGenerateDcqlSdJwt() {
+        val att1 =
+            Attribute(
+                id = 0,
+                name = "given_name",
+                type = AttributeType.STRING,
+                displayName =
+                    mapOf("en-US" to "something"),
+            )
+        val att2 =
+            Attribute(
+                id = 0,
+                name = "family_name",
+                type = AttributeType.STRING,
+                displayName =
+                    mapOf("en-US" to "something"),
+            )
+        val input1: List<Attribute> = listOf(att1, att2)
 
-	@Test
-	fun testGenerateDcqlSdJwt() {
-		val att1 = Attribute(id = 0, name = "given_name", type = AttributeType.STRING, displayName = mapOf("en-US" to "something"))
-		val att2 = Attribute(id = 0, name = "family_name", type = AttributeType.STRING, displayName = mapOf("en-US" to "something"))
-		val input1: List<Attribute> = listOf(att1, att2)
+        val query =
+            parseDcqlQuery(
+                """
+                {
+                    "credentials": [
+                        {
+                            "id": "pid",
+                            "format": "dc+sd-jwt",
+                            "claims": [
+                                {"path": ["given_name"]},
+                                {"path": ["family_name"]}
+                            ]
+                        }
+                    ]
+                }
+                """.trimIndent(),
+            )
 
-		val query = parseDcqlQuery(
-			"""
-            {
-                "credentials": [
-                    {
-                        "id": "pid",
-                        "format": "dc+sd-jwt",
-                        "claims": [
-                            {"path": ["given_name"]},
-                            {"path": ["family_name"]}
-                        ]
-                    }
-                ]
-            }
-            """.trimIndent()
-		)
+        val result = sdJwtDcqlClaimsFromAttributes(input1)
+        val claims = query.credentials?.get(0)?.claims
 
+        assertEquals(result, claims)
+    }
 
+    @Test
+    fun testGenerateDcqlMDoc() {
+        val att1 =
+            Attribute(
+                id = 0,
+                name = "given_name",
+                type = AttributeType.STRING,
+                displayName =
+                    mapOf("en-US" to "something"),
+            )
+        val att2 =
+            Attribute(
+                id = 0,
+                name = "family_name",
+                type = AttributeType.STRING,
+                displayName =
+                    mapOf("en-US" to "something"),
+            )
+        val input1: List<Attribute> = listOf(att1, att2)
 
-		val result = sdJwtDcqlClaimsFromAttributes(input1)
-		val claims = query.credentials?.get(0)?.claims
+        val query =
+            parseDcqlQuery(
+                """
+                {
+                    "credentials": [
+                        {
+                            "id": "pid",
+                            "format": "mso_mdoc",
+                            "claims": [
+                                {"path": ["org.iso.18013.5.1", "given_name"]},
+                                {"path": ["org.iso.18013.5.1", "family_name"]}
+                            ]
+                        }
+                    ]
+                }
+                """.trimIndent(),
+            )
 
-		assertEquals(result, claims);
-	}
+        val result = mDocDcqlClaimsFromAttributes(input1)
+        val claims = query.credentials?.get(0)?.claims
 
-
-	@Test
-	fun testGenerateDcqlMDoc() {
-		val att1 = Attribute(id = 0, name = "given_name", type = AttributeType.STRING, displayName = mapOf("en-US" to "something"))
-		val att2 = Attribute(id = 0, name = "family_name", type = AttributeType.STRING, displayName = mapOf("en-US" to "something"))
-		val input1: List<Attribute> = listOf(att1, att2)
-
-		val query = parseDcqlQuery(
-			"""
-            {
-                "credentials": [
-                    {
-                        "id": "pid",
-                        "format": "mso_mdoc",
-                        "claims": [
-                            {"path": ["org.iso.18013.5.1", "given_name"]},
-                            {"path": ["org.iso.18013.5.1", "family_name"]}
-                        ]
-                    }
-                ]
-            }
-            """.trimIndent()
-		)
-
-		val result = mDocDcqlClaimsFromAttributes(input1)
-		val claims = query.credentials?.get(0)?.claims
-
-		assertEquals(result, claims);
-	}
-
-
-
-
+        assertEquals(result, claims)
+    }
 }

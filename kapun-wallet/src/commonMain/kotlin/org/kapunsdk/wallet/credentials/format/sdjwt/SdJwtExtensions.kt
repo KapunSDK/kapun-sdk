@@ -21,16 +21,17 @@ import org.kapunsdk.util.extensions.*
 import uniffi.kapun_util_rust.Value
 
 fun SdJwt.getRenderMetadata(): SdJwtVcRenderMetadata? {
-	val claims = innerJwt.claims
-	val renderClaim = claims["render"]
-	return if (renderClaim is Value.Object) {
-		SdJwtVcRenderMetadata(
-			render = SdJwtVcRender(
-				type = requireNotNull(renderClaim["type"].asString()),
-				oca = requireNotNull(renderClaim["oca"].asString()),
-			)
-		)
-	} else {
-		null
-	}
+    val claims = innerJwt.claims
+    val renderClaim = claims["render"]
+    return if (renderClaim is Value.Object) {
+        SdJwtVcRenderMetadata(
+            render =
+                SdJwtVcRender(
+                    type = requireNotNull(renderClaim["type"].asString()),
+                    oca = requireNotNull(renderClaim["oca"].asString()),
+                ),
+        )
+    } else {
+        null
+    }
 }

@@ -19,26 +19,25 @@ package org.kapunsdk.wallet.process.issuance.eaa
 import org.kapunsdk.wallet.process.ProcessEvent
 
 sealed interface EaaIssuanceProcessEvent : ProcessEvent {
+    data class CredentialOfferReceived(
+        val credentialOfferString: String,
+    ) : EaaIssuanceProcessEvent
 
-	data class CredentialOfferReceived(
-		val credentialOfferString: String,
-	) : EaaIssuanceProcessEvent
-	data class DeferredIssuance(
-		val transactionId: String
-	) : EaaIssuanceProcessEvent
+    data class DeferredIssuance(
+        val transactionId: String,
+    ) : EaaIssuanceProcessEvent
 
-	data class TransactionCodeEntered(
-		val transactionCode: String,
-	) : EaaIssuanceProcessEvent
+    data class TransactionCodeEntered(
+        val transactionCode: String,
+    ) : EaaIssuanceProcessEvent
 
-	data class AuthorizationCodeReceived(
-		val authorizationCode: String,
-	) : EaaIssuanceProcessEvent
+    data class AuthorizationCodeReceived(
+        val authorizationCode: String,
+    ) : EaaIssuanceProcessEvent
 
-	data class PresentationSuccessful(
-		val authSession: String,
-		val scope: String,
-		val pdiSession: String?,
-	) : EaaIssuanceProcessEvent
-
+    data class PresentationSuccessful(
+        val authSession: String,
+        val scope: String,
+        val pdiSession: String?,
+    ) : EaaIssuanceProcessEvent
 }

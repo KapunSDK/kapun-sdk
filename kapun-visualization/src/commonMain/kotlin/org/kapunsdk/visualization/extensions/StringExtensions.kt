@@ -21,22 +21,27 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 /**
  * Return the first substring between two delimiters. If the string does not contain one of the delimiters, returns [missingDelimiterValue] which defaults to [this]
  */
-internal fun String.substringBetween(startDelimiter: String, endDelimiter: String, missingDelimiterValue: String = this): String {
-	val startIndex = indexOf(startDelimiter) + startDelimiter.length
-	val endIndex = lastIndexOf(endDelimiter)
-	return if (startIndex != -1 && endIndex != -1) {
-		substring(startIndex, endIndex)
-	} else {
-		missingDelimiterValue
-	}
+internal fun String.substringBetween(
+    startDelimiter: String,
+    endDelimiter: String,
+    missingDelimiterValue: String = this,
+): String {
+    val startIndex = indexOf(startDelimiter) + startDelimiter.length
+    val endIndex = lastIndexOf(endDelimiter)
+    return if (startIndex != -1 && endIndex != -1) {
+        substring(startIndex, endIndex)
+    } else {
+        missingDelimiterValue
+    }
 }
-fun String.isPng() : Boolean {
-	return this.startsWith("iVBOR")
-}
+
+fun String.isPng(): Boolean = this.startsWith("iVBOR")
+
 @OptIn(ExperimentalEncodingApi::class)
-fun String?.tryDecodeBase64() : ByteArray? {
-	return this?.let {
-		(runCatching {  Base64.UrlSafe.decode(it) }.getOrNull()
-			?: runCatching { Base64.decode(it) }.getOrNull())
-	}
-}
+fun String?.tryDecodeBase64(): ByteArray? =
+    this?.let {
+        (
+            runCatching { Base64.UrlSafe.decode(it) }.getOrNull()
+                ?: runCatching { Base64.decode(it) }.getOrNull()
+        )
+    }

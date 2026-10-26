@@ -20,10 +20,10 @@ package org.kapunsdk.issuance.extensions
 import org.kapunsdk.issuance.metadata.data.Display
 
 fun List<Display>?.getLocalizedLabel(locale: String): String? {
-	if (this == null) return null
-	firstOrNull { it.locale.equals(locale, ignoreCase = true) && !it.name.isNullOrBlank() }?.name?.let { return it }
+    if (this == null) return null
+    firstOrNull { it.locale.equals(locale, ignoreCase = true) && !it.name.isNullOrBlank() }?.name?.let { return it }
 
-	firstOrNull { it.locale.equals("en", ignoreCase = true) && !it.name.isNullOrBlank() }?.name?.let { return it }
+    firstOrNull { it.locale.equals("en", ignoreCase = true) && !it.name.isNullOrBlank() }?.name?.let { return it }
 
-	return firstOrNull { !it.name.isNullOrBlank() }?.name
+    return firstOrNull { !it.name.isNullOrBlank() }?.name
 }

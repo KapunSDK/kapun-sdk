@@ -13,8 +13,8 @@ import uniffi.kapun_util_rust.logBridgeConfirmation
  * can confirm Rust logs reach its sink too, without needing to trigger a specific credential flow.
  */
 internal fun logKapunSdkInitialized() {
-	Logger("KapunSdk").info(
-		"KapunSdk initialized (version=${KapunSdkInfo.VERSION}, commit=${KapunSdkInfo.GIT_COMMIT})",
-	)
-	logBridgeConfirmation()
+    Logger("KapunSdk").info(
+        "KapunSdk initialized (version=${KapunSdkInfo.VERSION}, commit=${KapunSdkInfo.GIT_COMMIT})",
+    )
+    logBridgeConfirmation()
 }

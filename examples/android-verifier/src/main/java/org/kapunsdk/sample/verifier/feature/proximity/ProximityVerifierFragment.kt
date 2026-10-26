@@ -11,7 +11,7 @@ software distributed under the License is distributed on an
 "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
-under the License.   
+under the License.
  */
 package org.kapunsdk.sample.verifier.feature.proximity
 
@@ -28,66 +28,73 @@ import org.kapunsdk.sample.verifier.databinding.FragmentComposeBinding
 import org.koin.androidx.viewmodel.ext.android.viewModel
 import org.koin.core.component.KoinComponent
 
-class ProximityVerifierFragment : Fragment(), KoinComponent {
+class ProximityVerifierFragment :
+    Fragment(),
+    KoinComponent {
+    companion object {
+        val TAG = "ProximityFragment"
 
-	companion object {
-		val TAG = "ProximityFragment"
+        fun newInstance() = ProximityVerifierFragment()
+    }
 
-		fun newInstance() = ProximityVerifierFragment()
-	}
+    private val viewModel by viewModel<ProximityVerifierViewModel>()
 
-	private val viewModel by viewModel<ProximityVerifierViewModel>()
+    private var _binding: FragmentComposeBinding? = null
+    private val binding get() = _binding!!
 
-	private var _binding: FragmentComposeBinding? = null
-	private val binding get() = _binding!!
+    private val launcher =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
+            if (permissions.all { it.value }) {
+                locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+            }
+        }
 
+    private val locationPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) {
+                // TODO Handle permissions properly?
+            }
+        }
 
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?,
+    ): View {
+        _binding = FragmentComposeBinding.inflate(inflater, container, false)
+        return binding.root
+    }
 
-	private val launcher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
-		if (permissions.all { it.value }) {
-			locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-		}
-	}
+    override fun onViewCreated(
+        view: View,
+        savedInstanceState: Bundle?,
+    ) {
+        super.onViewCreated(view, savedInstanceState)
 
-	private val locationPermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-		if (granted) {
-			// TODO Handle permissions properly?
-		}
-	}
+        launcher.launch(
+            arrayOf(
+                Manifest.permission.BLUETOOTH,
+                Manifest.permission.BLUETOOTH_SCAN,
+                Manifest.permission.BLUETOOTH_ADVERTISE,
+                Manifest.permission.BLUETOOTH_CONNECT,
+            ),
+        )
 
-	override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
-		_binding = FragmentComposeBinding.inflate(inflater, container, false)
-		return binding.root
-	}
+        binding.composeView.setContent {
+            KapunTheme {
+                ProximityVerifierScreen(
+                    proofTemplate = viewModel.proofTemplate.collectAsState(),
+                    proximityState = viewModel.proximityState.collectAsState(),
+                    onProofTemplateChanged = viewModel::setProofTemplate,
+                    onStartVerificationClicked = viewModel::startEngagement,
+                    onRestartClicked = viewModel::reset,
+                )
+            }
+        }
+    }
 
-	override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-		super.onViewCreated(view, savedInstanceState)
-
-		launcher.launch(
-			arrayOf(
-				Manifest.permission.BLUETOOTH,
-				Manifest.permission.BLUETOOTH_SCAN,
-				Manifest.permission.BLUETOOTH_ADVERTISE,
-				Manifest.permission.BLUETOOTH_CONNECT,
-			)
-		)
-
-		binding.composeView.setContent {
-			KapunTheme {
-				ProximityVerifierScreen(
-					proofTemplate = viewModel.proofTemplate.collectAsState(),
-					proximityState = viewModel.proximityState.collectAsState(),
-					onProofTemplateChanged = viewModel::setProofTemplate,
-					onStartVerificationClicked = viewModel::startEngagement,
-					onRestartClicked = viewModel::reset,
-				)
-			}
-		}
-	}
-
-	override fun onDestroyView() {
-		super.onDestroyView()
-		_binding = null
-	}
-
+    override fun onDestroyView() {
+        super.onDestroyView()
+        _binding = null
+    }
 }

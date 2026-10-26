@@ -20,5 +20,6 @@ import org.kapunsdk.proximity.ble.gatt.BleGattCharacteristic
 
 internal expect class MdlCharacteristicsFactory {
     internal fun createServerWalletCharacteristics(): List<BleGattCharacteristic>
+
     internal fun createServerVerifierCharacteristics(): List<BleGattCharacteristic>
 }

@@ -19,20 +19,18 @@ package org.kapunsdk.wallet.credentials.metadata
 import org.kapunsdk.credentials.models.metadata.Tokens
 import uniffi.kapun_wallet_rust.DeviceBoundTokens
 
-fun Tokens.Companion.fromNative(tokens: DeviceBoundTokens): Tokens {
-	return Tokens(
-		dpopKeyReference = tokens.dpopKeyReference,
-		accessToken = tokens.accessToken,
-		refreshToken = tokens.refreshToken,
-		lastNonce = tokens.cNonce,
-	)
-}
+fun Tokens.Companion.fromNative(tokens: DeviceBoundTokens): Tokens =
+    Tokens(
+        dpopKeyReference = tokens.dpopKeyReference,
+        accessToken = tokens.accessToken,
+        refreshToken = tokens.refreshToken,
+        lastNonce = tokens.cNonce,
+    )
 
-fun Tokens.toNative(): DeviceBoundTokens {
-	return DeviceBoundTokens(
-		dpopKeyReference = this.dpopKeyReference,
-		accessToken = this.accessToken,
-		refreshToken = this.refreshToken,
-		cNonce = this.lastNonce
-	)
-}
+fun Tokens.toNative(): DeviceBoundTokens =
+    DeviceBoundTokens(
+        dpopKeyReference = this.dpopKeyReference,
+        accessToken = this.accessToken,
+        refreshToken = this.refreshToken,
+        cNonce = this.lastNonce,
+    )

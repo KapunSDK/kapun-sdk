@@ -20,12 +20,12 @@ import android.content.Context
 import org.kapunsdk.visualization.di.KapunVisualizationKoinContext
 import org.koin.android.ext.koin.androidContext
 
-actual class KapunVisualization(private val context: Context) {
-
-	actual fun initialize() {
-		KapunVisualizationKoinContext.initialize {
-			androidContext(context)
-		}
-	}
-
+actual class KapunVisualization(
+    private val context: Context,
+) {
+    actual fun initialize() {
+        KapunVisualizationKoinContext.initialize {
+            androidContext(context)
+        }
+    }
 }

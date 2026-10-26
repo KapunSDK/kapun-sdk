@@ -16,6 +16,7 @@ under the License.
 
 package org.kapunsdk
 
+import kotlinx.serialization.json.Json
 import org.kapunsdk.credentials.Bbs
 import org.kapunsdk.credentials.BbsPresentation
 import org.kapunsdk.credentials.Mdoc
@@ -29,7 +30,6 @@ import org.kapunsdk.util.extensions.asObject
 import org.kapunsdk.util.extensions.asOrderedObject
 import org.kapunsdk.util.extensions.asString
 import org.kapunsdk.util.extensions.get
-import kotlinx.serialization.json.Json
 import uniffi.kapun_credential_core_rust.PointerPart
 import uniffi.kapun_crypto_rust.base64UrlDecode
 import uniffi.kapun_crypto_rust.base64UrlEncode
@@ -45,85 +45,121 @@ import uniffi.kapun_util_rust.encodeCbor
 private fun <T> List<Result<T>>.collect(): Result<List<T>> {
     val failure = find { it.isFailure }?.exceptionOrNull()
 
-    return if (failure != null) Result.failure(failure)
-    else Result.success(map { it.getOrNull()!! })
+    return if (failure != null) {
+        Result.failure(failure)
+    } else {
+        Result.success(map { it.getOrNull()!! })
+    }
 }
 
-fun PointerPart.toReadableString(): String = when (this) {
-    is PointerPart.String -> this.v1
-    is PointerPart.Index -> this.v1.toString()
-    is PointerPart.Null -> "null"
-}
+fun PointerPart.toReadableString(): String =
+    when (this) {
+        is PointerPart.String -> this.v1
+        is PointerPart.Index -> this.v1.toString()
+        is PointerPart.Null -> "null"
+    }
 
 typealias DcqlPresentation = Map<String, String>
 
 fun interface CheckVpTokenCallback {
     // Makes Java aware that this function can throw exceptions
     @Throws(Exception::class)
-    fun check(credentialType: CredentialType, vpToken: String, queryId: String): Map<String, Value>
+    fun check(
+        credentialType: CredentialType,
+        vpToken: String,
+        queryId: String,
+    ): Map<String, Value>
 }
 
-open class DcqlVerificationException(message: String) : Exception(message)
-class CredentialQueryNotFoundException(id: String) :
-    DcqlVerificationException("Credential Query with id = $id not found!")
+open class DcqlVerificationException(
+    message: String,
+) : Exception(message)
 
-class ClaimQueryNotFoundException(id: String) :
-    DcqlVerificationException("Credential Query with id = $id not found!")
+class CredentialQueryNotFoundException(
+    id: String,
+) : DcqlVerificationException("Credential Query with id = $id not found!")
 
-class UnknownCredentialQueryFormatException(format: String) :
-    DcqlVerificationException("Credential Query format = $format is unknown!")
+class ClaimQueryNotFoundException(
+    id: String,
+) : DcqlVerificationException("Credential Query with id = $id not found!")
 
-class InvalidCredentialQueryMetaException(expected: String, actual: String) :
-    DcqlVerificationException("Credential Query with meta = $actual is invalid, expected meta = $expected!")
+class UnknownCredentialQueryFormatException(
+    format: String,
+) : DcqlVerificationException("Credential Query format = $format is unknown!")
 
-class InvalidClaimTypeException(expected: String, actual: String) :
-    DcqlVerificationException("Claim with type = $actual is invalid, expected type = $expected!")
+class InvalidCredentialQueryMetaException(
+    expected: String,
+    actual: String,
+) : DcqlVerificationException("Credential Query with meta = $actual is invalid, expected meta = $expected!")
 
-class InvalidVctValueException(allowed: List<String>, actual: String) :
-    DcqlVerificationException("vct = $actual is not in allowed = $allowed!")
+class InvalidClaimTypeException(
+    expected: String,
+    actual: String,
+) : DcqlVerificationException("Claim with type = $actual is invalid, expected type = $expected!")
 
-class NotAllClaimsProvidedException() :
+class InvalidVctValueException(
+    allowed: List<String>,
+    actual: String,
+) : DcqlVerificationException("vct = $actual is not in allowed = $allowed!")
+
+class NotAllClaimsProvidedException :
     DcqlVerificationException("A fully disclosed VC was expected, but a restricted was received")
 
-class UnexpectedClaimsProvidedException() :
+class UnexpectedClaimsProvidedException :
     DcqlVerificationException("No selectively disclosable claims were requested, but some were received")
 
-class NoCredentialSetQueryOptionSatisfiedException() :
+class NoCredentialSetQueryOptionSatisfiedException :
     DcqlVerificationException("No credential set option was satisfied!")
 
-class NoClaimSetQueryOptionSatisfiedException() :
-    DcqlVerificationException("No claim set option was satisfied!")
+class NoClaimSetQueryOptionSatisfiedException : DcqlVerificationException("No claim set option was satisfied!")
 
-class ClaimHasNoValueException(path: String) :
-    DcqlVerificationException("Claim with path = $path has no value!")
+class ClaimHasNoValueException(
+    path: String,
+) : DcqlVerificationException("Claim with path = $path has no value!")
 
-class ClaimValueNotAllowed(allowed: List<Value>, actual: Value, path: String) :
-    DcqlVerificationException("Claim with path = $path has value = $actual, but one of $allowed was expected!")
+class ClaimValueNotAllowed(
+    allowed: List<Value>,
+    actual: Value,
+    path: String,
+) : DcqlVerificationException("Claim with path = $path has value = $actual, but one of $allowed was expected!")
 
-class InvalidDocTypeException(expected: String, actual: String) :
-    DcqlVerificationException("A document with docType = $expected was expected, but got docType = $actual!")
+class InvalidDocTypeException(
+    expected: String,
+    actual: String,
+) : DcqlVerificationException("A document with docType = $expected was expected, but got docType = $actual!")
 
-class InvalidCredentialTypeException(expected: List<String>, actual: List<String>) :
-    DcqlVerificationException("A document with credentialType in $expected was expected, but got credentialTypes = $actual!")
+class InvalidCredentialTypeException(
+    expected: List<String>,
+    actual: List<String>,
+) : DcqlVerificationException(
+        "A document with credentialType in $expected was expected, but got credentialTypes = $actual!",
+    )
 
-class InvalidCredentialTypeCombinationException(expected: List<List<String>>, actual: List<String>) :
-    DcqlVerificationException("A document with credentialType combination in $expected was expected, but got credentialTypes = $actual!")
-
+class InvalidCredentialTypeCombinationException(
+    expected: List<List<String>>,
+    actual: List<String>,
+) : DcqlVerificationException(
+        "A document with credentialType combination in $expected was expected, but got credentialTypes = $actual!",
+    )
 
 private fun checkClaimQuery(
-    query: ClaimsQuery, claims: Value
+    query: ClaimsQuery,
+    claims: Value,
 ): Result<Unit> {
     val value = claims[query.path.toClaimsPointer()!!]
 
-    if (value.size != 1) return Result.failure(
-        ClaimHasNoValueException(query.path.joinToString("->") { it.toReadableString() })
-    )
+    if (value.size != 1) {
+        return Result.failure(
+            ClaimHasNoValueException(query.path.joinToString("->") { it.toReadableString() }),
+        )
+    }
 
     query.values?.let { values ->
-        if (!values.contains(value[0])) return Result.failure(
-            ClaimValueNotAllowed(
-                values, value[0], query.path.joinToString("->") { it.toReadableString() })
-        )
+        if (!values.contains(value[0])) {
+            return Result.failure(
+                ClaimValueNotAllowed(values, value[0], query.path.joinToString("->") { it.toReadableString() }),
+            )
+        }
     }
 
     return Result.success(Unit)
@@ -138,9 +174,11 @@ private fun checkCredentialQuery(
     if (claimQueries.isNullOrEmpty()) {
         // If claims is absent, no selectively disclosable claims are requested. Treat an empty
         // legacy value the same way; mandatory claims are not included in numClaimsDisclosed.
-        if (numClaimsDisclosed > 0) return Result.failure(
-            UnexpectedClaimsProvidedException()
-        )
+        if (numClaimsDisclosed > 0) {
+            return Result.failure(
+                UnexpectedClaimsProvidedException(),
+            )
+        }
         return Result.success(Unit)
     } else {
         val claimQuerySets = query.claimSets
@@ -152,41 +190,52 @@ private fun checkCredentialQuery(
         } else {
             // If both claims and claim_sets are present, the Verifier requests one combination
             // of the claims listed in claim_sets.
-            return claimQuerySets.map { set ->
-                set.map inner@{ id ->
-                    val claimQuery = claimQueries.find { it.id == id }
+            return claimQuerySets
+                .map { set ->
+                    set
+                        .map inner@{ id ->
+                            val claimQuery = claimQueries.find { it.id == id }
 
-                    return@inner claimQuery?.let { checkClaimQuery(it, claims) }
-                        ?: Result.failure(ClaimQueryNotFoundException(id))
-                }.collect().map { }
-            }.find { it.isSuccess } ?: Result.failure(NoClaimSetQueryOptionSatisfiedException())
+                            return@inner claimQuery?.let { checkClaimQuery(it, claims) }
+                                ?: Result.failure(ClaimQueryNotFoundException(id))
+                        }.collect()
+                        .map { }
+                }.find { it.isSuccess } ?: Result.failure(NoClaimSetQueryOptionSatisfiedException())
         }
     }
 }
 
 private fun checkMetaSdJwt(
-    meta: Meta, sdJwt: SdJwt
+    meta: Meta,
+    sdJwt: SdJwt,
 ): Result<Unit> {
-    if (meta !is Meta.SdjwtVc) return Result.failure(
-        InvalidCredentialQueryMetaException(
-            "SdJwt",
-            meta.toString()
+    if (meta !is Meta.SdjwtVc) {
+        return Result.failure(
+            InvalidCredentialQueryMetaException(
+                "SdJwt",
+                meta.toString(),
+            ),
         )
-    )
+    }
 
     val vctValue = sdJwt.innerJwt.claims["vct"]
-    if (vctValue !is Value.String) return Result.failure(
-        InvalidClaimTypeException(
-            "Value.String", vctValue::class.simpleName.toString()
+    if (vctValue !is Value.String) {
+        return Result.failure(
+            InvalidClaimTypeException(
+                "Value.String",
+                vctValue::class.simpleName.toString(),
+            ),
         )
-    )
+    }
 
-    if (!meta.vctValues.contains(vctValue.v1)) return Result.failure(
-        InvalidVctValueException(
-            meta.vctValues,
-            vctValue.v1
+    if (!meta.vctValues.contains(vctValue.v1)) {
+        return Result.failure(
+            InvalidVctValueException(
+                meta.vctValues,
+                vctValue.v1,
+            ),
         )
-    )
+    }
     return Result.success(Unit)
 }
 
@@ -194,54 +243,58 @@ private fun checkMetaMdoc(
     meta: Meta,
     docType: String,
 ): Result<Unit> {
-    if (meta !is Meta.IsoMdoc) return Result.failure(
-        InvalidCredentialQueryMetaException(
-            "IsoMdoc",
-            meta.toString()
+    if (meta !is Meta.IsoMdoc) {
+        return Result.failure(
+            InvalidCredentialQueryMetaException(
+                "IsoMdoc",
+                meta.toString(),
+            ),
         )
-    )
+    }
 
-    if (meta.doctypeValue != docType) return Result.failure(
-        InvalidDocTypeException(
-            meta.doctypeValue,
-            docType
+    if (meta.doctypeValue != docType) {
+        return Result.failure(
+            InvalidDocTypeException(
+                meta.doctypeValue,
+                docType,
+            ),
         )
-    )
+    }
 
     return Result.success(Unit)
 }
 
 private fun checkMetaBbs(
     meta: Meta,
-    types: List<String>
+    types: List<String>,
 ): Result<Unit> {
     // BBS and W3C use the same metadata structure
-    if (meta !is Meta.W3c)
+    if (meta !is Meta.W3c) {
         return Result.failure(InvalidCredentialQueryMetaException("BBS", meta.toString()))
+    }
 
     return if (meta.credentialTypes.intersect(types).isEmpty()) {
         Result.failure(
             InvalidCredentialTypeException(
-                meta.credentialTypes, types
-            )
+                meta.credentialTypes,
+                types,
+            ),
         )
     } else {
         Result.success(Unit)
     }
 }
 
-private fun checkMetaW3C(
-    meta: Meta
-): Result<Unit> {
-    return Result.failure(InvalidCredentialQueryMetaException("W3C", meta.toString()))
-}
+private fun checkMetaW3C(meta: Meta): Result<Unit> =
+    Result.failure(InvalidCredentialQueryMetaException("W3C", meta.toString()))
 
 private fun checkMetaOpenBadges(
     meta: Meta,
-    types: List<String>
+    types: List<String>,
 ): Result<Unit> {
-    if (meta !is Meta.LdpVc)
+    if (meta !is Meta.LdpVc) {
         return Result.failure(InvalidCredentialQueryMetaException("BBS", meta.toString()))
+    }
 
     return if (meta.typeValues.any { it.containsAll(types) }) {
         Result.success(Unit)
@@ -250,27 +303,33 @@ private fun checkMetaOpenBadges(
     }
 }
 
-
-private fun getCredentialType(vpToken: String, expectedFormat: String): Result<CredentialType> {
+private fun getCredentialType(
+    vpToken: String,
+    expectedFormat: String,
+): Result<CredentialType> {
     // BBS term-wise has unique formats
-    if (Bbs.BBS_TERMWISE_FORMATS.contains(expectedFormat))
+    if (Bbs.BBS_TERMWISE_FORMATS.contains(expectedFormat)) {
         return Result.success(CredentialType.BbsTermwise)
+    }
 
     // Mdoc has unique formats
-    if (Mdoc.MDOC_FORMATS.contains(expectedFormat))
+    if (Mdoc.MDOC_FORMATS.contains(expectedFormat)) {
         return Result.success(CredentialType.Mdoc)
+    }
 
     // SD-JWT and W3C have overlapping formats
-    if (SdJwt.SD_JWT_FORMATS.contains(expectedFormat)
-        && W3C.W3C_FORMATS.contains(expectedFormat)
+    if (SdJwt.SD_JWT_FORMATS.contains(expectedFormat) &&
+        W3C.W3C_FORMATS.contains(expectedFormat)
     ) {
         // If parsing one credential fails, its the other format
-        val sdJwt = runCatching { SdJwt.parse(vpToken) }.getOrElse {
-            return Result.success(CredentialType.W3C_VCDM)
-        }
-        val w3c = runCatching { W3C.parse(vpToken) }.getOrElse {
-            return Result.success(CredentialType.SdJwt)
-        }
+        val sdJwt =
+            runCatching { SdJwt.parse(vpToken) }.getOrElse {
+                return Result.success(CredentialType.W3C_VCDM)
+            }
+        val w3c =
+            runCatching { W3C.parse(vpToken) }.getOrElse {
+                return Result.success(CredentialType.SdJwt)
+            }
 
         // Otherwise, try to distinguish the formats using a heuristic:
         // "Pure" SD-JWT credentials should not have a "@context" property
@@ -281,14 +340,17 @@ private fun getCredentialType(vpToken: String, expectedFormat: String): Result<C
         }
     }
 
-    if (SdJwt.SD_JWT_FORMATS.contains(expectedFormat))
+    if (SdJwt.SD_JWT_FORMATS.contains(expectedFormat)) {
         return Result.success(CredentialType.SdJwt)
+    }
 
-    if (W3C.W3C_FORMATS.contains(expectedFormat))
+    if (W3C.W3C_FORMATS.contains(expectedFormat)) {
         return Result.success(CredentialType.W3C_VCDM)
+    }
 
-    if (W3C.OpenBadge303.OPEN_BADGE_FORMATS.contains(expectedFormat))
+    if (W3C.OpenBadge303.OPEN_BADGE_FORMATS.contains(expectedFormat)) {
         return Result.success(CredentialType.OpenBadge303)
+    }
 
     return Result.failure(UnknownCredentialQueryFormatException(expectedFormat))
 }
@@ -306,9 +368,10 @@ private fun checkCredentialQuery(
 
     return when (credentialType) {
         CredentialType.SdJwt -> {
-            val result = runCatching {
-                checkVpToken(CredentialType.SdJwt, vpToken, query.id)
-            }.getOrElse { return Result.failure(it) }
+            val result =
+                runCatching {
+                    checkVpToken(CredentialType.SdJwt, vpToken, query.id)
+                }.getOrElse { return Result.failure(it) }
             val sdJwt = SdJwt.parse(vpToken)
 
             query.meta?.let {
@@ -316,14 +379,17 @@ private fun checkCredentialQuery(
             }
 
             checkCredentialQuery(
-                query, sdJwt.innerJwt.claims, sdJwt.getNumDisclosed()
+                query,
+                sdJwt.innerJwt.claims,
+                sdJwt.getNumDisclosed(),
             ).map { result }
         }
 
         CredentialType.Mdoc -> {
-            val result = runCatching {
-                checkVpToken(CredentialType.Mdoc, vpToken, query.id)
-            }.getOrElse { return Result.failure(it) }
+            val result =
+                runCatching {
+                    checkVpToken(CredentialType.Mdoc, vpToken, query.id)
+                }.getOrElse { return Result.failure(it) }
 
             val parsedCbor = decodeCbor(base64UrlDecode(vpToken))
             val issuerSigned =
@@ -340,33 +406,38 @@ private fun checkCredentialQuery(
             checkCredentialQuery(
                 query,
                 mdoc.mdoc.namespaceMap,
-                mdoc.mdoc.namespaceMap.asOrderedObject()!!
-                    .entries.sumOf { (_, value) -> value.asOrderedObject()!!.entries.size },
+                mdoc.mdoc.namespaceMap
+                    .asOrderedObject()!!
+                    .entries
+                    .sumOf { (_, value) -> value.asOrderedObject()!!.entries.size },
             ).map { result }
         }
 
         CredentialType.BbsTermwise -> {
-            val result = runCatching {
-                checkVpToken(CredentialType.BbsTermwise, vpToken, query.id)
-            }.getOrElse { return Result.failure(it) }
+            val result =
+                runCatching {
+                    checkVpToken(CredentialType.BbsTermwise, vpToken, query.id)
+                }.getOrElse { return Result.failure(it) }
             val bbs = BbsPresentation.parse(vpToken)
 
             query.meta?.let {
-                checkMetaBbs(it, bbs.vcTypes()).exceptionOrNull()
+                checkMetaBbs(it, bbs.vcTypes())
+                    .exceptionOrNull()
                     ?.let { e -> return Result.failure(e) }
             }
 
             checkCredentialQuery(
                 query,
                 bbs.claims(),
-                bbs.getNumDisclosed()
+                bbs.getNumDisclosed(),
             ).map { result }
         }
 
         CredentialType.W3C_VCDM -> {
-            val result = runCatching {
-                checkVpToken(CredentialType.W3C_VCDM, vpToken, query.id)
-            }.getOrElse { return Result.failure(it) }
+            val result =
+                runCatching {
+                    checkVpToken(CredentialType.W3C_VCDM, vpToken, query.id)
+                }.getOrElse { return Result.failure(it) }
             val w3c = W3C.parse(vpToken)
 
             query.meta?.let {
@@ -374,32 +445,40 @@ private fun checkCredentialQuery(
             }
 
             checkCredentialQuery(
-                query, w3c.asJson(), w3c.getNumDisclosed()
+                query,
+                w3c.asJson(),
+                w3c.getNumDisclosed(),
             ).map { result }
         }
 
         CredentialType.OpenBadge303 -> {
-            val result = runCatching {
-                checkVpToken(CredentialType.OpenBadge303, vpToken, query.id)
-            }.getOrElse { return Result.failure(it) }
+            val result =
+                runCatching {
+                    checkVpToken(CredentialType.OpenBadge303, vpToken, query.id)
+                }.getOrElse { return Result.failure(it) }
             val vpJson = Json.decodeFromString<Value>(vpToken)
             val vcJson = vpJson["verifiableCredential"][0]
 
             query.meta?.let {
-                val types = vcJson["type"]
-                    .asArray()
-                    ?.mapNotNull { t -> t.asString() }
-                    ?: listOf()
+                val types =
+                    vcJson["type"]
+                        .asArray()
+                        ?.mapNotNull { t -> t.asString() }
+                        ?: listOf()
 
                 checkMetaOpenBadges(it, types).exceptionOrNull()?.let { e -> return Result.failure(e) }
             }
 
             checkCredentialQuery(
-                query, vcJson, 0
+                query,
+                vcJson,
+                0,
             ).map { result }
         }
 
-        CredentialType.Unknown -> Result.failure(UnknownCredentialQueryFormatException(query.format))
+        CredentialType.Unknown -> {
+            Result.failure(UnknownCredentialQueryFormatException(query.format))
+        }
     }
 }
 
@@ -414,19 +493,26 @@ private fun checkCredentialSetQuery(
     // To satisfy a Credential Set Query, the Wallet MUST return presentations
     // of a set of Credentials that match to one of the options inside the
     // Credential Set Query.
-    return query.options.map { option ->
-        option.map { id ->
-            credentialQueries.find { it.id == id }?.let {
-                checkCredentialQuery(
-                    it, vpTokens, checkVpToken
-                )
-            }?.map { Pair(id, it) } ?: Result.failure(
-                CredentialQueryNotFoundException(
-                    id
-                )
-            )
-        }.collect().map { it.associate { (id, res) -> id to res } }
-    }.find { it.isSuccess } ?: Result.failure(NoCredentialSetQueryOptionSatisfiedException())
+    return query.options
+        .map { option ->
+            option
+                .map { id ->
+                    credentialQueries
+                        .find { it.id == id }
+                        ?.let {
+                            checkCredentialQuery(
+                                it,
+                                vpTokens,
+                                checkVpToken,
+                            )
+                        }?.map { Pair(id, it) } ?: Result.failure(
+                        CredentialQueryNotFoundException(
+                            id,
+                        ),
+                    )
+                }.collect()
+                .map { it.associate { (id, res) -> id to res } }
+        }.find { it.isSuccess } ?: Result.failure(NoCredentialSetQueryOptionSatisfiedException())
 }
 
 /**
@@ -447,22 +533,27 @@ fun checkDcqlPresentation(
     // The Verifier requests presentations of Credentials to be returned satisfying
     // all of the Credential Set Queries in the credential_sets array where the
     // required attribute is true.
-    return credentialSetQueries?.map {
-        checkCredentialSetQuery(
-            it,
-            credentialQueries,
-            vpTokens,
-            { type, vpToken, id -> checkVpToken.check(type, vpToken, id) },
-        )
-    }?.collect()?.map { it.reduce { acc, map -> acc + map } }
-    // If credential_sets is not provided, the Verifier requests presentations
-    // for all Credentials in credentials to be returned.
-        ?: credentialQueries.map {
-            checkCredentialQuery(
-                it, vpTokens,
+    return credentialSetQueries
+        ?.map {
+            checkCredentialSetQuery(
+                it,
+                credentialQueries,
+                vpTokens,
                 { type, vpToken, id -> checkVpToken.check(type, vpToken, id) },
-            ).map { res -> Pair(it.id, res) }
-        }.collect().map { it.associate { (id, res) -> id to res } }
+            )
+        }?.collect()
+        ?.map { it.reduce { acc, map -> acc + map } }
+        // If credential_sets is not provided, the Verifier requests presentations
+        // for all Credentials in credentials to be returned.
+        ?: credentialQueries
+            .map {
+                checkCredentialQuery(
+                    it,
+                    vpTokens,
+                    { type, vpToken, id -> checkVpToken.check(type, vpToken, id) },
+                ).map { res -> Pair(it.id, res) }
+            }.collect()
+            .map { it.associate { (id, res) -> id to res } }
 }
 
 fun verifyDcqlPresentation(

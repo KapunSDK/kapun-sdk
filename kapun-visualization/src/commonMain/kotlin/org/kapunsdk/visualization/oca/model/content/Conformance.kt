@@ -21,9 +21,9 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 enum class Conformance {
-	@SerialName("M")
-	MANDATORY,
+    @SerialName("M")
+    MANDATORY,
 
-	@SerialName("O")
-	OPTIONAL,
+    @SerialName("O")
+    OPTIONAL,
 }

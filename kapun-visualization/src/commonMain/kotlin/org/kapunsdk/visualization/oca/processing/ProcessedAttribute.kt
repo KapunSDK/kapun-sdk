@@ -20,14 +20,14 @@ import org.kapunsdk.visualization.oca.model.content.AttributeName
 import org.kapunsdk.visualization.oca.model.content.AttributeType
 
 data class ProcessedAttribute(
-	val attributeName: AttributeName,
-	val attributeType: AttributeType,
-	val attributeValue: AttributeValue<*>?,
-	val label: String? = null,
-	val information: String? = null,
-	val standard: String? = null,
-	val unit: String? = null,
-	val isFlagged: Boolean = false,
-	val isMandatory: Boolean = false,
+    val attributeName: AttributeName,
+    val attributeType: AttributeType,
+    val attributeValue: AttributeValue<*>?,
+    val label: String? = null,
+    val information: String? = null,
+    val standard: String? = null,
+    val unit: String? = null,
+    val isFlagged: Boolean = false,
+    val isMandatory: Boolean = false,
     val isHidden: Boolean = false,
 )

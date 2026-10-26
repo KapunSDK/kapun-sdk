@@ -16,29 +16,29 @@ under the License.
 
 package org.kapunsdk.wallet.credentials.oca.networking
 
-import org.kapunsdk.credentials.Bbs
-import org.kapunsdk.credentials.SdJwt
-import org.kapunsdk.credentials.W3C
-import org.kapunsdk.issuance.metadata.data.CredentialConfiguration
-import org.kapunsdk.issuance.metadata.data.CredentialIssuerMetadataClaims
-import org.kapunsdk.wallet.credentials.format.mdoc.MdocUtils
-import org.kapunsdk.wallet.credentials.mapping.defaults.OcaBundleFactory
-import org.kapunsdk.credentials.models.credential.CredentialMetadata
-import org.kapunsdk.credentials.models.credential.CredentialType
-import org.kapunsdk.credentials.toJson
-import org.kapunsdk.util.extensions.asObject
-import org.kapunsdk.util.extensions.asString
-import org.kapunsdk.wallet.credentials.metadata.asMetadataFormat
-import org.kapunsdk.wallet.resources.StringResourceProvider
 import io.ktor.client.HttpClient
-import io.ktor.http.Url
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.statement.bodyAsBytes
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpHeaders
+import io.ktor.http.Url
 import io.ktor.util.encodeBase64
 import kotlinx.serialization.json.Json
+import org.kapunsdk.credentials.Bbs
+import org.kapunsdk.credentials.SdJwt
+import org.kapunsdk.credentials.W3C
+import org.kapunsdk.credentials.models.credential.CredentialMetadata
+import org.kapunsdk.credentials.models.credential.CredentialType
+import org.kapunsdk.credentials.toJson
+import org.kapunsdk.issuance.metadata.data.CredentialConfiguration
+import org.kapunsdk.issuance.metadata.data.CredentialIssuerMetadataClaims
+import org.kapunsdk.util.extensions.asObject
+import org.kapunsdk.util.extensions.asString
+import org.kapunsdk.wallet.credentials.format.mdoc.MdocUtils
+import org.kapunsdk.wallet.credentials.mapping.defaults.OcaBundleFactory
+import org.kapunsdk.wallet.credentials.metadata.asMetadataFormat
+import org.kapunsdk.wallet.resources.StringResourceProvider
 import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.module
 import uniffi.kapun_wallet_rust.Credential
@@ -46,80 +46,147 @@ import uniffi.kapun_wallet_rust.CredentialFormat
 import uniffi.kapun_wallet_rust.mdocAsJsonRepresentation
 import kotlin.io.encoding.Base64
 
-class OcaServiceController(val client: HttpClient, val stringResourceProvider: StringResourceProvider, val json: Json) {
-	companion object {
-		val koinModule = module {
-			singleOf(::OcaServiceController)
-		}
-	}
+class OcaServiceController(
+    val client: HttpClient,
+    val stringResourceProvider: StringResourceProvider,
+    val json: Json,
+) {
+    companion object {
+        val koinModule =
+            module {
+                singleOf(::OcaServiceController)
+            }
+    }
 
-	suspend fun getOcaBundleForUrl(url: String): String = client.get(url) {
-		header(HttpHeaders.CacheControl, null)
-	}.bodyAsText()
+    suspend fun getOcaBundleForUrl(url: String): String =
+        client
+            .get(url) {
+                header(HttpHeaders.CacheControl, null)
+            }.bodyAsText()
 
-	suspend fun getDataFromUrl(url: String): String {
-		return client.get(Url(url.trim('"'))).bodyAsText()
-	}
+    suspend fun getDataFromUrl(url: String): String = client.get(Url(url.trim('"'))).bodyAsText()
 
-	suspend fun getOcaFromMetadata(locale: String, metadata: CredentialIssuerMetadataClaims?, credential: Credential, credentialMetadata: CredentialMetadata) : String? {
-		val credentialType = credential.credential.asMetadataFormat()
-		val jsonContent = when (credentialType) {
-			CredentialType.SdJwt -> SdJwt.parse((credential.credential as CredentialFormat.SdJwt).v1).toJson() ?: return null
-			//TODO: improve the mdocAsJsonRepresentation
-			CredentialType.Mdoc -> mdocAsJsonRepresentation((credential.credential as CredentialFormat.Mdoc).v1) ?: return null
-			CredentialType.BbsTermwise -> runCatching {
-				json.encodeToString(Bbs.parse((credential.credential as CredentialFormat.BbsTermWise).v1).body())
-			}.getOrNull() ?: return null
-			CredentialType.W3C_VCDM -> Json.encodeToString(W3C.parse((credential.credential as CredentialFormat.W3c).v1).asJson())
-            CredentialType.OpenBadge303 -> Json.encodeToString(W3C.OpenBadge303.parse(
-                Base64.UrlSafe.decode((credential.credential as CredentialFormat.OpenBadge).v1)).asJson())
-            CredentialType.Unknown -> return null
-		}
+    suspend fun getOcaFromMetadata(
+        locale: String,
+        metadata: CredentialIssuerMetadataClaims?,
+        credential: Credential,
+        credentialMetadata: CredentialMetadata,
+    ): String? {
+        val credentialType = credential.credential.asMetadataFormat()
+        val jsonContent =
+            when (credentialType) {
+                CredentialType.SdJwt -> {
+                    SdJwt.parse((credential.credential as CredentialFormat.SdJwt).v1).toJson() ?: return null
+                }
 
-		val credentialPayload = when(credential.credential) {
-			is CredentialFormat.Mdoc -> credential.credential.v1
-			is CredentialFormat.SdJwt -> credential.credential.v1
-			is CredentialFormat.BbsTermWise -> credential.credential.v1
-			is CredentialFormat.W3c -> credential.credential.v1
-            is CredentialFormat.OpenBadge -> credential.credential.v1
-		}
+                // TODO: improve the mdocAsJsonRepresentation
+                CredentialType.Mdoc -> {
+                    mdocAsJsonRepresentation((credential.credential as CredentialFormat.Mdoc).v1) ?: return null
+                }
 
-		val docType = when (credentialType) {
-			CredentialType.SdJwt -> SdJwt.parse(credentialPayload).getMetadata().vct
-			CredentialType.Mdoc -> MdocUtils.getDocType(credentialPayload)
-			CredentialType.BbsTermwise -> Bbs.parse(credentialPayload).body().asObject()?.get("@id")?.asString() ?: return null
-			CredentialType.W3C_VCDM -> W3C.parse(credentialPayload).docType
-            CredentialType.OpenBadge303 -> W3C.OpenBadge303
-                .parse(Base64.UrlSafe.decode(credentialPayload)).docType
-            CredentialType.Unknown -> {
-				// Don't insert this credential if it's an unknown type
-				return null
-			}
-		}
+                CredentialType.BbsTermwise -> {
+                    runCatching {
+                        json.encodeToString(
+                            Bbs.parse((credential.credential as CredentialFormat.BbsTermWise).v1).body(),
+                        )
+                    }.getOrNull() ?: return null
+                }
 
-		val credentialConfiguration = metadata?.credentialConfigurationsSupported?.values?.firstOrNull {
-			when(it) {
-				is CredentialConfiguration.Mdoc -> it.doctype == docType
-				is CredentialConfiguration.SdJwt -> it.vct == docType
-				is CredentialConfiguration.Bbs -> it.format == "zkp_vc"
-				else -> false
-			}
-		}
-		val display = credentialConfiguration?.getDisplayMetadata()?.firstOrNull()
-		val backgroundImage = try {
-			if (display?.backgroundImage?.uri?.startsWith("data:") == true) {
-				display.backgroundImage?.uri
-			} else {
-				display?.backgroundImage?.uri?.let {
-					client.get(it).bodyAsBytes().encodeBase64()
-				}
-			}
-		} catch (_: Exception) {
-			null
-		}
+                CredentialType.W3C_VCDM -> {
+                    Json.encodeToString(W3C.parse((credential.credential as CredentialFormat.W3c).v1).asJson())
+                }
 
-		val metadataType = (credentialConfiguration as? CredentialConfiguration.Bbs)?.vct ?: docType
-		val bundle = OcaBundleFactory.createOcaFromDisplayMetadata(locale, stringResourceProvider, backgroundImage, metadata, metadataType, jsonContent)
-		return bundle?.let { json.encodeToString(it) }
-	}
+                CredentialType.OpenBadge303 -> {
+                    Json.encodeToString(
+                        W3C.OpenBadge303
+                            .parse(
+                                Base64.UrlSafe.decode((credential.credential as CredentialFormat.OpenBadge).v1),
+                            ).asJson(),
+                    )
+                }
+
+                CredentialType.Unknown -> {
+                    return null
+                }
+            }
+
+        val credentialPayload =
+            when (credential.credential) {
+                is CredentialFormat.Mdoc -> credential.credential.v1
+                is CredentialFormat.SdJwt -> credential.credential.v1
+                is CredentialFormat.BbsTermWise -> credential.credential.v1
+                is CredentialFormat.W3c -> credential.credential.v1
+                is CredentialFormat.OpenBadge -> credential.credential.v1
+            }
+
+        val docType =
+            when (credentialType) {
+                CredentialType.SdJwt -> {
+                    SdJwt.parse(credentialPayload).getMetadata().vct
+                }
+
+                CredentialType.Mdoc -> {
+                    MdocUtils.getDocType(credentialPayload)
+                }
+
+                CredentialType.BbsTermwise -> {
+                    Bbs
+                        .parse(credentialPayload)
+                        .body()
+                        .asObject()
+                        ?.get("@id")
+                        ?.asString() ?: return null
+                }
+
+                CredentialType.W3C_VCDM -> {
+                    W3C.parse(credentialPayload).docType
+                }
+
+                CredentialType.OpenBadge303 -> {
+                    W3C.OpenBadge303
+                        .parse(Base64.UrlSafe.decode(credentialPayload))
+                        .docType
+                }
+
+                CredentialType.Unknown -> {
+                    // Don't insert this credential if it's an unknown type
+                    return null
+                }
+            }
+
+        val credentialConfiguration =
+            metadata?.credentialConfigurationsSupported?.values?.firstOrNull {
+                when (it) {
+                    is CredentialConfiguration.Mdoc -> it.doctype == docType
+                    is CredentialConfiguration.SdJwt -> it.vct == docType
+                    is CredentialConfiguration.Bbs -> it.format == "zkp_vc"
+                    else -> false
+                }
+            }
+        val display = credentialConfiguration?.getDisplayMetadata()?.firstOrNull()
+        val backgroundImage =
+            try {
+                if (display?.backgroundImage?.uri?.startsWith("data:") == true) {
+                    display.backgroundImage?.uri
+                } else {
+                    display?.backgroundImage?.uri?.let {
+                        client.get(it).bodyAsBytes().encodeBase64()
+                    }
+                }
+            } catch (_: Exception) {
+                null
+            }
+
+        val metadataType = (credentialConfiguration as? CredentialConfiguration.Bbs)?.vct ?: docType
+        val bundle =
+            OcaBundleFactory.createOcaFromDisplayMetadata(
+                locale,
+                stringResourceProvider,
+                backgroundImage,
+                metadata,
+                metadataType,
+                jsonContent,
+            )
+        return bundle?.let { json.encodeToString(it) }
+    }
 }

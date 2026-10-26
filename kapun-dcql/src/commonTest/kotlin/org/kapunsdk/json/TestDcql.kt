@@ -16,44 +16,43 @@ under the License.
 
 package org.kapunsdk.json
 
-import org.kapunsdk.credentials.ClaimsPointer
-import org.kapunsdk.credentials.SdJwt
-import org.kapunsdk.util.extensions.*
-import org.kapunsdk.credentials.get
-import org.kapunsdk.credentials.toClaimsPointer
+import kotlinx.serialization.json.Json
 import org.kapunsdk.SdJwtParser
 import org.kapunsdk.checkDcqlPresentation
+import org.kapunsdk.credentials.ClaimsPointer
+import org.kapunsdk.credentials.SdJwt
+import org.kapunsdk.credentials.get
+import org.kapunsdk.credentials.toClaimsPointer
 import org.kapunsdk.getVpToken
 import org.kapunsdk.trustedAuthority.AkiAuthorityMatcher
 import org.kapunsdk.trustedAuthority.DidAuthorityMatcher
-import kotlinx.serialization.json.Json
+import org.kapunsdk.util.extensions.*
 import uniffi.kapun_credential_core_rust.SignatureCreator
-import uniffi.kapun_dcql_sdjwt_rust.decodeSdjwt
 import uniffi.kapun_crypto_rust.SoftwareKeyPair
 import uniffi.kapun_dcql_rust.Credential
 import uniffi.kapun_dcql_rust.DcqlQuery
-import uniffi.kapun_util_rust.Value
 import uniffi.kapun_dcql_rust.selectCredentials
+import uniffi.kapun_dcql_sdjwt_rust.decodeSdjwt
+import uniffi.kapun_util_rust.Value
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class TestDcql {
-    class TestSigner(private val kp : SoftwareKeyPair) : SignatureCreator {
-        override fun alg(): String {
-            return "ES256"
-        }
+    class TestSigner(
+        private val kp: SoftwareKeyPair,
+    ) : SignatureCreator {
+        override fun alg(): String = "ES256"
 
-        override fun sign(bytes: ByteArray): ByteArray {
-            return kp.signWithKey(bytes)
-        }
+        override fun sign(bytes: ByteArray): ByteArray = kp.signWithKey(bytes)
     }
 
     val issuerKey = SoftwareKeyPair()
     val keyBindingKey = SoftwareKeyPair()
     val deviceKeyJwk = Json.decodeFromString<Value>(keyBindingKey.jwkString())
-    val uniQuery = " {\n" +
+    val uniQuery =
+        " {\n" +
             "    \"credentials\" : [\n" +
             "        {\n" +
             "            \"id\" : \"confirmation-of-matriculation\",\n" +
@@ -81,7 +80,8 @@ class TestDcql {
             "        }\n" +
             "    ]\n" +
             " }"
-    val matrikulationsBstMusterstadt = "{\n" +
+    val matrikulationsBstMusterstadt =
+        "{\n" +
             "  \"vct\": \"https://schema.example.invalid/v1/schema/matrikulations-bst/0.0.4\",\n" +
             "  \"iss\": \"did:example\",\n" +
             "  \"render\": {\n" +
@@ -97,7 +97,8 @@ class TestDcql {
             "        \"Student\"\n" +
             "  ]\n" +
             "}\n"
-    val subjects1 = "[\n" +
+    val subjects1 =
+        "[\n" +
             "        { \n" +
             "            \"title\" : \"Computer Science\",\n" +
             "            \"major\" : true,\n" +
@@ -112,7 +113,8 @@ class TestDcql {
             "        }\n" +
             "    ]"
 
-    val rolesJson = "{\n" +
+    val rolesJson =
+        "{\n" +
             "  \"vct\": \"testArray\",\n" +
             "  \"iss\": \"https://issuer.example.invalid\",\n" +
             "  \"render\": {\n" +
@@ -133,7 +135,8 @@ class TestDcql {
             "        }\n" +
             "  ]\n" +
             "}"
-    val rolesJson2 = "{\n" +
+    val rolesJson2 =
+        "{\n" +
             "  \"vct\": \"testArray\",\n" +
             "  \"iss\": \"https://issuer.example.invalid\",\n" +
             "  \"render\": {\n" +
@@ -159,7 +162,8 @@ class TestDcql {
             "        }\n" +
             "  ]\n" +
             "}"
-    val rolesQueryParentRoles = " {\n" +
+    val rolesQueryParentRoles =
+        " {\n" +
             "    \"credentials\" : [\n" +
             "        {\n" +
             "            \"id\" : \"test-parent-role\",\n" +
@@ -176,7 +180,8 @@ class TestDcql {
             "        }\n" +
             "    ]\n" +
             " }"
-    val rolesQueryParentRoles2 = " {\n" +
+    val rolesQueryParentRoles2 =
+        " {\n" +
             "    \"credentials\" : [\n" +
             "        {\n" +
             "            \"id\" : \"test-parent-role\",\n" +
@@ -193,7 +198,8 @@ class TestDcql {
             "        }\n" +
             "    ]\n" +
             " }"
-    val rolesQueryAllNames = " {\n" +
+    val rolesQueryAllNames =
+        " {\n" +
             "    \"credentials\" : [\n" +
             "        {\n" +
             "            \"id\" : \"test-parent-role\",\n" +
@@ -210,10 +216,20 @@ class TestDcql {
             "        }\n" +
             "    ]\n" +
             " }"
-    fun createMusterMatriculationConf(university: String, subjects: Value) : Value {
-        val payload = matrikulationsBstMusterstadt.replace("<<UNIVERSITY>>", university).replace("<<SUBJECTS>>", Json.encodeToString(Value.serializer() ,subjects))
+
+    fun createMusterMatriculationConf(
+        university: String,
+        subjects: Value,
+    ): Value {
+        val payload =
+            matrikulationsBstMusterstadt
+                .replace(
+                    "<<UNIVERSITY>>",
+                    university,
+                ).replace("<<SUBJECTS>>", Json.encodeToString(Value.serializer(), subjects))
         return Json.decodeFromString<Value>(payload)
     }
+
     @Test
     fun createAKey() {
         val jwk = SoftwareKeyPair().privateJwkString()
@@ -225,13 +241,14 @@ class TestDcql {
         val p = SdJwtParser
         val claims1: Value = createMusterMatriculationConf("Universität Musterstadt", Json.decodeFromString(subjects1))
         val claims2: Value = createMusterMatriculationConf("Universität Musterwil", Json.decodeFromString(subjects1))
-        val disclosures : List<ClaimsPointer> = listOf(
-            listOf("unv", "matriculationNr").toClaimsPointer()!!,
-            listOf("unv", "enrolledAt").toClaimsPointer()!!,
-            listOf("unv", "subjects", null).toClaimsPointer()!!,
-            listOf("unv", "subjects", null, "currentEcts").toClaimsPointer()!!,
-            listOf("roles", null).toClaimsPointer()!!,
-        )
+        val disclosures: List<ClaimsPointer> =
+            listOf(
+                listOf("unv", "matriculationNr").toClaimsPointer()!!,
+                listOf("unv", "enrolledAt").toClaimsPointer()!!,
+                listOf("unv", "subjects", null).toClaimsPointer()!!,
+                listOf("unv", "subjects", null, "currentEcts").toClaimsPointer()!!,
+                listOf("roles", null).toClaimsPointer()!!,
+            )
         val sdjwt1 = SdJwt.create(claims1, disclosures, "123", TestSigner(issuerKey), deviceKeyJwk)!!
         val sdjwt2 = SdJwt.create(claims2, disclosures, "123", TestSigner(issuerKey), deviceKeyJwk)!!
 
@@ -240,7 +257,7 @@ class TestDcql {
         val store = listOf(sdjwt1.innerJwt.originalSdjwt, sdjwt2.innerJwt.originalSdjwt)
         val query: DcqlQuery = Json.decodeFromString(uniQuery)
         // this should register the did matcher
-		val didMatcher = DidAuthorityMatcher.register()
+        val didMatcher = DidAuthorityMatcher.register()
         val akiMatcher = AkiAuthorityMatcher.register()
         val results = selectCredentials(query, store)[0].setOptions[0][0]
         assertEquals(results.options.size, 1)
@@ -248,54 +265,100 @@ class TestDcql {
         val selectedCredential = results.options[0].credential
         assertIs<Credential.SdJwtCredential>(selectedCredential)
 
-        val enrolledAt = selectedCredential.v1.getBody()[listOf("unv", "enrolledAt").toClaimsPointer()!!][0].asString()!!
+        val enrolledAt =
+            selectedCredential.v1.getBody()[
+                listOf(
+                    "unv",
+                    "enrolledAt",
+                ).toClaimsPointer()!!,
+            ][0].asString()!!
         assertEquals(enrolledAt, "Universität Musterstadt")
         val respectiveQuery = query.credentials!!.first { it.id == results.id }
-        val vpToken = SdJwt(decodeSdjwt(selectedCredential.v1.serialize())).getVpToken(respectiveQuery,"test", null, null, "1234", TestSigner(
-            keyBindingKey)).getOrThrow()
+        val vpToken =
+            SdJwt(decodeSdjwt(selectedCredential.v1.serialize()))
+                .getVpToken(
+                    respectiveQuery,
+                    "test",
+                    null,
+                    null,
+                    "1234",
+                    TestSigner(keyBindingKey),
+                ).getOrThrow()
 
         val parsedVpToken = SdJwt.parse(vpToken)
         assertEquals(parsedVpToken.innerJwt.disclosuresMap.size, 3)
-        assertEquals(parsedVpToken.innerJwt.claims[listOf("unv", "enrolledAt").toClaimsPointer()!!][0].asString()!!, "Universität Musterstadt")
-        assertEquals(parsedVpToken.innerJwt.claims[listOf("unv", "subjects", 0, "currentEcts").toClaimsPointer()!!][0].asLong()!!, 42)
+        assertEquals(
+            parsedVpToken.innerJwt.claims[listOf("unv", "enrolledAt").toClaimsPointer()!!][0].asString()!!,
+            "Universität Musterstadt",
+        )
+        assertEquals(
+            parsedVpToken.innerJwt.claims[
+                listOf(
+                    "unv",
+                    "subjects",
+                    0,
+                    "currentEcts",
+                ).toClaimsPointer()!!,
+            ][0].asLong()!!,
+            42,
+        )
         assertEquals(parsedVpToken.innerJwt.claims[listOf("unv", "subjects", 1, "title").toClaimsPointer()!!].size, 0)
 
         val pres = mapOf<String, String>(results.id to vpToken)
         assertTrue(checkDcqlPresentation(query, pres, { _, _, _ -> emptyMap<String, Value>() }).isSuccess)
     }
+
     @Test
     fun testRolesParentRoles() {
         val claims1: Value = createMusterMatriculationConf("Universität Musterstadt", Json.decodeFromString(subjects1))
         val claims2: Value = createMusterMatriculationConf("Universität Musterwil", Json.decodeFromString(subjects1))
-        val disclosureswrong : List<ClaimsPointer> = listOf(
-            listOf("unv", "matriculationNr").toClaimsPointer()!!,
-            listOf("unv", "enrolledAt").toClaimsPointer()!!,
-            listOf("unv", "subjects", null).toClaimsPointer()!!,
-            listOf("unv", "subjects", null, "currentEcts").toClaimsPointer()!!,
-            listOf("roles", null).toClaimsPointer()!!,
-        )
+        val disclosureswrong: List<ClaimsPointer> =
+            listOf(
+                listOf("unv", "matriculationNr").toClaimsPointer()!!,
+                listOf("unv", "enrolledAt").toClaimsPointer()!!,
+                listOf("unv", "subjects", null).toClaimsPointer()!!,
+                listOf("unv", "subjects", null, "currentEcts").toClaimsPointer()!!,
+                listOf("roles", null).toClaimsPointer()!!,
+            )
         val sdjwt1 = SdJwt.create(claims1, disclosureswrong, "123", TestSigner(issuerKey), deviceKeyJwk)!!
         val sdjwt2 = SdJwt.create(claims2, disclosureswrong, "123", TestSigner(issuerKey), deviceKeyJwk)!!
 
-        val claims : Value = Json.decodeFromString(rolesJson)
-        val claims3 : Value = Json.decodeFromString(rolesJson2)
-        val rolesParentRolesQuery : DcqlQuery = Json.decodeFromString(rolesQueryParentRoles)
-        val rolesParentRolesQuery2 : DcqlQuery = Json.decodeFromString(rolesQueryParentRoles2)
-        val disclosures : List<ClaimsPointer> = listOf(
-            listOf("roles").toClaimsPointer()!!,
-            listOf("roles", null).toClaimsPointer()!!,
-            listOf("roles", null, "name").toClaimsPointer()!!,
-            listOf("roles", null, "parentRoles", null).toClaimsPointer()!!,
-            listOf("roles", null, "parentRoles", null, "name").toClaimsPointer()!!,
-        )
+        val claims: Value = Json.decodeFromString(rolesJson)
+        val claims3: Value = Json.decodeFromString(rolesJson2)
+        val rolesParentRolesQuery: DcqlQuery = Json.decodeFromString(rolesQueryParentRoles)
+        val rolesParentRolesQuery2: DcqlQuery = Json.decodeFromString(rolesQueryParentRoles2)
+        val disclosures: List<ClaimsPointer> =
+            listOf(
+                listOf("roles").toClaimsPointer()!!,
+                listOf("roles", null).toClaimsPointer()!!,
+                listOf("roles", null, "name").toClaimsPointer()!!,
+                listOf("roles", null, "parentRoles", null).toClaimsPointer()!!,
+                listOf("roles", null, "parentRoles", null, "name").toClaimsPointer()!!,
+            )
         val rolesSdjwt = SdJwt.create(claims, disclosures, "1234", TestSigner(issuerKey), deviceKeyJwk)!!
         val rolesSdjwt2 = SdJwt.create(claims3, disclosures, "1234", TestSigner(issuerKey), deviceKeyJwk)!!
 
         assertEquals(rolesSdjwt.innerJwt.disclosuresMap.size, 7)
         val sdjwt = SdJwt(rolesSdjwt.innerJwt)
-        val result = selectCredentials(rolesParentRolesQuery, listOf(sdjwt.innerJwt.originalSdjwt, sdjwt1.innerJwt.originalSdjwt, sdjwt2.innerJwt.originalSdjwt))
-        val result2 = selectCredentials(rolesParentRolesQuery2, listOf(rolesSdjwt2.innerJwt.originalSdjwt, sdjwt1.innerJwt.originalSdjwt, sdjwt2.innerJwt.originalSdjwt))
-        val result3 = selectCredentials(rolesParentRolesQuery2, listOf(rolesSdjwt.innerJwt.originalSdjwt, sdjwt1.innerJwt.originalSdjwt, sdjwt2.innerJwt.originalSdjwt))
+        val result =
+            selectCredentials(
+                rolesParentRolesQuery,
+                listOf(sdjwt.innerJwt.originalSdjwt, sdjwt1.innerJwt.originalSdjwt, sdjwt2.innerJwt.originalSdjwt),
+            )
+        val result2 =
+            selectCredentials(
+                rolesParentRolesQuery2,
+                listOf(
+                    rolesSdjwt2.innerJwt.originalSdjwt,
+                    sdjwt1.innerJwt.originalSdjwt,
+                    sdjwt2.innerJwt.originalSdjwt,
+                ),
+            )
+        val result3 =
+            selectCredentials(
+                rolesParentRolesQuery2,
+                listOf(rolesSdjwt.innerJwt.originalSdjwt, sdjwt1.innerJwt.originalSdjwt, sdjwt2.innerJwt.originalSdjwt),
+            )
 
         assertEquals(1, result.size)
         assertEquals(1, result2.size)
@@ -305,9 +368,17 @@ class TestDcql {
         assertEquals(setOption.options.size, 1)
         val selectedCredential = setOption.options[0].credential
         assertIs<Credential.SdJwtCredential>(selectedCredential)
-        val credentialQuery = rolesParentRolesQuery.credentials!!.first { it.id == setOption.id}
-        val vpToken = SdJwt(decodeSdjwt(selectedCredential.v1.serialize())).getVpToken(credentialQuery, "123", null, null, "123", TestSigner(
-            keyBindingKey)).getOrThrow()
+        val credentialQuery = rolesParentRolesQuery.credentials!!.first { it.id == setOption.id }
+        val vpToken =
+            SdJwt(decodeSdjwt(selectedCredential.v1.serialize()))
+                .getVpToken(
+                    credentialQuery,
+                    "123",
+                    null,
+                    null,
+                    "123",
+                    TestSigner(keyBindingKey),
+                ).getOrThrow()
 
         val parsedVpToken = SdJwt.parse(vpToken)
         val parentRoleNamePointer = listOf("roles", null, "parentRoles", null, "name").toClaimsPointer()!!
@@ -317,63 +388,114 @@ class TestDcql {
         assertEquals(parsedVpToken.innerJwt.claims[parentRoleNamePointer][0].asString()!!, "Role2")
 
         val pres = mapOf<String, String>(credentialQuery.id to vpToken)
-        assertTrue(checkDcqlPresentation(rolesParentRolesQuery, pres, { _, _, _ -> emptyMap<String, Value>() }).isSuccess)
+        assertTrue(
+            checkDcqlPresentation(rolesParentRolesQuery, pres, { _, _, _ -> emptyMap<String, Value>() }).isSuccess,
+        )
 
-        assertTrue(checkDcqlPresentation(
-            rolesParentRolesQuery2,
-            mapOf(credentialQuery.id to SdJwt( decodeSdjwt(
-                (result2[0].setOptions[0][0].options[0].credential as Credential.SdJwtCredential).v1.serialize())
-            ).getVpToken(credentialQuery, "123", null, null, "123", TestSigner(
-                keyBindingKey
-            )).getOrThrow()),
-            { _, _, _ -> emptyMap<String, Value>() }
-        ).isSuccess)
-        assertTrue(checkDcqlPresentation(
-            rolesParentRolesQuery2,
-            mapOf(credentialQuery.id to SdJwt(
-                (decodeSdjwt((result3[0].setOptions[0][0].options[0].credential as Credential.SdJwtCredential).v1.serialize()))
-            ).getVpToken(credentialQuery, "123", null, null,"123", TestSigner(
-                keyBindingKey
-            )).getOrThrow()),
-            { _, _, _ -> emptyMap<String, Value>() }
-        ).isSuccess)
+        assertTrue(
+            checkDcqlPresentation(
+                rolesParentRolesQuery2,
+                mapOf(
+                    credentialQuery.id to
+                        SdJwt(
+                            decodeSdjwt(
+                                (result2[0].setOptions[0][0].options[0].credential as Credential.SdJwtCredential)
+                                    .v1
+                                    .serialize(),
+                            ),
+                        ).getVpToken(
+                            credentialQuery,
+                            "123",
+                            null,
+                            null,
+                            "123",
+                            TestSigner(
+                                keyBindingKey,
+                            ),
+                        ).getOrThrow(),
+                ),
+                { _, _, _ -> emptyMap<String, Value>() },
+            ).isSuccess,
+        )
+        assertTrue(
+            checkDcqlPresentation(
+                rolesParentRolesQuery2,
+                mapOf(
+                    credentialQuery.id to
+                        SdJwt(
+                            (
+                                decodeSdjwt(
+                                    (result3[0].setOptions[0][0].options[0].credential as Credential.SdJwtCredential)
+                                        .v1
+                                        .serialize(),
+                                )
+                            ),
+                        ).getVpToken(
+                            credentialQuery,
+                            "123",
+                            null,
+                            null,
+                            "123",
+                            TestSigner(
+                                keyBindingKey,
+                            ),
+                        ).getOrThrow(),
+                ),
+                { _, _, _ -> emptyMap<String, Value>() },
+            ).isSuccess,
+        )
     }
+
     @Test
     fun testRolesAllNamesRoles() {
         val claims1: Value = createMusterMatriculationConf("Universität Musterstadt", Json.decodeFromString(subjects1))
         val claims2: Value = createMusterMatriculationConf("Universität Musterwil", Json.decodeFromString(subjects1))
-        val disclosureswrong : List<ClaimsPointer> = listOf(
-            listOf("unv", "matriculationNr").toClaimsPointer()!!,
-            listOf("unv", "enrolledAt").toClaimsPointer()!!,
-            listOf("unv", "subjects", null).toClaimsPointer()!!,
-            listOf("unv", "subjects", null, "currentEcts").toClaimsPointer()!!,
-            listOf("roles", null).toClaimsPointer()!!,
-        )
+        val disclosureswrong: List<ClaimsPointer> =
+            listOf(
+                listOf("unv", "matriculationNr").toClaimsPointer()!!,
+                listOf("unv", "enrolledAt").toClaimsPointer()!!,
+                listOf("unv", "subjects", null).toClaimsPointer()!!,
+                listOf("unv", "subjects", null, "currentEcts").toClaimsPointer()!!,
+                listOf("roles", null).toClaimsPointer()!!,
+            )
         val sdjwt1 = SdJwt.create(claims1, disclosureswrong, "123", TestSigner(issuerKey), deviceKeyJwk)!!
         val sdjwt2 = SdJwt.create(claims2, disclosureswrong, "123", TestSigner(issuerKey), deviceKeyJwk)!!
 
-        val claims : Value = Json.decodeFromString(rolesJson)
-        val rolesAllNamesQuery : DcqlQuery = Json.decodeFromString(rolesQueryAllNames)
-        val disclosures : List<ClaimsPointer> = listOf(
-            listOf("roles").toClaimsPointer()!!,
-            listOf("roles", null).toClaimsPointer()!!,
-            listOf("roles", null, "name").toClaimsPointer()!!,
-            listOf("roles", null, "parentRoles", null).toClaimsPointer()!!,
-            listOf("roles", null, "parentRoles", null, "name").toClaimsPointer()!!,
-        )
+        val claims: Value = Json.decodeFromString(rolesJson)
+        val rolesAllNamesQuery: DcqlQuery = Json.decodeFromString(rolesQueryAllNames)
+        val disclosures: List<ClaimsPointer> =
+            listOf(
+                listOf("roles").toClaimsPointer()!!,
+                listOf("roles", null).toClaimsPointer()!!,
+                listOf("roles", null, "name").toClaimsPointer()!!,
+                listOf("roles", null, "parentRoles", null).toClaimsPointer()!!,
+                listOf("roles", null, "parentRoles", null, "name").toClaimsPointer()!!,
+            )
         val rolesSdjwt = SdJwt.create(claims, disclosures, "1234", TestSigner(issuerKey), deviceKeyJwk)!!
         assertEquals(rolesSdjwt.innerJwt.disclosuresMap.size, 7)
         val sdjwt = SdJwt(rolesSdjwt.innerJwt)
-        val result = selectCredentials(rolesAllNamesQuery, listOf(sdjwt.innerJwt.originalSdjwt, sdjwt1.innerJwt.originalSdjwt, sdjwt2.innerJwt.originalSdjwt))
+        val result =
+            selectCredentials(
+                rolesAllNamesQuery,
+                listOf(sdjwt.innerJwt.originalSdjwt, sdjwt1.innerJwt.originalSdjwt, sdjwt2.innerJwt.originalSdjwt),
+            )
         assertEquals(1, result.size)
         // we only have one set
         val setOption = result[0].setOptions[0][0]
         assertEquals(setOption.options.size, 1)
         val selectedCredential = setOption.options[0].credential
         assertIs<Credential.SdJwtCredential>(selectedCredential)
-        val credentialQuery = rolesAllNamesQuery.credentials!!.first { it.id == setOption.id}
-        val vpToken = SdJwt(decodeSdjwt(selectedCredential.v1.serialize()) ).getVpToken(credentialQuery, "123", null, null, "123", TestSigner(
-            keyBindingKey)).getOrThrow()
+        val credentialQuery = rolesAllNamesQuery.credentials!!.first { it.id == setOption.id }
+        val vpToken =
+            SdJwt(decodeSdjwt(selectedCredential.v1.serialize()))
+                .getVpToken(
+                    credentialQuery,
+                    "123",
+                    null,
+                    null,
+                    "123",
+                    TestSigner(keyBindingKey),
+                ).getOrThrow()
 
         val parsedVpToken = SdJwt.parse(vpToken)
         val parentRoleNamePointer = listOf("roles", null, "parentRoles", null, "name").toClaimsPointer()!!
@@ -383,30 +505,33 @@ class TestDcql {
         assertEquals(parsedVpToken.innerJwt.claims[rolesNamePointer][0].asString()!!, "Role1")
         assertEquals(parsedVpToken.innerJwt.claims[rolesNamePointer][1].asString()!!, "Role3")
     }
+
     @Test
     fun generateTestOutput() {
         val claims1: Value = createMusterMatriculationConf("Universität Musterstadt", Json.decodeFromString(subjects1))
         val claims2: Value = createMusterMatriculationConf("Universität Musterwil", Json.decodeFromString(subjects1))
-        val disclosureswrong : List<ClaimsPointer> = listOf(
-            listOf("unv", "matriculationNr").toClaimsPointer()!!,
-            listOf("unv", "enrolledAt").toClaimsPointer()!!,
-            listOf("unv", "subjects", null).toClaimsPointer()!!,
-            listOf("unv", "subjects", null, "currentEcts").toClaimsPointer()!!,
-            listOf("roles", null).toClaimsPointer()!!,
-        )
+        val disclosureswrong: List<ClaimsPointer> =
+            listOf(
+                listOf("unv", "matriculationNr").toClaimsPointer()!!,
+                listOf("unv", "enrolledAt").toClaimsPointer()!!,
+                listOf("unv", "subjects", null).toClaimsPointer()!!,
+                listOf("unv", "subjects", null, "currentEcts").toClaimsPointer()!!,
+                listOf("roles", null).toClaimsPointer()!!,
+            )
         val sdjwt1 = SdJwt.create(claims1, disclosureswrong, "123", TestSigner(issuerKey), deviceKeyJwk)!!
         val sdjwt2 = SdJwt.create(claims2, disclosureswrong, "123", TestSigner(issuerKey), deviceKeyJwk)!!
 
-        val claims : Value = Json.decodeFromString(rolesJson)
-        val claims3 : Value = Json.decodeFromString(rolesJson2)
-        val rolesAllNamesQuery : DcqlQuery = Json.decodeFromString(rolesQueryAllNames)
-        val disclosures : List<ClaimsPointer> = listOf(
-            listOf("roles").toClaimsPointer()!!,
-            listOf("roles", null).toClaimsPointer()!!,
-            listOf("roles", null, "name").toClaimsPointer()!!,
-            listOf("roles", null, "parentRoles", null).toClaimsPointer()!!,
-            listOf("roles", null, "parentRoles", null, "name").toClaimsPointer()!!,
-        )
+        val claims: Value = Json.decodeFromString(rolesJson)
+        val claims3: Value = Json.decodeFromString(rolesJson2)
+        val rolesAllNamesQuery: DcqlQuery = Json.decodeFromString(rolesQueryAllNames)
+        val disclosures: List<ClaimsPointer> =
+            listOf(
+                listOf("roles").toClaimsPointer()!!,
+                listOf("roles", null).toClaimsPointer()!!,
+                listOf("roles", null, "name").toClaimsPointer()!!,
+                listOf("roles", null, "parentRoles", null).toClaimsPointer()!!,
+                listOf("roles", null, "parentRoles", null, "name").toClaimsPointer()!!,
+            )
         val rolesSdjwt = SdJwt.create(claims, disclosures, "1234", TestSigner(issuerKey), deviceKeyJwk)!!
         val rolesSdjwt2 = SdJwt.create(claims3, disclosures, "1234", TestSigner(issuerKey), deviceKeyJwk)!!
 

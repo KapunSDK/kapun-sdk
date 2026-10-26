@@ -32,69 +32,79 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.uuid.Uuid
 
 internal object KeyRepository {
-	private val keyStore: KeyStore = KeyStore.getInstance("AndroidKeystore").apply { load(null) }
-	private const val KEY_LEN = 256 //bits
+    private val keyStore: KeyStore = KeyStore.getInstance("AndroidKeystore").apply { load(null) }
+    private const val KEY_LEN = 256 // bits
 
-	fun generateES256KeyPair(): KeyPair {
-		// Create a KeyPairGenerator instance for EC (Elliptic Curve)
-		val keyPairGenerator = KeyPairGenerator.getInstance("EC")
+    fun generateES256KeyPair(): KeyPair {
+        // Create a KeyPairGenerator instance for EC (Elliptic Curve)
+        val keyPairGenerator = KeyPairGenerator.getInstance("EC")
 
-		// Initialize the KeyPairGenerator with the P-256 curve
-		val ecGenParameterSpec = ECGenParameterSpec("secp256r1")
-		keyPairGenerator.initialize(ecGenParameterSpec)
+        // Initialize the KeyPairGenerator with the P-256 curve
+        val ecGenParameterSpec = ECGenParameterSpec("secp256r1")
+        keyPairGenerator.initialize(ecGenParameterSpec)
 
-		// Generate the KeyPair
-		return keyPairGenerator.generateKeyPair()
-	}
+        // Generate the KeyPair
+        return keyPairGenerator.generateKeyPair()
+    }
 
+    fun getKeyPair(alias: String): KeyPair? =
+        (keyStore.getEntry(alias, null) as? KeyStore.PrivateKeyEntry)?.let {
+            KeyPair(it.certificate.publicKey, it.privateKey)
+        }
 
-	fun getKeyPair(alias: String): KeyPair? {
-		return (keyStore.getEntry(alias, null) as? KeyStore.PrivateKeyEntry)?.let {
-			KeyPair(it.certificate.publicKey, it.privateKey)
-		}
-	}
+    @OptIn(ExperimentalEncodingApi::class)
+    fun getKeyAttestation(alias: String): String? {
+        val certs = keyStore.getCertificateChain(alias)
+        return certs.joinToString(separator = "") {
+            "-----BEGIN CERTIFICATE-----\n" + Base64.encode(it.encoded) + "\n-----END CERTIFICATE-----\n"
+        }
+    }
 
-	@OptIn(ExperimentalEncodingApi::class)
-	fun getKeyAttestation(alias: String): String? {
-		val certs = keyStore.getCertificateChain(alias)
-		return certs.joinToString(separator = "") {
-			"-----BEGIN CERTIFICATE-----\n" + Base64.encode(it.encoded) + "\n-----END CERTIFICATE-----\n";
-		}
-	}
+    fun createKeyPair(
+        context: Context,
+        accessControl: SecureHardwareAccessControl,
+    ): KeyPairBundle {
+        val alias = Uuid.random().toString()
+        val kpg: KeyPairGenerator =
+            KeyPairGenerator.getInstance(
+                KeyProperties.KEY_ALGORITHM_EC,
+                "AndroidKeyStore",
+            )
+        val parameterSpec: KeyGenParameterSpec =
+            KeyGenParameterSpec
+                .Builder(
+                    alias,
+                    KeyProperties.PURPOSE_SIGN or KeyProperties.PURPOSE_VERIFY,
+                ).run {
+                    setDigests(KeyProperties.DIGEST_SHA256)
+                    setAlgorithmParameterSpec(ECGenParameterSpec("secp256r1"))
+                    if (accessControl == SecureHardwareAccessControl.BIOMETRY) {
+                        setUserAuthenticationRequired(true)
 
-	fun createKeyPair(context: Context, accessControl: SecureHardwareAccessControl): KeyPairBundle {
-		val alias = Uuid.random().toString()
-		val kpg: KeyPairGenerator = KeyPairGenerator.getInstance(
-			KeyProperties.KEY_ALGORITHM_EC,
-			"AndroidKeyStore"
-		)
-		val parameterSpec: KeyGenParameterSpec = KeyGenParameterSpec.Builder(
-			alias,
-			KeyProperties.PURPOSE_SIGN or KeyProperties.PURPOSE_VERIFY
-		).run {
-			setDigests(KeyProperties.DIGEST_SHA256)
-			setAlgorithmParameterSpec(ECGenParameterSpec("secp256r1"))
-			if (accessControl == SecureHardwareAccessControl.BIOMETRY) {
-				setUserAuthenticationRequired(true)
+                        // Allow the key to be used for 15min after authentication
+                        val keyStoreUsageTimeoutInSeconds = 15.minutes.inWholeSeconds.toInt()
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                            setUserAuthenticationParameters(
+                                keyStoreUsageTimeoutInSeconds,
+                                KeyProperties.AUTH_BIOMETRIC_STRONG,
+                            )
+                        } else {
+                            setUserAuthenticationValidityDurationSeconds(keyStoreUsageTimeoutInSeconds)
+                        }
+                    }
+                    val now = Date()
+                    setAttestationChallenge(now.toString().toByteArray())
 
-				// Allow the key to be used for 15min after authentication
-				val keyStoreUsageTimeoutInSeconds = 15.minutes.inWholeSeconds.toInt()
-				if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-					setUserAuthenticationParameters(keyStoreUsageTimeoutInSeconds, KeyProperties.AUTH_BIOMETRIC_STRONG)
-				} else {
-					setUserAuthenticationValidityDurationSeconds(keyStoreUsageTimeoutInSeconds)
-				}
-			}
-			val now = Date()
-			setAttestationChallenge(now.toString().toByteArray())
+                    val hasStrongBox =
+                        context.packageManager.hasSystemFeature(
+                            PackageManager.FEATURE_STRONGBOX_KEYSTORE,
+                        )
+                    setIsStrongBoxBacked(hasStrongBox)
+                    build()
+                }
 
-			val hasStrongBox = context.packageManager.hasSystemFeature(PackageManager.FEATURE_STRONGBOX_KEYSTORE)
-			setIsStrongBoxBacked(hasStrongBox)
-			build()
-		}
+        kpg.initialize(parameterSpec)
 
-		kpg.initialize(parameterSpec)
-
-		return KeyPairBundle(kpg.generateKeyPair(), alias)
-	}
+        return KeyPairBundle(kpg.generateKeyPair(), alias)
+    }
 }

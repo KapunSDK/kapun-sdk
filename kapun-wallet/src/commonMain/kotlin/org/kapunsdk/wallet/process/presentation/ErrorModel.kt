@@ -21,4 +21,3 @@ data class ErrorModel(
     val code: String? = null,
     val cause: Exception? = null,
 )
-

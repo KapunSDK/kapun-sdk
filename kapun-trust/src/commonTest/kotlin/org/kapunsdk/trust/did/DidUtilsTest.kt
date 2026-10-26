@@ -20,22 +20,22 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 class DidUtilsTest {
-	@Test
-	fun extractsDidFromAbsoluteKid() {
-		assertEquals(
-			"did:example:verifier",
-			getDidFromAbsoluteKid("did:example:verifier#authentication-key"),
-		)
-		assertEquals(
-			"did:example:verifier",
-			getDidFromAbsoluteKid("decentralized_identifier:did:example:verifier#authentication-key"),
-		)
-	}
+    @Test
+    fun extractsDidFromAbsoluteKid() {
+        assertEquals(
+            "did:example:verifier",
+            getDidFromAbsoluteKid("did:example:verifier#authentication-key"),
+        )
+        assertEquals(
+            "did:example:verifier",
+            getDidFromAbsoluteKid("decentralized_identifier:did:example:verifier#authentication-key"),
+        )
+    }
 
-	@Test
-	fun rejectsMalformedAbsoluteKids() {
-		assertNull(getDidFromAbsoluteKid("did:example:verifier"))
-		assertNull(getDidFromAbsoluteKid("did:example:verifier#authentication-key#extra"))
-		assertNull(getDidFromAbsoluteKid("https://verifier.example#authentication-key"))
-	}
+    @Test
+    fun rejectsMalformedAbsoluteKids() {
+        assertNull(getDidFromAbsoluteKid("did:example:verifier"))
+        assertNull(getDidFromAbsoluteKid("did:example:verifier#authentication-key#extra"))
+        assertNull(getDidFromAbsoluteKid("https://verifier.example#authentication-key"))
+    }
 }

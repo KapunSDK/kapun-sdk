@@ -19,8 +19,7 @@ package org.kapunsdk.proximity.protocol.openid4vp
 import org.kapunsdk.proximity.ble.gatt.BleGattCharacteristic
 
 internal actual class OpenId4VpCharacteristicsFactory {
-	internal actual fun createServerCharacteristics(): List<BleGattCharacteristic> {
-		TODO("Not yet implemented")
-	}
-
+    internal actual fun createServerCharacteristics(): List<BleGattCharacteristic> {
+        TODO("Not yet implemented")
+    }
 }

@@ -16,8 +16,9 @@ under the License.
 
 package org.kapunsdk.presentation.request.model
 
-
-enum class TransactionType(val serialName: String) {
+enum class TransactionType(
+    val serialName: String,
+) {
     QES_AUTHORIZATION("qes_authorization"),
-    QCERT_CREATION_ACCEPTANCE("qcert_creation_acceptance")
+    QCERT_CREATION_ACCEPTANCE("qcert_creation_acceptance"),
 }

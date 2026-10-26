@@ -21,17 +21,17 @@ import io.ktor.client.engine.ProxyBuilder
 import io.ktor.client.engine.http
 
 actual fun HttpClientEngineConfig.configureSystemProxy() {
-	getProxySettings()?.let  {
-		this.proxy = ProxyBuilder.http("http://${it.first}:${it.second}")
-	}
+    getProxySettings()?.let {
+        this.proxy = ProxyBuilder.http("http://${it.first}:${it.second}")
+    }
 }
 
 private fun getProxySettings(): Pair<String, UShort>? {
-	val systemProxyHost = System.getProperty("http.proxyHost")
-	val systemProxyPort = System.getProperty("http.proxyPort")?.toUShortOrNull()
-	return systemProxyPort?.let {  port ->
-		systemProxyHost?.let {  host ->
-			Pair(host, port)
-		}
-	}
+    val systemProxyHost = System.getProperty("http.proxyHost")
+    val systemProxyPort = System.getProperty("http.proxyPort")?.toUShortOrNull()
+    return systemProxyPort?.let { port ->
+        systemProxyHost?.let { host ->
+            Pair(host, port)
+        }
+    }
 }

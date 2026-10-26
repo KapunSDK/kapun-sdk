@@ -1,90 +1,98 @@
 plugins {
-	alias(libs.plugins.kotlin.multiplatform)
-	alias(libs.plugins.android.kotlin.multiplatform.library)
-	alias(libs.plugins.skie)
-	alias(libs.plugins.vanniktech.publish)
-	alias(libs.plugins.kotlin.atomicfu)
-	alias(libs.plugins.uniffi.plugin)
-	alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.kotlin.multiplatform)
+    alias(libs.plugins.android.kotlin.multiplatform.library)
+    alias(libs.plugins.skie)
+    alias(libs.plugins.vanniktech.publish)
+    alias(libs.plugins.kotlin.atomicfu)
+    alias(libs.plugins.uniffi.plugin)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 kotlin {
-	compilerOptions {
-		freeCompilerArgs.add("-Xexpect-actual-classes")
-	}
+    compilerOptions {
+        freeCompilerArgs.add("-Xexpect-actual-classes")
+    }
 
-	jvmToolchain(17)
+    jvmToolchain(17)
 
-	android {
-		namespace = "org.kapunsdk.util"
-		compileSdk = libs.versions.android.compileSdk.get().toInt()
-		minSdk = libs.versions.android.minSdk.get().toInt()
+    android {
+        namespace = "org.kapunsdk.util"
+        compileSdk =
+            libs.versions.android.compileSdk
+                .get()
+                .toInt()
+        minSdk =
+            libs.versions.android.minSdk
+                .get()
+                .toInt()
 
-		withHostTest {}
+        withHostTest {}
 
-		optimization {
-			consumerKeepRules.publish = true
-			consumerKeepRules.file(rootProject.file("consumer-jna-rules.pro"))
-		}
-	}
-	jvm()
+        optimization {
+            consumerKeepRules.publish = true
+            consumerKeepRules.file(rootProject.file("consumer-jna-rules.pro"))
+        }
+    }
+    jvm()
 
-	listOf(
+    listOf(
+        iosArm64(),
+        iosSimulatorArm64(),
+    ).forEach { iosTarget ->
+        iosTarget.binaries.framework {
+            baseName = "kapun-util"
+            isStatic = true
+        }
 
-		iosArm64(),
-		iosSimulatorArm64()
-	).forEach { iosTarget ->
-		iosTarget.binaries.framework {
-			baseName = "kapun-util"
-			isStatic = true
-		}
+        iosTarget.binaries.all {
+        }
+    }
 
-		iosTarget.binaries.all {
-		}
-	}
+    sourceSets {
+        commonMain.dependencies {
+            api(libs.ktor.client.core)
+            implementation(libs.kotlin.coroutines)
+            implementation(libs.kotlin.datetime)
+            implementation(libs.kotlin.serialization)
 
-	sourceSets {
-		commonMain.dependencies {
-			api(libs.ktor.client.core)
-			implementation(libs.kotlin.coroutines)
-			implementation(libs.kotlin.datetime)
-			implementation(libs.kotlin.serialization)
+            implementation(libs.koin.core)
+        }
 
-			implementation(libs.koin.core)
-		}
+        commonTest.dependencies {
+            implementation(libs.kotlin.test)
+        }
 
-		commonTest.dependencies {
-			implementation(libs.kotlin.test)
-		}
-
-		androidMain.dependencies {
-			implementation(libs.koin.android)
-			implementation("net.java.dev.jna:jna:5.18.1@aar") // Android-compatible
-		}
-	}
+        androidMain.dependencies {
+            implementation(libs.koin.android)
+            implementation("net.java.dev.jna:jna:5.18.1@aar") // Android-compatible
+        }
+    }
 }
 
 uniffi {
-	bindgenFromGitTag(
-		"https://github.com/UbiqueInnovation/uniffi-kotlin-multiplatform-bindings.git",
-		libs.versions.uniffi.bindgen.get()
-	)
-	generateFromLibrary()
+    bindgenFromGitTag(
+        "https://github.com/UbiqueInnovation/uniffi-kotlin-multiplatform-bindings.git",
+        libs.versions.uniffi.bindgen
+            .get(),
+    )
+    generateFromLibrary()
 }
 
 cargo {
-	packageDirectory = layout.projectDirectory.dir("rust")
-	ndkVersion = libs.versions.android.ndk.get()
+    packageDirectory = layout.projectDirectory.dir("rust")
+    ndkVersion =
+        libs.versions.android.ndk
+            .get()
 }
 
 skie {
-	analytics {
-		enabled = false
-		disableUpload = true
-	}
+    analytics {
+        enabled = false
+        disableUpload = true
+    }
 }
 
 mavenPublishing {
-	coordinates(artifactId= property("ARTIFACT_ID").toString(), version= project.version.toString())
-	publishToMavenCentral(true)
+    coordinates(artifactId = property("ARTIFACT_ID").toString(), version = project.version.toString())
+    publishToMavenCentral(true)
 }

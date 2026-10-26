@@ -21,16 +21,16 @@ import org.kapunsdk.credentials.models.metadata.KeyMaterialType
 import org.kapunsdk.credentials.models.metadata.KeyStorage
 
 data class CredentialUiModel(
-	val id: Long,
-	val type: CredentialType,
-	val storage: KeyStorage,
-	val keyMaterialType: KeyMaterialType,
-	val publicKey: String?,
-	val uuid: String,
-	val issuedAt: Long?,
-	val expiresAt: Long?,
-	val isUsed: Boolean,
-	val jsonPayload: String?,
-	val originalPayload: String?,
-	val signatureVerified: Boolean?,
+    val id: Long,
+    val type: CredentialType,
+    val storage: KeyStorage,
+    val keyMaterialType: KeyMaterialType,
+    val publicKey: String?,
+    val uuid: String,
+    val issuedAt: Long?,
+    val expiresAt: Long?,
+    val isUsed: Boolean,
+    val jsonPayload: String?,
+    val originalPayload: String?,
+    val signatureVerified: Boolean?,
 )

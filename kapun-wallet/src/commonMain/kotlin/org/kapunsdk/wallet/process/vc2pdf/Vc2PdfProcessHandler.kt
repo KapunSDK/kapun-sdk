@@ -16,40 +16,43 @@ under the License.
 
 package org.kapunsdk.wallet.process.vc2pdf
 
+import io.ktor.client.HttpClient
 import org.kapunsdk.wallet.process.ProcessEvent
 import org.kapunsdk.wallet.process.ProcessHandler
 import org.kapunsdk.wallet.process.ProcessStep
-import io.ktor.client.HttpClient
 
 class Vc2PdfProcessHandler(
-	private val client: HttpClient,
-	private val baseUrl: String
+    private val client: HttpClient,
+    private val baseUrl: String,
 ) : ProcessHandler {
+    private var currentProcess: Vc2PdfProcess? = null
 
-	private var currentProcess: Vc2PdfProcess? = null
+    override suspend fun handleProcessStep(
+        current: ProcessStep?,
+        inputEvent: ProcessEvent,
+    ): ProcessStep? =
+        when {
+            // New VC to PDF conversion process is initiated
+            inputEvent is Vc2PdfProcessEvent.InitiateCredentialToPdf -> {
+                currentProcess =
+                    Vc2PdfProcess(
+                        client,
+                        baseUrl,
+                    )
+                currentProcess?.initiateCredentialToPdf(inputEvent.flowId)
+            }
 
-	override suspend fun handleProcessStep(current: ProcessStep?, inputEvent: ProcessEvent): ProcessStep? {
-		return when {
-			// New VC to PDF conversion process is initiated
-			inputEvent is Vc2PdfProcessEvent.InitiateCredentialToPdf -> {
-				currentProcess = Vc2PdfProcess(
-					client,
-					baseUrl,
-				)
-				currentProcess?.initiateCredentialToPdf(inputEvent.flowId)
-			}
+            // Handle presentation completion with redirect URI
+            inputEvent is Vc2PdfProcessEvent.PresentationCompleted -> {
+                currentProcess?.handlePresentationCompleted(inputEvent.redirectUri)
+            }
 
-			// Handle presentation completion with redirect URI
-			inputEvent is Vc2PdfProcessEvent.PresentationCompleted -> {
-				currentProcess?.handlePresentationCompleted(inputEvent.redirectUri)
-			}
+            else -> {
+                null
+            }
+        }
 
-			else -> null
-		}
-	}
-
-	override suspend fun cleanupHandler() {
-		currentProcess = null
-	}
-
+    override suspend fun cleanupHandler() {
+        currentProcess = null
+    }
 }

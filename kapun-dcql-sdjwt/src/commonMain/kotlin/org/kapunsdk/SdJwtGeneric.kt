@@ -21,7 +21,6 @@ import org.kapunsdk.util.extensions.asString
 import org.kapunsdk.util.extensions.get
 import uniffi.kapun_credential_core_rust.*
 import uniffi.kapun_credential_core_rust.SignatureCreator
-import uniffi.kapun_dcql_sdjwt_rust.*
 import uniffi.kapun_dcql_rust.CombinedSdJwtMetaMismatch
 import uniffi.kapun_dcql_rust.Credential
 import uniffi.kapun_dcql_rust.CredentialLike
@@ -30,20 +29,18 @@ import uniffi.kapun_dcql_rust.CredentialQuery
 import uniffi.kapun_dcql_rust.Meta
 import uniffi.kapun_dcql_rust.MetaMismatch
 import uniffi.kapun_dcql_rust.registerParser
+import uniffi.kapun_dcql_sdjwt_rust.*
 import uniffi.kapun_util_rust.*
 import kotlin.text.iterator
 
-object SdJwtParser: CredentialParser {
-
+object SdJwtParser : CredentialParser {
     init {
         register()
     }
 
     fun register() = registerParser(this)
 
-    override fun id(): String {
-        return "sdjwt-parser"
-    }
+    override fun id(): String = "sdjwt-parser"
 
     override fun fromStr(credential: String): Credential? {
         val sdjwt = runCatching { decodeSdjwt(credential) }.getOrNull() ?: return null
@@ -52,38 +49,41 @@ object SdJwtParser: CredentialParser {
     }
 }
 
-class SdJwtCredential(val sdjwt: SdJwtRust): CredentialLike {
-    override fun getBody(): Value {
-        return sdjwt.claims
-    }
+class SdJwtCredential(
+    val sdjwt: SdJwtRust,
+) : CredentialLike {
+    override fun getBody(): Value = sdjwt.claims
 
-    override fun serialize(): String {
-        return sdjwt.originalSdjwt
-    }
+    override fun serialize(): String = sdjwt.originalSdjwt
 
-    override fun formatSpecifiers(): List<String> {
-       return listOf("dc+sd-jwt", "vc+sd-jwt")
-    }
+    override fun formatSpecifiers(): List<String> = listOf("dc+sd-jwt", "vc+sd-jwt")
 
     override fun matchesMeta(meta: Meta?): MetaMismatch? {
-        val vct = this.sdjwt.claims["vct"].asString() ?: return MetaMismatch.SdJwtMetaMismatch(CombinedSdJwtMetaMismatch.WRONG_VCT_VALUE)
-        return when(meta) {
+        val vct =
+            this.sdjwt.claims["vct"].asString()
+                ?: return MetaMismatch.SdJwtMetaMismatch(CombinedSdJwtMetaMismatch.WRONG_VCT_VALUE)
+        return when (meta) {
             is Meta.SdjwtVc -> {
-                if(meta.vctValues.any { vct == it }){
+                if (meta.vctValues.any { vct == it }) {
                     null
                 } else {
                     MetaMismatch.SdJwtMetaMismatch(CombinedSdJwtMetaMismatch.WRONG_VCT_VALUE)
                 }
             }
-            else if meta == null -> null
-            else -> MetaMismatch.SdJwtMetaMismatch(CombinedSdJwtMetaMismatch.INVALID_META)
+
+            else if meta == null -> {
+                null
+            }
+
+            else -> {
+                MetaMismatch.SdJwtMetaMismatch(CombinedSdJwtMetaMismatch.INVALID_META)
+            }
         }
     }
 
-    override fun get(selector: Selector): List<Value>? {
-        return runCatching { sdjwt.claims[selector] }.getOrNull()
-    }
+    override fun get(selector: Selector): List<Value>? = runCatching { sdjwt.claims[selector] }.getOrNull()
 }
+
 fun SdJwtBuilder.getVpToken(
     claims: Value,
     query: CredentialQuery,
@@ -92,13 +92,13 @@ fun SdJwtBuilder.getVpToken(
     specVersion: SpecVersion?,
     nonce: String,
     signer: SignatureCreator?,
-    overrideDisclosures: List<List<PointerPart>>? = null
-) : Result<String> {
+    overrideDisclosures: List<List<PointerPart>>? = null,
+): Result<String> {
     this.withAudience(audience)
     this.withNonce(nonce)
 
-    if(transactionData != null && specVersion != null) {
-        this.withTransactionData(transactionData, specVersion);
+    if (transactionData != null && specVersion != null) {
+        this.withTransactionData(transactionData, specVersion)
     }
 
     // useful for tests
@@ -110,7 +110,7 @@ fun SdJwtBuilder.getVpToken(
     // If claims is absent, no selectively disclosable claims are requested. Treat an empty legacy
     // value the same way so that invalid input fails closed instead of disclosing data.
     // https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-selecting-claims
-    if(query.claims.isNullOrEmpty()){
+    if (query.claims.isNullOrEmpty()) {
         this.removeAll()
         return Result.success(this.build(signer.asNativeSdJwtSignatureCreator()))
     }
@@ -118,37 +118,38 @@ fun SdJwtBuilder.getVpToken(
     // If claims is present, but claim_sets is absent, the Verifier requests all claims listed in claims
     val requestedClaims = query.claims.orEmpty()
     val requestedClaimSets = query.claimSets
-    if(requestedClaimSets == null){
-        for(claim in requestedClaims){
-            val path = if (this.isW3c() && claim.path.firstOrNull() != PointerPart.String("credentialSubject")) {
-                listOf(PointerPart.String("credentialSubject")) + claim.path
-            } else {
-                claim.path
-            }
+    if (requestedClaimSets == null) {
+        for (claim in requestedClaims) {
+            val path =
+                if (this.isW3c() && claim.path.firstOrNull() != PointerPart.String("credentialSubject")) {
+                    listOf(PointerPart.String("credentialSubject")) + claim.path
+                } else {
+                    claim.path
+                }
             val ptrs = resolvePointer(claims, path)
             for (ptr in ptrs) {
                 val r = claims[ptr.asSelector()]
-                if(r.size > 1 || r.isEmpty()) {
+                if (r.size > 1 || r.isEmpty()) {
                     return Result.failure(SdJwtErrors.InvalidDisclosurePath(claim.path))
                 }
                 this.addDisclosure(ptr)
             }
         }
-    } else  {
+    } else {
         // If both claims and claim_sets are present, the Verifier requests one combination of the claims listed in claim_sets.
         // The order of the options conveyed in the claim_sets array expresses the Verifier's preference for what is returned;
         // the Wallet MUST return the first option that it can satisfy.
         // If the Wallet cannot satisfy any of the options, it MUST NOT return any claims
-        setLoop@ for (option in requestedClaimSets){
+        setLoop@ for (option in requestedClaimSets) {
             var disclosurePtrs = mutableListOf<List<PointerPart>>()
-            for(claim in option) {
+            for (claim in option) {
                 val claimQuery = requestedClaims.firstOrNull { it.id == claim } ?: continue
                 val ptrs = resolvePointer(claims, claimQuery.path)
-                if(ptrs.isEmpty()) {
+                if (ptrs.isEmpty()) {
                     // we don't have claims matching the query, so skip these options
                     continue@setLoop
                 }
-                for(ptr in ptrs) {
+                for (ptr in ptrs) {
                     val res = ptr.asSelector().select(claims)
                     if (res.isEmpty()) {
                         continue@setLoop
@@ -157,10 +158,10 @@ fun SdJwtBuilder.getVpToken(
                 disclosurePtrs.addAll(ptrs)
             }
             // we passed all options, so lets add them to the token and return
-            for(ptr in disclosurePtrs){
+            for (ptr in disclosurePtrs) {
                 try {
                     this.addDisclosure(ptr)
-                }catch (e: Exception) {
+                } catch (e: Exception) {
                     println(e)
                 }
             }
@@ -172,7 +173,10 @@ fun SdJwtBuilder.getVpToken(
     return Result.success(this.build(signer.asNativeSdJwtSignatureCreator()))
 }
 
-private fun resolvePointer(claims: Value, ptr: List<PointerPart>) : List<List<PointerPart>> {
+private fun resolvePointer(
+    claims: Value,
+    ptr: List<PointerPart>,
+): List<List<PointerPart>> {
     val p = ClaimsPointer(ptr)
     return p.resolvePtr(claims)
 }

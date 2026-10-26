@@ -20,10 +20,12 @@ import android.annotation.SuppressLint
 import android.content.Context
 import org.kapunsdk.wallet.resources.StringResourceProvider
 
-class AndroidStringResourceProvider(private val context: Context) : StringResourceProvider {
-	@SuppressLint("DiscouragedApi")
-	override fun getString(stringName: String): String {
-		val stringId = context.resources.getIdentifier(stringName, "string", context.packageName)
-		return if (stringId != 0) context.getString(stringId) else stringName
-	}
+class AndroidStringResourceProvider(
+    private val context: Context,
+) : StringResourceProvider {
+    @SuppressLint("DiscouragedApi")
+    override fun getString(stringName: String): String {
+        val stringId = context.resources.getIdentifier(stringName, "string", context.packageName)
+        return if (stringId != 0) context.getString(stringId) else stringName
+    }
 }

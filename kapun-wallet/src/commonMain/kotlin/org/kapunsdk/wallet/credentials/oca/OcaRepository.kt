@@ -24,38 +24,44 @@ import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
 @OptIn(ExperimentalTime::class)
-class OcaRepository private constructor(db: KapunDatabase) {
-	companion object {
-		val koinModule = module {
-			singleOf(::OcaRepository)
-		}
-	}
+class OcaRepository private constructor(
+    db: KapunDatabase,
+) {
+    companion object {
+        val koinModule =
+            module {
+                singleOf(::OcaRepository)
+            }
+    }
 
-	private val queries = db.ocaBundleQueries
+    private val queries = db.ocaBundleQueries
 
-	fun clear() = queries.clear()
+    fun clear() = queries.clear()
 
-	fun getAllEntities() = queries.getAll().executeAsList()
+    fun getAllEntities() = queries.getAll().executeAsList()
 
-	fun fullInsert(
-		url: String,
-		content: String,
-		updatedAt: Long,
-	) = queries.fullInsert(
-		url,
-		content,
-		updatedAt,
-	)
+    fun fullInsert(
+        url: String,
+        content: String,
+        updatedAt: Long,
+    ) = queries.fullInsert(
+        url,
+        content,
+        updatedAt,
+    )
 
-	fun getForUrl(url: String) = queries.getByUrl(url).executeAsOneOrNull()?.toModel()
+    fun getForUrl(url: String) = queries.getByUrl(url).executeAsOneOrNull()?.toModel()
 
-	fun getAll() = queries.getAll().executeAsList().map { it.toModel() }
+    fun getAll() = queries.getAll().executeAsList().map { it.toModel() }
 
-	fun insertOrUpdateOca(url: String, json: String) {
-		if (queries.exists(url).executeAsOne()) {
-			queries.update(json, Clock.System.now().toEpochMilliseconds(), url)
-		} else {
-			queries.insert(url, json, Clock.System.now().toEpochMilliseconds())
-		}
-	}
+    fun insertOrUpdateOca(
+        url: String,
+        json: String,
+    ) {
+        if (queries.exists(url).executeAsOne()) {
+            queries.update(json, Clock.System.now().toEpochMilliseconds(), url)
+        } else {
+            queries.insert(url, json, Clock.System.now().toEpochMilliseconds())
+        }
+    }
 }

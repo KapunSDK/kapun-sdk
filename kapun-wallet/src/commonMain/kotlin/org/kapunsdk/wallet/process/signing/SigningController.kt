@@ -16,73 +16,76 @@ under the License.
 
 package org.kapunsdk.wallet.process.signing
 
-import org.kapunsdk.util.log.Logger
-import org.kapunsdk.wallet.process.ProcessRepository
-import org.kapunsdk.wallet.process.signing.qes.QesPdfSigningProcessEvent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.launch
+import org.kapunsdk.util.log.Logger
+import org.kapunsdk.wallet.process.ProcessRepository
+import org.kapunsdk.wallet.process.signing.qes.QesPdfSigningProcessEvent
 import org.koin.dsl.module
 
 class SigningController private constructor(
-	private val processRepository: ProcessRepository,
-	private val scope: CoroutineScope,
+    private val processRepository: ProcessRepository,
+    private val scope: CoroutineScope,
 ) {
-	companion object {
-		val koinModule = module {
-			factory { (scope: CoroutineScope) ->
-				SigningController(
-					processRepository = get(),
-					scope = scope,
-				)
-			}
-		}
-	}
+    companion object {
+        val koinModule =
+            module {
+                factory { (scope: CoroutineScope) ->
+                    SigningController(
+                        processRepository = get(),
+                        scope = scope,
+                    )
+                }
+            }
+    }
 
-	val currentProcessStep = processRepository.currentProcessStep
+    val currentProcessStep = processRepository.currentProcessStep
 
-	fun resetState() {
-		scope.launch(Dispatchers.IO) {
-			processRepository.cancelProcess()
-		}
-	}
+    fun resetState() {
+        scope.launch(Dispatchers.IO) {
+            processRepository.cancelProcess()
+        }
+    }
 
-	// QES PDF Signing methods
-	fun startQesPdfSigning(pdfData: ByteArray, fileName: String) {
-		scope.launch(Dispatchers.IO) {
-			Logger.debug("QesPdfSigningProcessEvent.InitiatePdfSigning with fileName: $fileName")
-			processRepository.continueProcess(
-				QesPdfSigningProcessEvent.InitiatePdfSigning(pdfData, fileName)
-			)
-		}
-	}
+    // QES PDF Signing methods
+    fun startQesPdfSigning(
+        pdfData: ByteArray,
+        fileName: String,
+    ) {
+        scope.launch(Dispatchers.IO) {
+            Logger.debug("QesPdfSigningProcessEvent.InitiatePdfSigning with fileName: $fileName")
+            processRepository.continueProcess(
+                QesPdfSigningProcessEvent.InitiatePdfSigning(pdfData, fileName),
+            )
+        }
+    }
 
-	fun onQesPresentationCompleted(redirectUri: String) {
-		scope.launch(Dispatchers.IO) {
-			Logger.debug("QesPdfSigningProcessEvent.PresentationCompleted with URI: $redirectUri")
-			processRepository.continueProcess(
-				QesPdfSigningProcessEvent.PresentationCompleted(redirectUri)
-			)
-		}
-	}
+    fun onQesPresentationCompleted(redirectUri: String) {
+        scope.launch(Dispatchers.IO) {
+            Logger.debug("QesPdfSigningProcessEvent.PresentationCompleted with URI: $redirectUri")
+            processRepository.continueProcess(
+                QesPdfSigningProcessEvent.PresentationCompleted(redirectUri),
+            )
+        }
+    }
 
-	fun onQesPdfSigningAccepted() {
-		scope.launch(Dispatchers.IO) {
-			Logger.debug("QesPdfSigningProcessEvent.UserAcceptedSigning")
-			processRepository.continueProcess(
-				QesPdfSigningProcessEvent.UserAcceptedSigning
-			)
-		}
-	}
+    fun onQesPdfSigningAccepted() {
+        scope.launch(Dispatchers.IO) {
+            Logger.debug("QesPdfSigningProcessEvent.UserAcceptedSigning")
+            processRepository.continueProcess(
+                QesPdfSigningProcessEvent.UserAcceptedSigning,
+            )
+        }
+    }
 
-	fun onQesPdfSigningRejected() {
-		scope.launch(Dispatchers.IO) {
-			Logger.debug("QesPdfSigningProcessEvent.UserRejectedSigning")
-			processRepository.continueProcess(
-				QesPdfSigningProcessEvent.UserRejectedSigning
-			)
-		}
-	}
-
+    fun onQesPdfSigningRejected() {
+        scope.launch(Dispatchers.IO) {
+            Logger.debug("QesPdfSigningProcessEvent.UserRejectedSigning")
+            processRepository.continueProcess(
+                QesPdfSigningProcessEvent.UserRejectedSigning,
+            )
+        }
+    }
 }

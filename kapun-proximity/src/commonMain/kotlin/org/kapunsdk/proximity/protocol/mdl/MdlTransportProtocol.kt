@@ -31,13 +31,15 @@ internal class MdlTransportProtocol(
     private val serviceUuidPeripheralMode: Uuid?,
     private val ephemeralKey: EphemeralKey,
     private val deviceMacAddress: String? = null,
-    private val options: ProximityBleOptions = ProximityBleOptions.Default
-) : BleTransportProtocol(role), KapunProximityKoinComponent, MdlTransportProtocolExtensions {
+    private val options: ProximityBleOptions = ProximityBleOptions.Default,
+) : BleTransportProtocol(role),
+    KapunProximityKoinComponent,
+    MdlTransportProtocolExtensions {
     var centralClientModeTransportProtocol: MdlCentralClientModeTransportProtocol?
     var peripheralServerModeTransportProtocol: MdlPeripheralServerModeTransportProtocol?
     override var sessionTranscript: Value?
         get() {
-            if(centralClientModeTransportProtocol?.isConnected == true) {
+            if (centralClientModeTransportProtocol?.isConnected == true) {
                 return centralClientModeTransportProtocol?.sessionTranscript
             }
             return peripheralServerModeTransportProtocol?.sessionTranscript
@@ -45,16 +47,41 @@ internal class MdlTransportProtocol(
         set(value) {
             TODO("Session Transcript should not be overridden")
         }
+
     init {
-        centralClientModeTransportProtocol = if (serviceUuidCentralMode != null) { MdlCentralClientModeTransportProtocol(role, serviceUuidCentralMode, ephemeralKey, deviceMacAddress, options) } else { null }
-        peripheralServerModeTransportProtocol = if(serviceUuidPeripheralMode != null){ MdlPeripheralServerModeTransportProtocol(role, serviceUuidPeripheralMode, ephemeralKey, deviceMacAddress, options) } else {
-            null
-        }
-        if(centralClientModeTransportProtocol?.isSupported() == false) {
+        centralClientModeTransportProtocol =
+            if (serviceUuidCentralMode !=
+                null
+            ) {
+                MdlCentralClientModeTransportProtocol(
+                    role,
+                    serviceUuidCentralMode,
+                    ephemeralKey,
+                    deviceMacAddress,
+                    options,
+                )
+            } else {
+                null
+            }
+        peripheralServerModeTransportProtocol =
+            if (serviceUuidPeripheralMode !=
+                null
+            ) {
+                MdlPeripheralServerModeTransportProtocol(
+                    role,
+                    serviceUuidPeripheralMode,
+                    ephemeralKey,
+                    deviceMacAddress,
+                    options,
+                )
+            } else {
+                null
+            }
+        if (centralClientModeTransportProtocol?.isSupported() == false) {
             Logger(TAG).warn("central client mode offered but not supported on this device, dropping it")
             centralClientModeTransportProtocol = null
         }
-        if(peripheralServerModeTransportProtocol?.isSupported() == false) {
+        if (peripheralServerModeTransportProtocol?.isSupported() == false) {
             Logger(TAG).warn("peripheral server mode offered but not supported on this device, dropping it")
             peripheralServerModeTransportProtocol = null
         }
@@ -63,11 +90,12 @@ internal class MdlTransportProtocol(
             // To select central client mode, omit the peripheral server UUID from the engagement.
             centralClientModeTransportProtocol = null
         }
-        val selected = when {
-            centralClientModeTransportProtocol != null -> "centralClient"
-            peripheralServerModeTransportProtocol != null -> "peripheralServer"
-            else -> "none"
-        }
+        val selected =
+            when {
+                centralClientModeTransportProtocol != null -> "centralClient"
+                peripheralServerModeTransportProtocol != null -> "peripheralServer"
+                else -> "none"
+            }
         Logger(TAG).debug("transport mode selected: role=$role mode=$selected")
         if (selected == "none") {
             Logger(TAG).error("no usable BLE transport mode for role=$role, the session cannot connect")
@@ -79,59 +107,67 @@ internal class MdlTransportProtocol(
     }
 
     override fun getMessage(): ByteArray? {
-        if(centralClientModeTransportProtocol?.isConnected == true) {
+        if (centralClientModeTransportProtocol?.isConnected == true) {
             return centralClientModeTransportProtocol?.getMessage()
         }
-        if(peripheralServerModeTransportProtocol?.isConnected == true) {
+        if (peripheralServerModeTransportProtocol?.isConnected == true) {
             return peripheralServerModeTransportProtocol?.getMessage()
         }
         return null
     }
+
     override fun setListener(listener: Listener) {
         centralClientModeTransportProtocol?.setListener(listener)
         peripheralServerModeTransportProtocol?.setListener(listener)
     }
+
     override suspend fun connect() {
         centralClientModeTransportProtocol?.connect()
         peripheralServerModeTransportProtocol?.connect()
     }
 
     override fun disconnect() {
-            centralClientModeTransportProtocol?.disconnect()
-            peripheralServerModeTransportProtocol?.disconnect()
+        centralClientModeTransportProtocol?.disconnect()
+        peripheralServerModeTransportProtocol?.disconnect()
     }
 
-    override fun sendMessage(data: ByteArray, onProgress: ((sent: Int, total: Int) -> Unit)?) {
-        if(centralClientModeTransportProtocol?.isConnected == true) {
+    override fun sendMessage(
+        data: ByteArray,
+        onProgress: ((sent: Int, total: Int) -> Unit)?,
+    ) {
+        if (centralClientModeTransportProtocol?.isConnected == true) {
             centralClientModeTransportProtocol?.sendMessage(data, onProgress)
         }
-        if(peripheralServerModeTransportProtocol?.isConnected == true) {
+        if (peripheralServerModeTransportProtocol?.isConnected == true) {
             peripheralServerModeTransportProtocol?.sendMessage(data, onProgress)
         }
     }
 
     override fun sendTransportSpecificTerminationMessage() {
-        if(centralClientModeTransportProtocol?.isConnected == true && centralClientModeTransportProtocol?.supportsTransportSpecificTerminationMessage() == true) {
+        if (centralClientModeTransportProtocol?.isConnected == true &&
+            centralClientModeTransportProtocol?.supportsTransportSpecificTerminationMessage() == true
+        ) {
             centralClientModeTransportProtocol?.sendTransportSpecificTerminationMessage()
         }
-        if(peripheralServerModeTransportProtocol?.isConnected == true && peripheralServerModeTransportProtocol?.supportsTransportSpecificTerminationMessage() == true) {
+        if (peripheralServerModeTransportProtocol?.isConnected == true &&
+            peripheralServerModeTransportProtocol?.supportsTransportSpecificTerminationMessage() == true
+        ) {
             peripheralServerModeTransportProtocol?.sendTransportSpecificTerminationMessage()
         }
     }
 
-    override fun supportsTransportSpecificTerminationMessage(): Boolean {
-       return centralClientModeTransportProtocol?.supportsTransportSpecificTerminationMessage() == true || peripheralServerModeTransportProtocol?.supportsTransportSpecificTerminationMessage() == true
-    }
+    override fun supportsTransportSpecificTerminationMessage(): Boolean =
+        centralClientModeTransportProtocol?.supportsTransportSpecificTerminationMessage() == true ||
+            peripheralServerModeTransportProtocol?.supportsTransportSpecificTerminationMessage() == true
 
     override fun getSessionCipher(
         engagementBytes: ByteArray,
         eReaderKeyBytes: ByteArray,
-        peerCoseKey: ByteArray?
+        peerCoseKey: ByteArray?,
     ): SessionCipher? {
-        if(centralClientModeTransportProtocol != null) {
+        if (centralClientModeTransportProtocol != null) {
             return centralClientModeTransportProtocol?.getSessionCipher(engagementBytes, eReaderKeyBytes, peerCoseKey)
         }
         return peripheralServerModeTransportProtocol?.getSessionCipher(engagementBytes, eReaderKeyBytes, peerCoseKey)
     }
-
 }

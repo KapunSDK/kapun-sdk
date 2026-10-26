@@ -21,14 +21,18 @@ import org.kapunsdk.proximity.ble.server.BleGattServer
 import kotlin.uuid.Uuid
 
 internal actual class BleGattFactory {
-	internal actual fun createServer(serviceUuid: Uuid): BleGattServer {
-		TODO("Not yet implemented")
-	}
+    internal actual fun createServer(serviceUuid: Uuid): BleGattServer {
+        TODO("Not yet implemented")
+    }
 
-	internal actual fun createClient(serviceUuid: Uuid, options: ProximityBleOptions): BleGattClient {
-		TODO("Not yet implemented")
-	}
-	internal actual fun isBleAdvSupported() : Boolean {
-		TODO("Not yet implemented")
-	}
+    internal actual fun createClient(
+        serviceUuid: Uuid,
+        options: ProximityBleOptions,
+    ): BleGattClient {
+        TODO("Not yet implemented")
+    }
+
+    internal actual fun isBleAdvSupported(): Boolean {
+        TODO("Not yet implemented")
+    }
 }

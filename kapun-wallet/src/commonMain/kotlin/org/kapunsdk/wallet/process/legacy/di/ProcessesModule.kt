@@ -20,9 +20,10 @@ import org.kapunsdk.wallet.process.legacy.ProcessController
 import org.kapunsdk.wallet.process.legacy.presentation.LegacyPresentationController
 import org.koin.dsl.module
 
-internal fun processesModule() = module {
-	includes(
-		ProcessController.koinModule,
-		LegacyPresentationController.koinModule,
-	)
-}
+internal fun processesModule() =
+    module {
+        includes(
+            ProcessController.koinModule,
+            LegacyPresentationController.koinModule,
+        )
+    }

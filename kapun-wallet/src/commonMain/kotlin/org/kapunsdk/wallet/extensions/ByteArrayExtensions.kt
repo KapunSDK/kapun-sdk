@@ -16,12 +16,11 @@ under the License.
 
 package org.kapunsdk.wallet.extensions
 
-fun ByteArray.toFixedLength(length: Int): ByteArray {
-	return if (this.size == length) {
-		this
-	} else if (this.size < length) {
-		ByteArray(length - this.size) + this
-	} else {
-		this.copyOfRange(this.size - length, this.size)
-	}
-}
+fun ByteArray.toFixedLength(length: Int): ByteArray =
+    if (this.size == length) {
+        this
+    } else if (this.size < length) {
+        ByteArray(length - this.size) + this
+    } else {
+        this.copyOfRange(this.size - length, this.size)
+    }

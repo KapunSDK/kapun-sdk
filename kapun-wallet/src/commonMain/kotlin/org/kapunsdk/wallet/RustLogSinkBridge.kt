@@ -10,13 +10,16 @@ import uniffi.kapun_util_rust.LogPriority
  * own UniFFI callback vtable.
  */
 private object ComponentRustLogSink :
-	uniffi.kapun_crypto_rust.LogSink,
-	uniffi.kapun_issuance_rust.LogSink,
-	uniffi.kapun_dcql_rust.LogSink,
-	uniffi.kapun_dcql_sdjwt_rust.LogSink,
-	uniffi.kapun_wallet_rust.LogSink {
-	override fun log(priority: LogPriority, tag: String, message: String): Boolean =
-		RustToKotlinLogSink.log(priority, tag, message)
+    uniffi.kapun_crypto_rust.LogSink,
+    uniffi.kapun_issuance_rust.LogSink,
+    uniffi.kapun_dcql_rust.LogSink,
+    uniffi.kapun_dcql_sdjwt_rust.LogSink,
+    uniffi.kapun_wallet_rust.LogSink {
+    override fun log(
+        priority: LogPriority,
+        tag: String,
+        message: String,
+    ): Boolean = RustToKotlinLogSink.log(priority, tag, message)
 }
 
 /**
@@ -29,10 +32,10 @@ private object ComponentRustLogSink :
  * this reason. Called once from each platform's `KapunSdk.initialize()`.
  */
 internal fun bridgeAllRustLogSinks() {
-	bridgeRustLogsToKotlin()
-	uniffi.kapun_crypto_rust.registerLogSink(ComponentRustLogSink)
-	uniffi.kapun_issuance_rust.registerLogSink(ComponentRustLogSink)
-	uniffi.kapun_dcql_rust.registerLogSink(ComponentRustLogSink)
-	uniffi.kapun_dcql_sdjwt_rust.registerLogSink(ComponentRustLogSink)
-	uniffi.kapun_wallet_rust.registerLogSink(ComponentRustLogSink)
+    bridgeRustLogsToKotlin()
+    uniffi.kapun_crypto_rust.registerLogSink(ComponentRustLogSink)
+    uniffi.kapun_issuance_rust.registerLogSink(ComponentRustLogSink)
+    uniffi.kapun_dcql_rust.registerLogSink(ComponentRustLogSink)
+    uniffi.kapun_dcql_sdjwt_rust.registerLogSink(ComponentRustLogSink)
+    uniffi.kapun_wallet_rust.registerLogSink(ComponentRustLogSink)
 }

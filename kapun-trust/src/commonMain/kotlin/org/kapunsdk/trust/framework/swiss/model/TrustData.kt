@@ -21,38 +21,37 @@ import kotlinx.serialization.Serializable
 // TODO UBMW: Remove once we fully migrated to the new multi-trust framework approach
 @Serializable
 sealed interface TrustData {
-	val baseUrl: String
-	val identity: TrustedIdentity?
-	val identityJwt: String?
-	val isVerified: Boolean
-	val isTrusted: Boolean
+    val baseUrl: String
+    val identity: TrustedIdentity?
+    val identityJwt: String?
+    val isVerified: Boolean
+    val isTrusted: Boolean
 
-	@Serializable
-	data class Issuance(
-		val issuance: TrustedIssuance?,
-		val issuanceJwt: String?,
-		override val baseUrl: String,
-		override val identity: TrustedIdentity?,
-		override val identityJwt: String?,
-		override val isTrusted: Boolean,
-		override val isVerified: Boolean,
-	) : TrustData
+    @Serializable
+    data class Issuance(
+        val issuance: TrustedIssuance?,
+        val issuanceJwt: String?,
+        override val baseUrl: String,
+        override val identity: TrustedIdentity?,
+        override val identityJwt: String?,
+        override val isTrusted: Boolean,
+        override val isVerified: Boolean,
+    ) : TrustData
 
-	@Serializable
-	data class Verification(
-		val verification: TrustedVerification?,
-		val verificationJwt: String?,
-		/** The Swiss Trust Protocol 2.0 Verification Query Public Statement. */
-		val verificationQueryJwt: String? = null,
-		/** Validated Protected Verification Authorization statements supplied by the verifier. */
-		val protectedVerificationAuthorizationJwts: List<String> = emptyList(),
-		/** Trust Protocol 2.0 markers established for this request. */
-		val trustMarkers: List<String> = emptyList(),
-		override val baseUrl: String,
-		override val identity: TrustedIdentity?,
-		override val identityJwt: String?,
-		override val isTrusted: Boolean,
-		override val isVerified: Boolean,
-	) : TrustData
-
+    @Serializable
+    data class Verification(
+        val verification: TrustedVerification?,
+        val verificationJwt: String?,
+        /** The Swiss Trust Protocol 2.0 Verification Query Public Statement. */
+        val verificationQueryJwt: String? = null,
+        /** Validated Protected Verification Authorization statements supplied by the verifier. */
+        val protectedVerificationAuthorizationJwts: List<String> = emptyList(),
+        /** Trust Protocol 2.0 markers established for this request. */
+        val trustMarkers: List<String> = emptyList(),
+        override val baseUrl: String,
+        override val identity: TrustedIdentity?,
+        override val identityJwt: String?,
+        override val isTrusted: Boolean,
+        override val isVerified: Boolean,
+    ) : TrustData
 }

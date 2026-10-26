@@ -16,6 +16,8 @@ under the License.
 
 package org.kapunsdk.visualization.oca.model.overlay.presentation
 
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import org.kapunsdk.util.extensions.toArgb
 import org.kapunsdk.visualization.layout.LayoutCardImage
 import org.kapunsdk.visualization.layout.LayoutData
@@ -28,64 +30,72 @@ import org.kapunsdk.visualization.oca.model.overlay.Overlay
 import org.kapunsdk.visualization.oca.model.overlay.semantic.MetaOverlay
 import org.kapunsdk.visualization.oca.processing.AttributeValue
 import org.kapunsdk.visualization.oca.processing.ProcessedAttribute
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
 @Serializable
 data class AriesBrandingOverlay(
-	@SerialName("logo") val logo: String? = null,
-	@SerialName("background_image") val backgroundImage: String? = null,
-	@SerialName("background_image_slice") val backgroundImageSlice: String? = null,
-	@SerialName("primary_background_color") val primaryBackgroundColor: String? = null,
-	@SerialName("secondary_background_color") val secondaryBackgroundColor: String? = null,
-	@SerialName("primary_attribute") val primaryAttribute: AttributeName? = null,
-	@SerialName("secondary_attribute") val secondaryAttribute: AttributeName? = null,
-	@SerialName("issued_date_attribute") val issuedDateAttribute: AttributeName? = null,
-	@SerialName("expiry_date_attribute") val expiryDateAttribute: AttributeName? = null,
-	@SerialName("capture_base") override val captureBase: SAID,
-	@SerialName("type") override val type: String = "spec/overlays/branding/1.0",
-	@SerialName("digest") override val digest: SAID = SAID_HASH_PLACEHOLDER,
+    @SerialName("logo") val logo: String? = null,
+    @SerialName("background_image") val backgroundImage: String? = null,
+    @SerialName("background_image_slice") val backgroundImageSlice: String? = null,
+    @SerialName("primary_background_color") val primaryBackgroundColor: String? = null,
+    @SerialName("secondary_background_color") val secondaryBackgroundColor: String? = null,
+    @SerialName("primary_attribute") val primaryAttribute: AttributeName? = null,
+    @SerialName("secondary_attribute") val secondaryAttribute: AttributeName? = null,
+    @SerialName("issued_date_attribute") val issuedDateAttribute: AttributeName? = null,
+    @SerialName("expiry_date_attribute") val expiryDateAttribute: AttributeName? = null,
+    @SerialName("capture_base") override val captureBase: SAID,
+    @SerialName("type") override val type: String = "spec/overlays/branding/1.0",
+    @SerialName("digest") override val digest: SAID = SAID_HASH_PLACEHOLDER,
 ) : PresentationOverlay {
-	override fun updateDigest(digest: SAID, captureBase: SAID): Overlay = copy(digest = digest, captureBase = captureBase)
-	override fun presentsAttributes() = listOfNotNull(
-		primaryAttribute,
-		secondaryAttribute,
-		issuedDateAttribute,
-		expiryDateAttribute
-	)
+    override fun updateDigest(
+        digest: SAID,
+        captureBase: SAID,
+    ): Overlay = copy(digest = digest, captureBase = captureBase)
 
-	@OptIn(ExperimentalEncodingApi::class)
-	fun process(
-		layoutType: LayoutType,
-		meta: MetaOverlay?,
-		attributeProcessor: (AttributeName) -> ProcessedAttribute?,
-	): LayoutData? {
-		return when (layoutType) {
-			LayoutType.CARD -> {
-				val backgroundImage = when {
-					backgroundImage?.startsWith("http") == true -> LayoutCardImage.Url(backgroundImage)
-					backgroundImage != null -> LayoutCardImage.Base64(Base64.decode(backgroundImage))
-					else -> null
-				}
+    override fun presentsAttributes() =
+        listOfNotNull(
+            primaryAttribute,
+            secondaryAttribute,
+            issuedDateAttribute,
+            expiryDateAttribute,
+        )
 
-				LayoutData.Card(
-					credentialName = meta?.name,
-					issuerName = meta?.issuerName,
-					title = primaryAttribute?.let {
-						(attributeProcessor.invoke(it)?.attributeValue as? AttributeValue.Text)?.value
-					},
-					subtitle = secondaryAttribute?.let {
-						(attributeProcessor.invoke(it)?.attributeValue as? AttributeValue.Text)?.value
-					},
-					textColor = TextShade.DARK, // TODO Make dependent on background color
-					cardColor = primaryBackgroundColor?.toArgb(),
-					backgroundImage = backgroundImage,
-					overlays = null,
-				)
-			}
-			LayoutType.DETAIL_LIST -> null
-		}
-	}
+    @OptIn(ExperimentalEncodingApi::class)
+    fun process(
+        layoutType: LayoutType,
+        meta: MetaOverlay?,
+        attributeProcessor: (AttributeName) -> ProcessedAttribute?,
+    ): LayoutData? =
+        when (layoutType) {
+            LayoutType.CARD -> {
+                val backgroundImage =
+                    when {
+                        backgroundImage?.startsWith("http") == true -> LayoutCardImage.Url(backgroundImage)
+                        backgroundImage != null -> LayoutCardImage.Base64(Base64.decode(backgroundImage))
+                        else -> null
+                    }
+
+                LayoutData.Card(
+                    credentialName = meta?.name,
+                    issuerName = meta?.issuerName,
+                    title =
+                        primaryAttribute?.let {
+                            (attributeProcessor.invoke(it)?.attributeValue as? AttributeValue.Text)?.value
+                        },
+                    subtitle =
+                        secondaryAttribute?.let {
+                            (attributeProcessor.invoke(it)?.attributeValue as? AttributeValue.Text)?.value
+                        },
+                    textColor = TextShade.DARK, // TODO Make dependent on background color
+                    cardColor = primaryBackgroundColor?.toArgb(),
+                    backgroundImage = backgroundImage,
+                    overlays = null,
+                )
+            }
+
+            LayoutType.DETAIL_LIST -> {
+                null
+            }
+        }
 }

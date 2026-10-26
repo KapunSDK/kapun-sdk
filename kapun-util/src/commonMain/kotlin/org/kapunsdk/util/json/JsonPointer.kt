@@ -16,65 +16,78 @@ under the License.
 
 package org.kapunsdk.util.json
 
-
-import org.kapunsdk.util.extensions.jsonPrimitiveOrNull
 import kotlinx.serialization.json.*
+import org.kapunsdk.util.extensions.jsonPrimitiveOrNull
 
 /**
  * Basic implementation of JsonPointers as per RFC 6901
  */
 class JsonPointer(
-	private val path: String,
-	private val lenient: Boolean = true,
+    private val path: String,
+    private val lenient: Boolean = true,
 ) {
+    private val refTokens =
+        path
+            .trim('/')
+            .split('/')
+            .map {
+                it.replace("~0", "~").replace("~1", "/") // Special character handling
+            }
 
-	private val refTokens = path.trim('/')
-		.split('/')
-		.map {
-			it.replace("~0", "~").replace("~1", "/") // Special character handling
-		}
+    fun resolveString(json: JsonElement): String? {
+        if (path.isEmpty()) return json.toString()
 
-	fun resolveString(json: JsonElement): String? {
-		if (path.isEmpty()) return json.toString()
+        return when (val resolved = resolveElement(json)) {
+            null -> {
+                if (lenient) null else throw JsonPointerException("Path '$path' could not be resolved")
+            }
 
-		return when (val resolved = resolveElement(json)) {
-			null -> if (lenient) null else throw JsonPointerException("Path '$path' could not be resolved")
-			is JsonPrimitive -> resolved.content
-			is JsonArray -> if (lenient) {
-				resolved.joinToString(", ") { it.jsonPrimitiveOrNull()?.content ?: it.toString() }
-			} else {
-				throw JsonPointerException("Path '$path' resolved to JsonArray '$resolved'")
-			}
-			is JsonObject -> if (lenient) null else throw JsonPointerException("Path '$path' resolved to JsonObject '$resolved'")
-		}
-	}
+            is JsonPrimitive -> {
+                resolved.content
+            }
 
-	private fun resolveElement(json: JsonElement): JsonElement? {
-		var currentElement: JsonElement = json
+            is JsonArray -> {
+                if (lenient) {
+                    resolved.joinToString(", ") { it.jsonPrimitiveOrNull()?.content ?: it.toString() }
+                } else {
+                    throw JsonPointerException("Path '$path' resolved to JsonArray '$resolved'")
+                }
+            }
 
-		for (refToken in refTokens) {
-			currentElement = when (currentElement) {
-				is JsonObject -> {
-					// If the current element is a JsonObject, access by key
-					currentElement[refToken] ?: return null
-				}
-				is JsonArray -> {
-					// If the current element is a JsonArray, access by index
-					val index = refToken.toIntOrNull() ?: return null
-					if (index in 0 until currentElement.size) {
-						currentElement[index]
-					} else {
-						return null
-					}
-				}
-				else -> {
-					// If it's neither JsonObject nor JsonArray, the path is invalid
-					return null
-				}
-			}
-		}
+            is JsonObject -> {
+                if (lenient) null else throw JsonPointerException("Path '$path' resolved to JsonObject '$resolved'")
+            }
+        }
+    }
 
-		return currentElement
-	}
+    private fun resolveElement(json: JsonElement): JsonElement? {
+        var currentElement: JsonElement = json
 
+        for (refToken in refTokens) {
+            currentElement =
+                when (currentElement) {
+                    is JsonObject -> {
+                        // If the current element is a JsonObject, access by key
+                        currentElement[refToken] ?: return null
+                    }
+
+                    is JsonArray -> {
+                        // If the current element is a JsonArray, access by index
+                        val index = refToken.toIntOrNull() ?: return null
+                        if (index in 0 until currentElement.size) {
+                            currentElement[index]
+                        } else {
+                            return null
+                        }
+                    }
+
+                    else -> {
+                        // If it's neither JsonObject nor JsonArray, the path is invalid
+                        return null
+                    }
+                }
+        }
+
+        return currentElement
+    }
 }

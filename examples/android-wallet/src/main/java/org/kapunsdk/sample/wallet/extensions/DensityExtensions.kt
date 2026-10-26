@@ -11,7 +11,7 @@ software distributed under the License is distributed on an
 "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
-under the License.   
+under the License.
  */
 package org.kapunsdk.sample.wallet.extensions
 
@@ -20,5 +20,5 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 
 val Int.dpToPx: Float
-	@Composable
-	get() = with(LocalDensity.current) { this@dpToPx.dp.toPx() }
+    @Composable
+    get() = with(LocalDensity.current) { this@dpToPx.dp.toPx() }

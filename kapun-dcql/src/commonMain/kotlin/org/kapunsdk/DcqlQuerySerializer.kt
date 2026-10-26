@@ -22,10 +22,8 @@ import kotlin.jvm.JvmStatic
 
 public object DcqlQuerySerializer {
     @JvmStatic
-    public fun toJson(dcqlQuery: DcqlQuery): String
-        = Json.encodeToString(dcqlQuery)
+    public fun toJson(dcqlQuery: DcqlQuery): String = Json.encodeToString(dcqlQuery)
 
     @JvmStatic
-    public fun fromJson(json: String): DcqlQuery
-        = Json.decodeFromString<DcqlQuery>(json)
+    public fun fromJson(json: String): DcqlQuery = Json.decodeFromString<DcqlQuery>(json)
 }

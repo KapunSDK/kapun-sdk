@@ -16,17 +16,19 @@ under the License.
 
 package org.kapunsdk.wallet.process.presentation.proximity
 
+import kotlinx.serialization.json.Json
 import org.kapunsdk.credentials.models.credential.CredentialType
 import org.kapunsdk.credentials.models.metadata.KeyMaterial
-import org.kapunsdk.toReadableString
 import org.kapunsdk.issuance.metadata.data.CredentialIssuerMetadata
 import org.kapunsdk.proximity.documents.DocumentRequest
+import org.kapunsdk.toReadableString
 import org.kapunsdk.trust.TrustFrameworkController
 import org.kapunsdk.trust.framework.ValidationInfo
 import org.kapunsdk.trust.framework.germany.EU_TRUST_FRAMEWORK_ID
 import org.kapunsdk.trust.model.AgentInformation
 import org.kapunsdk.trust.model.AgentType
 import org.kapunsdk.util.extensions.asString
+import org.kapunsdk.util.extensions.get
 import org.kapunsdk.util.extensions.transform
 import org.kapunsdk.util.log.Logger
 import org.kapunsdk.wallet.credentials.LocalizedKeyValue
@@ -49,10 +51,9 @@ import org.kapunsdk.wallet.keyvalue.KeyValueRepository
 import org.kapunsdk.wallet.process.ProcessStep
 import org.kapunsdk.wallet.process.legacy.presentation.PresentationWorkflow
 import org.kapunsdk.wallet.process.presentation.CredentialSelection
+import org.kapunsdk.wallet.process.presentation.CredentialSelection.PexCredentialSelection
 import org.kapunsdk.wallet.process.presentation.PresentationProcess
 import org.kapunsdk.wallet.process.presentation.PresentationProcessKt
-import kotlinx.serialization.json.Json
-import org.kapunsdk.util.extensions.get
 import uniffi.kapun_util_rust.Value
 import uniffi.kapun_wallet_rust.ApiException
 import uniffi.kapun_wallet_rust.VerifiableCredential
@@ -70,9 +71,7 @@ class ProximityPresentationProcess(
     private val keyValueRepository: KeyValueRepository,
     private val viewModelFactory: ViewModelFactory,
     private val json: Json,
-
 ) : PresentationProcess(trustController) {
-
     private lateinit var presentationProcess: PresentationProcessKt
 
     private companion object {
@@ -82,22 +81,29 @@ class ProximityPresentationProcess(
     private var presentationScope: String? = null
     private var authSession: String? = null
 
-    suspend fun startPresentationProcess(engagementData: String): ProximityPresentationProcessStep {
-        return try {
+    suspend fun startPresentationProcess(engagementData: String): ProximityPresentationProcessStep =
+        try {
             Logger(TAG).debug("startPresentationProcess: initializing mdl presentation")
             presentationProcess = PresentationProcessKt.initializeMdl(signingProvider)
             ProximityPresentationProcessStep.QrCodeEngagementReady(engagementData)
         } catch (e: ApiException) {
             val info = e.asErrorState()
-            ProximityPresentationProcessStep.Error(errorMessage = info.messageOrCode, errorCode = info.code, cause = info.cause)
+            ProximityPresentationProcessStep.Error(
+                errorMessage = info.messageOrCode,
+                errorCode = info.code,
+                cause = info.cause,
+            )
         } catch (e: Exception) {
             ProximityPresentationProcessStep.Error(
-                errorMessage = e.message ?: e::class.simpleName ?: "TODO", cause = e
+                errorMessage = e.message ?: e::class.simpleName ?: "TODO",
+                cause = e,
             )
         }
-    }
 
-    suspend fun continueWithCredentialSelection(documentRequest: DocumentRequest, sessionTranscript: Value): ProximityPresentationProcessStep {
+    suspend fun continueWithCredentialSelection(
+        documentRequest: DocumentRequest,
+        sessionTranscript: Value,
+    ): ProximityPresentationProcessStep {
         try {
             presentationProcess.putDocumentRequest(documentRequest)
             presentationProcess.putSessionTranscript(sessionTranscript)
@@ -116,8 +122,8 @@ class ProximityPresentationProcess(
                         credentialUseCases = emptyList(),
                         purpose = "",
                         name = "",
-                        loA = //TODO: fix this?
-                        LoA.Low,
+                        // TODO: fix this?
+                        loA = LoA.Low,
                         authorizationRequestForDiagnostics = null,
                     ),
                     AgentInformation(
@@ -127,165 +133,208 @@ class ProximityPresentationProcess(
                         isTrusted = true,
                         isVerified = true,
                         trustFrameworkId = EU_TRUST_FRAMEWORK_ID,
-                        logoUri = null
+                        logoUri = null,
                     ),
                     validationInfo = null,
                 )
             } else {
-                val credentialUseCaseList = unusedCredentials.map { cs ->
-                    when (cs) {
-                        is CredentialSelection.ProximityCredentialSelection -> {
-                            //TODO: handle multiple sets
-                            CredentialUseCaseUiModel(null, cs.presentableCredentials.withIndex().associate {
-                                val key = "document:${it.index}"
-                                key to
-                                        it.value.map { matchingCredential ->
-                                            allIdentities.first { identity ->
-                                                if(identity !is IdentityUiModel.IdentityUiCredentialModel) {
-                                                    TODO("Handle deferred")
-                                                }
-                                                identity.credentials.map { it.id }
-                                                    .contains(matchingCredential.credential.id)
-                                            }.let { identity ->
-                                                val credential =
-                                                    credentialsRepository.getById(matchingCredential.credential.id)
+                val credentialUseCaseList =
+                    unusedCredentials.map { cs ->
+                        when (cs) {
+                            is CredentialSelection.ProximityCredentialSelection -> {
+                                // TODO: handle multiple sets
+                                CredentialUseCaseUiModel(
+                                    null,
+                                    cs.presentableCredentials.withIndex().associate {
+                                        val key = "document:${it.index}"
+                                        key to
+                                            it.value.map { matchingCredential ->
+                                                allIdentities
+                                                    .first { identity ->
+                                                        if (identity !is IdentityUiModel.IdentityUiCredentialModel) {
+                                                            TODO("Handle deferred")
+                                                        }
+                                                        identity.credentials
+                                                            .map { it.id }
+                                                            .contains(matchingCredential.credential.id)
+                                                    }.let { identity ->
+                                                        val credential =
+                                                            credentialsRepository.getById(
+                                                                matchingCredential.credential.id,
+                                                            )
 
-                                                var presentableCredential: CredentialSelectionUiModel =
-                                                    viewModelFactory.getPresentableCredentialUiModel(
-                                                        matchingCredential,
-                                                        identity,
-                                                        credential?.fk_oca_bundle_url
-                                                    )
+                                                        var presentableCredential: CredentialSelectionUiModel =
+                                                            viewModelFactory.getPresentableCredentialUiModel(
+                                                                matchingCredential,
+                                                                identity,
+                                                                credential?.fk_oca_bundle_url,
+                                                            )
 
-                                                presentableCredential
+                                                        presentableCredential
+                                                    }
                                             }
-                                        }
-                            }, cs)
-                        }
+                                    },
+                                    cs,
+                                )
+                            }
 
-                        is CredentialSelection.DcqlCredentialSelection -> {
-                            val nonEmptySetOption =
-                                cs.dcqlSetOptions.setOptions.find { it.all { other -> other.credentialOptions.isNotEmpty() } }
-                                    ?: cs.dcqlSetOptions.setOptions[0]
-                            CredentialUseCaseUiModel(
-                                cs.purpose,
-                                nonEmptySetOption.associate {
-                                    it.queryId to it.credentialOptions.map { matchingCredential ->
-                                        allIdentities.first { identity ->
-                                            if(identity !is IdentityUiModel.IdentityUiCredentialModel) {
-                                                TODO("Handle deferred")
-                                            }
-                                            identity.credentials.map { it.id }
-                                                .contains(matchingCredential.selectedVerifiableCredential.id)
-                                        }.let { identity ->
-                                            val ocaBundleUrl =
-                                                credentialsRepository.getById(matchingCredential.selectedVerifiableCredential.id)?.fk_oca_bundle_url
-                                            val credentialQuery =
-                                                cs.dcqlQuery.credentials?.first { cq -> cq.id == it.queryId }
-                                            if (credentialQuery == null) {
-                                                return ProximityPresentationProcessStep.Error(
-                                                    errorMessage = "Matching Credential query not found; this should not happen"
-                                                )
-                                            }
-                                            viewModelFactory.getPresentableCredentialUiModelFromDcql(
-                                                it.queryId,
-                                                credentialQuery,
-                                                matchingCredential.selectedVerifiableCredential,
-                                                matchingCredential.selectedCredential,
-                                                identity,
-                                                ocaBundleUrl,
-                                                cs.dcqlSetOptions.zkpOptions
-                                            )
+                            is CredentialSelection.DcqlCredentialSelection -> {
+                                val nonEmptySetOption =
+                                    cs.dcqlSetOptions.setOptions.find {
+                                        it.all { other ->
+                                            other.credentialOptions.isNotEmpty()
                                         }
                                     }
-                                },
-                                credentialSelection = cs,
-                                zkpInfo = cs.dcqlSetOptions.zkpOptions?.let {
-                                    ZkpUiModel(
-                                        equalityProofs = it.equalityProofClaims.map { claim ->
-                                            claim.path.joinToString("/") { p -> p.toReadableString() }
-                                        }
-                                    )
-                                }
-                            )
-                        }
-
-                        is CredentialSelection.PexCredentialSelection -> {
-                            //TODO: handle multiple sets
-                            CredentialUseCaseUiModel(null, cs.presentableCredentials.associate {
-                                val key =
-                                    it.map { it.responseId }.firstOrNull() ?: "<NO_CREDENTIAL>"
-                                key to
-                                        it.map { matchingCredential ->
-                                            allIdentities.first { identity ->
-                                                if(identity !is IdentityUiModel.IdentityUiCredentialModel) {
-                                                    TODO("Handle deferred")
-                                                }
-                                                identity.credentials.map { it.id }
-                                                    .contains(matchingCredential.credential.id)
-                                            }.let { identity ->
-                                                val credential =
-                                                    credentialsRepository.getById(matchingCredential.credential.id)
-
-                                                var presentableCredential: CredentialSelectionUiModel =
-                                                    viewModelFactory.getPresentableCredentialUiModel(
-                                                        matchingCredential,
-                                                        identity,
-                                                        credential?.fk_oca_bundle_url
-                                                    )
-
-                                                // If we have an Mdoc credential, prefer an SD-JWT credential for the values
-                                                if (credential?.credential_type == CredentialType.Mdoc) {
-                                                    if(identity !is IdentityUiModel.IdentityUiCredentialModel) {
-                                                        TODO("Handle deferred")
-                                                    }
-                                                    identity.getCredentialUiModel(viewModelFactory).firstOrNull { it.type == CredentialType.SdJwt }
-                                                        ?.let { credentialsRepository.getById(it.id) }
-                                                        ?.let { sdjwt ->
-                                                            val selection =
-                                                                presentationProcess.getMatchingCredentials(
-                                                                    listOf(
-                                                                        VerifiableCredential(
-                                                                            id = sdjwt.id,
-                                                                            identityId = identity.id,
-                                                                            name = sdjwt.name,
-                                                                            metadata = sdjwt.metadata,
-                                                                            payload = sdjwt.payload
-                                                                        )
-                                                                    ), null
-                                                                )
-                                                                    .firstOrNull() as? CredentialSelection.PexCredentialSelection
-                                                            selection?.presentableCredentials?.firstOrNull()
-                                                                ?.firstOrNull()?.let {
-                                                                val sdjwtPresentableCredential =
-                                                                    viewModelFactory.getPresentableCredentialUiModel(
-                                                                        it,
-                                                                        identity,
-                                                                        sdjwt.fk_oca_bundle_url
-                                                                    )
-                                                                presentableCredential =
-                                                                    CredentialSelectionUiModel(
-                                                                        credentialId = presentableCredential.credentialId,
-                                                                        identityUiModel = presentableCredential.identityUiModel,
-                                                                        // filter vct from the values as it is sdjwt only. TODO: define "credential specific" attributes, to filter out
-                                                                        values = sdjwtPresentableCredential.values.filter { it.attributeName != "vct" },
-                                                                        format = presentableCredential.format,
-                                                                        keyAssurance = presentableCredential.keyAssurance,
-                                                                        credential = presentableCredential.credential,
-                                                                        presentableCredential = presentableCredential.presentableCredential,
-                                                                        responseId = presentableCredential.responseId,
-                                                                        requiresCryptographicHolderBinding = true
-                                                                    )
-                                                            }
+                                        ?: cs.dcqlSetOptions.setOptions[0]
+                                CredentialUseCaseUiModel(
+                                    cs.purpose,
+                                    nonEmptySetOption.associate {
+                                        it.queryId to
+                                            it.credentialOptions.map { matchingCredential ->
+                                                allIdentities
+                                                    .first { identity ->
+                                                        if (identity !is IdentityUiModel.IdentityUiCredentialModel) {
+                                                            TODO("Handle deferred")
                                                         }
-                                                }
-                                                presentableCredential
+                                                        identity.credentials
+                                                            .map { it.id }
+                                                            .contains(
+                                                                matchingCredential.selectedVerifiableCredential.id,
+                                                            )
+                                                    }.let { identity ->
+                                                        val ocaBundleUrl =
+                                                            credentialsRepository
+                                                                .getById(
+                                                                    matchingCredential.selectedVerifiableCredential.id,
+                                                                )?.fk_oca_bundle_url
+                                                        val credentialQuery =
+                                                            cs.dcqlQuery.credentials?.first { cq ->
+                                                                cq.id == it.queryId
+                                                            }
+                                                        if (credentialQuery == null) {
+                                                            return ProximityPresentationProcessStep.Error(
+                                                                errorMessage =
+                                                                    "Matching Credential query not found; " +
+                                                                        "this should not happen",
+                                                            )
+                                                        }
+                                                        viewModelFactory.getPresentableCredentialUiModelFromDcql(
+                                                            it.queryId,
+                                                            credentialQuery,
+                                                            matchingCredential.selectedVerifiableCredential,
+                                                            matchingCredential.selectedCredential,
+                                                            identity,
+                                                            ocaBundleUrl,
+                                                            cs.dcqlSetOptions.zkpOptions,
+                                                        )
+                                                    }
                                             }
-                                        }
-                            }, cs)
+                                    },
+                                    credentialSelection = cs,
+                                    zkpInfo =
+                                        cs.dcqlSetOptions.zkpOptions?.let {
+                                            ZkpUiModel(
+                                                equalityProofs =
+                                                    it.equalityProofClaims.map { claim ->
+                                                        claim.path.joinToString("/") { p -> p.toReadableString() }
+                                                    },
+                                            )
+                                        },
+                                )
+                            }
+
+                            is CredentialSelection.PexCredentialSelection -> {
+                                // TODO: handle multiple sets
+                                CredentialUseCaseUiModel(
+                                    null,
+                                    cs.presentableCredentials.associate {
+                                        val key =
+                                            it.map { it.responseId }.firstOrNull() ?: "<NO_CREDENTIAL>"
+                                        key to
+                                            it.map { matchingCredential ->
+                                                allIdentities
+                                                    .first { identity ->
+                                                        if (identity !is IdentityUiModel.IdentityUiCredentialModel) {
+                                                            TODO("Handle deferred")
+                                                        }
+                                                        identity.credentials
+                                                            .map { it.id }
+                                                            .contains(matchingCredential.credential.id)
+                                                    }.let { identity ->
+                                                        val credential =
+                                                            credentialsRepository.getById(
+                                                                matchingCredential.credential.id,
+                                                            )
+
+                                                        var presentableCredential: CredentialSelectionUiModel =
+                                                            viewModelFactory.getPresentableCredentialUiModel(
+                                                                matchingCredential,
+                                                                identity,
+                                                                credential?.fk_oca_bundle_url,
+                                                            )
+
+                                                        // If we have an Mdoc credential, prefer an SD-JWT credential for the values
+                                                        if (credential?.credential_type == CredentialType.Mdoc) {
+                                                            if (
+                                                                identity !is IdentityUiModel.IdentityUiCredentialModel
+                                                            ) {
+                                                                TODO("Handle deferred")
+                                                            }
+                                                            identity
+                                                                .getCredentialUiModel(viewModelFactory)
+                                                                .firstOrNull {
+                                                                    it.type ==
+                                                                        CredentialType.SdJwt
+                                                                }?.let { credentialsRepository.getById(it.id) }
+                                                                ?.let { sdjwt ->
+                                                                    val selection =
+                                                                        presentationProcess
+                                                                            .getMatchingCredentials(
+                                                                                listOf(
+                                                                                    VerifiableCredential(
+                                                                                        id = sdjwt.id,
+                                                                                        identityId = identity.id,
+                                                                                        name = sdjwt.name,
+                                                                                        metadata = sdjwt.metadata,
+                                                                                        payload = sdjwt.payload,
+                                                                                    ),
+                                                                                ),
+                                                                                null,
+                                                                            ).firstOrNull() as? PexCredentialSelection
+                                                                    selection
+                                                                        ?.presentableCredentials
+                                                                        ?.firstOrNull()
+                                                                        ?.firstOrNull()
+                                                                        ?.let {
+                                                                            val sdjwtPresentableCredential =
+                                                                                viewModelFactory
+                                                                                    .getPresentableCredentialUiModel(
+                                                                                        it,
+                                                                                        identity,
+                                                                                        sdjwt.fk_oca_bundle_url,
+                                                                                    )
+                                                                            presentableCredential =
+                                                                                presentableCredential.copy(
+                                                                                    values =
+                                                                                        sdjwtPresentableCredential
+                                                                                            .values
+                                                                                            .filter {
+                                                                                                it.attributeName !=
+                                                                                                    "vct"
+                                                                                            },
+                                                                                )
+                                                                        }
+                                                                }
+                                                        }
+                                                        presentableCredential
+                                                    }
+                                            }
+                                    },
+                                    cs,
+                                )
+                            }
                         }
                     }
-                }
 
                 return ProximityPresentationProcessStep.CredentialSelection(
                     PresentationUiModel(
@@ -293,7 +342,7 @@ class ProximityPresentationProcess(
                         credentialUseCaseList,
                         "",
                         "",
-                        //TODO: fix this?
+                        // TODO: fix this?
                         LoA.Low,
                         null,
                     ),
@@ -304,17 +353,22 @@ class ProximityPresentationProcess(
                         isTrusted = true,
                         isVerified = true,
                         trustFrameworkId = EU_TRUST_FRAMEWORK_ID,
-                        logoUri = null
+                        logoUri = null,
                     ),
                     validationInfo = ValidationInfo(isValid = true),
                 )
             }
         } catch (e: ApiException) {
             val info = e.asErrorState()
-            return ProximityPresentationProcessStep.Error(errorMessage = info.messageOrCode, errorCode = info.code, cause = info.cause)
+            return ProximityPresentationProcessStep.Error(
+                errorMessage = info.messageOrCode,
+                errorCode = info.code,
+                cause = info.cause,
+            )
         } catch (e: Exception) {
             return ProximityPresentationProcessStep.Error(
-                errorMessage = e.message ?: e::class.simpleName ?: "TODO", cause = e
+                errorMessage = e.message ?: e::class.simpleName ?: "TODO",
+                cause = e,
             )
         }
     }
@@ -324,29 +378,38 @@ class ProximityPresentationProcess(
     ): ProcessStep {
         try {
             Logger(TAG).debug("credential selected: count=${credentialMapping.size}")
-            val credentialsWithPin = credentialMapping.filter {
-                it.value.credential.decodeMetadata()?.let {
-                    it.keyMaterial is KeyMaterial.Cloud
-                } == true
-            }.entries.toMutableList()
+            val credentialsWithPin =
+                credentialMapping
+                    .filter {
+                        it.value.credential.decodeMetadata()?.let {
+                            it.keyMaterial is KeyMaterial.Cloud
+                        } == true
+                    }.entries
+                    .toMutableList()
 
-            val credentialsWithFrost = credentialMapping.filter {
-                it.value.credential.decodeMetadata()?.let {
-                    it.keyMaterial is KeyMaterial.Frost
-                } == true
-            }.entries.toMutableList()
+            val credentialsWithFrost =
+                credentialMapping
+                    .filter {
+                        it.value.credential.decodeMetadata()?.let {
+                            it.keyMaterial is KeyMaterial.Frost
+                        } == true
+                    }.entries
+                    .toMutableList()
 
             for (entry in credentialMapping) {
                 presentationProcess.putVerifiableCredential(entry.key, entry.value.credential)
                 presentationProcess.putVerificationContent(
                     credRepresentative = entry.key,
-                    content = json.encodeToString(entry.value.values.map { attr ->
-                        LocalizedKeyValue(
-                            attr.attributeName,
-                            attr.attributeValue?.asString() ?: "",
-                            attr.label
-                        )
-                    })
+                    content =
+                        json.encodeToString(
+                            entry.value.values.map { attr ->
+                                LocalizedKeyValue(
+                                    attr.attributeName,
+                                    attr.attributeValue?.asString() ?: "",
+                                    attr.label,
+                                )
+                            },
+                        ),
                 )
                 entry.value.presentableCredential?.let {
                     presentationProcess.putPresentableCredential(entry.key, it)
@@ -356,10 +419,15 @@ class ProximityPresentationProcess(
             return continueWithPinOrPassphrase(credentialsWithPin, credentialsWithFrost)
         } catch (e: ApiException) {
             val info = e.asErrorState()
-            return ProximityPresentationProcessStep.Error(errorMessage = info.messageOrCode, errorCode = info.code, cause = info.cause)
+            return ProximityPresentationProcessStep.Error(
+                errorMessage = info.messageOrCode,
+                errorCode = info.code,
+                cause = info.cause,
+            )
         } catch (e: Exception) {
             return ProximityPresentationProcessStep.Error(
-                errorMessage = e.message ?: e::class.simpleName ?: "TODO", cause = e
+                errorMessage = e.message ?: e::class.simpleName ?: "TODO",
+                cause = e,
             )
         }
     }
@@ -384,13 +452,13 @@ class ProximityPresentationProcess(
             return ProximityPresentationProcessStep.EnterPin(
                 c,
                 credentialsWithPin,
-                credentialsWithFrost
+                credentialsWithFrost,
             )
         } else {
             val d = credentialsWithFrost.pop()
             if (d != null) {
                 val frostBlob = identityRepository.getById(d.value.credential.identityId)?.frostBlob
-                //TODO: what happens if this is null?
+                // TODO: what happens if this is null?
                 if (frostBlob != null) {
                     presentationProcess.putFrost(d.key, frostBlob)
                 }
@@ -411,20 +479,30 @@ class ProximityPresentationProcess(
                 is PresentationWorkflow.ProximitySuccess -> {
                     val usedCredentials = presentationProcess.getUsedCredentials()
                     for (c in usedCredentials) {
-                        val cred: VerifiableCredential = c["credential"].transform()
-                            ?: return ProximityPresentationProcessStep.Error(errorMessage = "Credential has invalid format")
+                        val cred: VerifiableCredential =
+                            c["credential"].transform()
+                                ?: return ProximityPresentationProcessStep.Error(
+                                    errorMessage = "Credential has invalid format",
+                                )
                         val content: String = c["content"].asString() ?: "{}"
 
                         // Only use the credential if it is refreshable
                         val identity = identityRepository.getById(cred.identityId)
                         val isRefreshable = identity?.tokens?.refreshToken != null
                         val isClaimBound = cred.decodeMetadata()?.keyMaterial is KeyMaterial.Local.ClaimBased
-                        val hasBatchIssuance = identity?.issuer?.credentialIssuerMetadata?.let {
-                            runCatching { json.decodeFromString<CredentialIssuerMetadata>(it) }.getOrNull()?.let { meta ->
-                                meta.claims.batchCredentialIssuance != null
-                            } ?: false
-                        } ?: false
-                        if (hasBatchIssuance && !isClaimBound && isRefreshable && cred.decodeMetadata()?.credentialType != CredentialType.BbsTermwise) {
+                        val hasBatchIssuance =
+                            identity
+                                ?.issuer
+                                ?.credentialIssuerMetadata
+                                ?.let { metadataJson ->
+                                    runCatching {
+                                        json.decodeFromString<CredentialIssuerMetadata>(metadataJson)
+                                    }.getOrNull()
+                                }?.claims
+                                ?.batchCredentialIssuance != null
+                        if (hasBatchIssuance && !isClaimBound && isRefreshable &&
+                            cred.decodeMetadata()?.credentialType != CredentialType.BbsTermwise
+                        ) {
                             credentialsRepository.useCredential(cred.id)
                         }
 
@@ -443,7 +521,7 @@ class ProximityPresentationProcess(
                     }
 
                     return ProximityPresentationProcessStep.Success(
-                        result.token
+                        result.token,
                     )
                 }
 
@@ -451,20 +529,27 @@ class ProximityPresentationProcess(
                     return ProximityPresentationProcessStep.Error(
                         errorMessage = "Credential presentation error",
                         errorCode = result.code,
-                        cause = result.error
+                        cause = result.error,
                     )
                 }
 
                 else -> {
-                    return ProximityPresentationProcessStep.Error(errorMessage = "Unknown credential presentation result")
+                    return ProximityPresentationProcessStep.Error(
+                        errorMessage = "Unknown credential presentation result",
+                    )
                 }
             }
         } catch (e: ApiException) {
             val info = e.asErrorState()
-            return ProximityPresentationProcessStep.Error(errorMessage = info.messageOrCode, errorCode = info.code, cause = info.cause)
+            return ProximityPresentationProcessStep.Error(
+                errorMessage = info.messageOrCode,
+                errorCode = info.code,
+                cause = info.cause,
+            )
         } catch (e: Exception) {
             return ProximityPresentationProcessStep.Error(
-                errorMessage = e.message ?: e::class.simpleName ?: "TODO", cause = e
+                errorMessage = e.message ?: e::class.simpleName ?: "TODO",
+                cause = e,
             )
         }
     }
@@ -472,9 +557,9 @@ class ProximityPresentationProcess(
     private fun getAllIdentities() = identityRepository.getAll()
 
     private suspend fun getMatchingCredentials(
-		documentRequest: DocumentRequest,
-		used: Boolean,
-		validAt: Instant?,
+        documentRequest: DocumentRequest,
+        used: Boolean,
+        validAt: Instant?,
     ): List<CredentialSelection> {
         val credentials = credentialsRepository.getAllCredentials()
 

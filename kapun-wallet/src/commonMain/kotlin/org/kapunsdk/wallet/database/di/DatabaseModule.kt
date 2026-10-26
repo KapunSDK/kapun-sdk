@@ -24,20 +24,23 @@ import org.kapunsdk.wallet.database.SqliteDriverFactory
 import org.koin.core.module.Module
 import org.koin.dsl.module
 
-internal fun databaseModule(databaseName: String) = module {
-	sqliteDriverModule(databaseName)
-	single {
-		KapunDatabase(
-			driver = get<SqliteDriverFactory>().createDriver(),
-			credentialEntityAdapter = CredentialEntity.Adapter(
-				key_material_typeAdapter = EnumColumnAdapter(),
-				credential_typeAdapter = EnumColumnAdapter(),
-			),
-			activityEntityAdapter = ActivityEntity.Adapter(
-				typeAdapter = EnumColumnAdapter()
-			)
-		)
-	}
-}
+internal fun databaseModule(databaseName: String) =
+    module {
+        sqliteDriverModule(databaseName)
+        single {
+            KapunDatabase(
+                driver = get<SqliteDriverFactory>().createDriver(),
+                credentialEntityAdapter =
+                    CredentialEntity.Adapter(
+                        key_material_typeAdapter = EnumColumnAdapter(),
+                        credential_typeAdapter = EnumColumnAdapter(),
+                    ),
+                activityEntityAdapter =
+                    ActivityEntity.Adapter(
+                        typeAdapter = EnumColumnAdapter(),
+                    ),
+            )
+        }
+    }
 
 internal expect fun Module.sqliteDriverModule(databaseName: String)

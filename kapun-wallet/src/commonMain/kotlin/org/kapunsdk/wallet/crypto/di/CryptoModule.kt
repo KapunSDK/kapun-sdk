@@ -20,11 +20,12 @@ import org.kapunsdk.wallet.crypto.SecureHardwareAccess
 import org.koin.core.module.Module
 import org.koin.dsl.module
 
-internal fun cryptoModule() = module {
-	nativeSignerFactory()
-	includes(
-		SecureHardwareAccess.koinModule,
-	)
-}
+internal fun cryptoModule() =
+    module {
+        nativeSignerFactory()
+        includes(
+            SecureHardwareAccess.koinModule,
+        )
+    }
 
 internal expect fun Module.nativeSignerFactory()

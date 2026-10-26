@@ -20,7 +20,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class StyleJsonSchema(
-	val metadata: StyleJsonMetadata,
-	val attributes: Map<String, StyleJsonAttributeDetails>,
-	val style: StyleJson,
+    val metadata: StyleJsonMetadata,
+    val attributes: Map<String, StyleJsonAttributeDetails>,
+    val style: StyleJson,
 )

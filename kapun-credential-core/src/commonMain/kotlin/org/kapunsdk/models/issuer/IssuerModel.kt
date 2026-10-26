@@ -17,7 +17,7 @@ under the License.
 package org.kapunsdk.credentials.models.issuer
 
 data class IssuerModel(
-	val url: String,
-	val credentialIssuerMetadata: String,
-	val authorizationServerMetadata: String?,
+    val url: String,
+    val credentialIssuerMetadata: String,
+    val authorizationServerMetadata: String?,
 )

@@ -11,7 +11,7 @@ software distributed under the License is distributed on an
 "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
-under the License.   
+under the License.
  */
 package org.kapunsdk.proximity.ble.server
 
@@ -20,21 +20,15 @@ import org.kapunsdk.proximity.ble.gatt.BleGattCharacteristic
 import org.kapunsdk.proximity.ble.gatt.BleGattCharacteristicDescriptor
 
 internal interface BleGattServerListener : BleGattListener {
+    fun onCharacteristicReadRequest(characteristic: BleGattCharacteristic): GattRequestResult =
+        GattRequestResult(isSuccessful = true)
 
-	fun onCharacteristicReadRequest(characteristic: BleGattCharacteristic): GattRequestResult {
-		return GattRequestResult(isSuccessful = true)
-	}
+    fun onCharacteristicWriteRequest(characteristic: BleGattCharacteristic): GattRequestResult =
+        GattRequestResult(isSuccessful = true)
 
-	fun onCharacteristicWriteRequest(characteristic: BleGattCharacteristic) : GattRequestResult {
-		return GattRequestResult(isSuccessful = true)
-	}
+    fun onDescriptorReadRequest(descriptor: BleGattCharacteristicDescriptor): GattRequestResult =
+        GattRequestResult(isSuccessful = true)
 
-	fun onDescriptorReadRequest(descriptor: BleGattCharacteristicDescriptor): GattRequestResult {
-		return GattRequestResult(isSuccessful = true)
-	}
-
-	fun onDescriptorWriteRequest(descriptor: BleGattCharacteristicDescriptor): GattRequestResult {
-		return GattRequestResult(isSuccessful = true)
-	}
-
+    fun onDescriptorWriteRequest(descriptor: BleGattCharacteristicDescriptor): GattRequestResult =
+        GattRequestResult(isSuccessful = true)
 }

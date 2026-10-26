@@ -16,6 +16,10 @@ under the License.
 
 package org.kapunsdk.wallet.process.issuance
 
+import io.ktor.client.plugins.ResponseException
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.kapunsdk.credentials.Bbs
 import org.kapunsdk.credentials.SdJwt
 import org.kapunsdk.credentials.W3C
@@ -42,10 +46,6 @@ import org.kapunsdk.wallet.credentials.format.sdjwt.getRenderMetadata
 import org.kapunsdk.wallet.credentials.metadata.asMetadataFormat
 import org.kapunsdk.wallet.credentials.oca.OcaRepository
 import org.kapunsdk.wallet.credentials.oca.networking.OcaServiceController
-import io.ktor.client.plugins.ResponseException
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import uniffi.kapun_crypto_rust.base64UrlDecode
 import uniffi.kapun_wallet_rust.Credential
 import uniffi.kapun_wallet_rust.CredentialFormat
@@ -57,217 +57,274 @@ import kotlin.time.ExperimentalTime
 
 @OptIn(ExperimentalTime::class)
 abstract class IssuanceProcess(
-	private val trustController: TrustFrameworkController,
-	private val credentialsRepository: CredentialsRepository,
-	private val deferredCredentialsRepository: DeferredCredentialsRepository,
-	private val ocaRepository: OcaRepository,
-	private val ocaServiceController: OcaServiceController,
-	private val json: Json,
+    private val trustController: TrustFrameworkController,
+    private val credentialsRepository: CredentialsRepository,
+    private val deferredCredentialsRepository: DeferredCredentialsRepository,
+    private val ocaRepository: OcaRepository,
+    private val ocaServiceController: OcaServiceController,
+    private val json: Json,
 ) {
-	private val credentialOfferRepository = CredentialOfferRepository()
-	private val metadataRepository = MetadataRepository()
+    private val credentialOfferRepository = CredentialOfferRepository()
+    private val metadataRepository = MetadataRepository()
 
-	protected lateinit var credentialOfferString: String
-	protected lateinit var credentialOffer: CredentialOfferParameters
-	protected lateinit var credentialIssuerMetadata: CredentialIssuerMetadata
-	protected lateinit var authorizationServerMetadata: AuthorizationServerMetadata
-	protected lateinit var trustFlow: TrustFlow
+    protected lateinit var credentialOfferString: String
+    protected lateinit var credentialOffer: CredentialOfferParameters
+    protected lateinit var credentialIssuerMetadata: CredentialIssuerMetadata
+    protected lateinit var authorizationServerMetadata: AuthorizationServerMetadata
+    protected lateinit var trustFlow: TrustFlow
 
-	protected suspend fun initializeMetadata(credentialOfferString: String): Result<Unit> {
-		this.credentialOfferString = credentialOfferString
-		credentialOffer = credentialOfferRepository.parseCredentialOffer(credentialOfferString)
-			?: return Result.failure(IllegalArgumentException("Invalid credential offer string"))
+    protected suspend fun initializeMetadata(credentialOfferString: String): Result<Unit> {
+        this.credentialOfferString = credentialOfferString
+        credentialOffer = credentialOfferRepository.parseCredentialOffer(credentialOfferString)
+            ?: return Result.failure(IllegalArgumentException("Invalid credential offer string"))
 
-		credentialIssuerMetadata = metadataRepository.getCredentialIssuerMetadata(credentialOffer.credentialIssuer)
+        credentialIssuerMetadata = metadataRepository.getCredentialIssuerMetadata(credentialOffer.credentialIssuer)
 
-		val authorizationServerUrl = metadataRepository.getAuthorizationServerBaseUrl(
-			credentialIssuerMetadata.claims.authorizationServers ?: emptyList(),
-			credentialOffer
-		) ?: return Result.failure(IllegalStateException("No authorization server found"))
-		authorizationServerMetadata = metadataRepository.getAuthorizationServerMetadata(authorizationServerUrl)
+        val authorizationServerUrl =
+            metadataRepository.getAuthorizationServerBaseUrl(
+                credentialIssuerMetadata.claims.authorizationServers ?: emptyList(),
+                credentialOffer,
+            ) ?: return Result.failure(IllegalStateException("No authorization server found"))
+        authorizationServerMetadata = metadataRepository.getAuthorizationServerMetadata(authorizationServerUrl)
 
-		trustFlow = startTrustFlow().getOrElse { return Result.failure(it) }
+        trustFlow = startTrustFlow().getOrElse { return Result.failure(it) }
 
-		return Result.success(Unit)
-	}
-	protected suspend fun trustFlowFromSaved(credentialIssuer :String, credentialConfigurationIds: List<String>, credentialIssuerMetadata: CredentialIssuerMetadata): Result<Unit> {
-		trustFlow =  runCatching {
-			trustController.startIssuanceFlow(
-				credentialIssuer,
-				credentialConfigurationIds,
-				credentialIssuerMetadata
-			)
-		}.getOrElse { return Result.failure(it) }
-		return Result.success(Unit)
-	}
+        return Result.success(Unit)
+    }
 
-	protected open suspend fun startTrustFlow(): Result<TrustFlow> {
-		return runCatching {
-			trustController.startIssuanceFlow(
-				credentialOffer.credentialIssuer,
-				credentialOffer.credentialConfigurationIds,
-				credentialIssuerMetadata
-			)
-		}
-	}
+    protected suspend fun trustFlowFromSaved(
+        credentialIssuer: String,
+        credentialConfigurationIds: List<String>,
+        credentialIssuerMetadata: CredentialIssuerMetadata,
+    ): Result<Unit> {
+        trustFlow =
+            runCatching {
+                trustController.startIssuanceFlow(
+                    credentialIssuer,
+                    credentialConfigurationIds,
+                    credentialIssuerMetadata,
+                )
+            }.getOrElse { return Result.failure(it) }
+        return Result.success(Unit)
+    }
 
-	protected fun insertDeferredCredential(identityName: String, transactionId: String, docType: String, metadatas: List<CredentialMetadata>) : DeferredIdentity? {
-		return deferredCredentialsRepository.insert(identityName,transactionId, json.encodeToString(metadatas), docType)
-	}
+    protected open suspend fun startTrustFlow(): Result<TrustFlow> =
+        runCatching {
+            trustController.startIssuanceFlow(
+                credentialOffer.credentialIssuer,
+                credentialOffer.credentialConfigurationIds,
+                credentialIssuerMetadata,
+            )
+        }
 
-	protected data class CredentialInsertion(
-		val identityName: String,
-		val credentialName: String,
-		val metadataJson: String,
-		val keyMaterialType: KeyMaterialType,
-		val credentialType: CredentialType,
-		val payload: String,
-		val docType: String,
-		val ocaBundleUrl: String?,
-	)
+    protected fun insertDeferredCredential(
+        identityName: String,
+        transactionId: String,
+        docType: String,
+        metadatas: List<CredentialMetadata>,
+    ): DeferredIdentity? =
+        deferredCredentialsRepository.insert(identityName, transactionId, json.encodeToString(metadatas), docType)
 
-	protected suspend fun buildCredentialInsertion(
-		identityName: String,
-		credential: Credential,
-		metadata: CredentialMetadata,
-	): CredentialInsertion? {
-		val ocaBundleUrl =
-			loadOcaBundleForCredential(credential) ?: loadOcaFromMetadata(credentialIssuerMetadata.claims, credential, metadata)
+    protected data class CredentialInsertion(
+        val identityName: String,
+        val credentialName: String,
+        val metadataJson: String,
+        val keyMaterialType: KeyMaterialType,
+        val credentialType: CredentialType,
+        val payload: String,
+        val docType: String,
+        val ocaBundleUrl: String?,
+    )
 
-		val credentialType = credential.credential.asMetadataFormat()
-		val credentialPayload = credential.credential.getPayload()
+    protected suspend fun buildCredentialInsertion(
+        identityName: String,
+        credential: Credential,
+        metadata: CredentialMetadata,
+    ): CredentialInsertion? {
+        val ocaBundleUrl =
+            loadOcaBundleForCredential(credential)
+                ?: loadOcaFromMetadata(credentialIssuerMetadata.claims, credential, metadata)
 
-		val docType = when (credentialType) {
-			CredentialType.SdJwt -> SdJwt.parse(credential.credential.getPayload()).getMetadata().vct
-			CredentialType.Mdoc -> MdocUtils.getDocType(credentialPayload)
-			CredentialType.BbsTermwise -> runCatching {
-				// TODO: Get Issuer Id / Public Key / ... Metadata
-				val cred = Json.parseToJsonElement(base64UrlDecode(credentialPayload).decodeToString())
-				val document = cred.jsonObject["document"]!!
-				val bbs = Json.parseToJsonElement( bbsJson(base64UrlDecode(document.jsonPrimitive.content).decodeToString()) ?: "{}")
-				bbs.jsonObject["https://www.w3.org/2018/credentials#credentialSubject"]!!.jsonObject["@id"]!!.jsonPrimitive.content
-			}.getOrNull() ?: return null
-			CredentialType.W3C_VCDM -> W3C.parse(credential.credential.getPayload()).docType
-            CredentialType.OpenBadge303 -> W3C.OpenBadge303
-                .parseSerialized(credential.credential.getPayload())
-                .docType
-			CredentialType.Unknown -> {
-				// Don't insert this credential if it's an unknown type
-				return null
-			}
-		}
+        val credentialType = credential.credential.asMetadataFormat()
+        val credentialPayload = credential.credential.getPayload()
 
-		return CredentialInsertion(
-			identityName = identityName,
-			credentialName = RandomGenerator().generateAlphanumericString(12),
-			metadataJson = json.encodeToString(metadata),
-			keyMaterialType = metadata.keyMaterial.type,
-			credentialType = credentialType,
-			payload = credentialPayload,
-			docType = docType,
-			ocaBundleUrl = ocaBundleUrl,
-		)
-	}
+        val docType =
+            when (credentialType) {
+                CredentialType.SdJwt -> {
+                    SdJwt.parse(credential.credential.getPayload()).getMetadata().vct
+                }
 
-	protected fun executeCredentialInsertion(insertion: CredentialInsertion): CredentialEntity? {
-		return credentialsRepository.insertCredential(
-			name = insertion.credentialName,
-			metadata = insertion.metadataJson,
-			keyMaterialType = insertion.keyMaterialType,
-			credentialType = insertion.credentialType,
-			payload = insertion.payload,
-			docType = insertion.docType,
-			ocaBundleUrl = insertion.ocaBundleUrl,
-			identityName = insertion.identityName,
-		)
-	}
+                CredentialType.Mdoc -> {
+                    MdocUtils.getDocType(credentialPayload)
+                }
 
-	protected suspend fun insertCredential(
-		identityName: String,
-		credential: Credential,
-		metadata: CredentialMetadata,
-	): CredentialEntity? {
-		val insertion = buildCredentialInsertion(identityName, credential, metadata) ?: return null
-		return executeCredentialInsertion(insertion)
-	}
+                CredentialType.BbsTermwise -> {
+                    runCatching {
+                        // TODO: Get Issuer Id / Public Key / ... Metadata
+                        val cred = Json.parseToJsonElement(base64UrlDecode(credentialPayload).decodeToString())
+                        val document = cred.jsonObject["document"]!!
+                        val bbs =
+                            Json.parseToJsonElement(
+                                bbsJson(base64UrlDecode(document.jsonPrimitive.content).decodeToString()) ?: "{}",
+                            )
+                        bbs.jsonObject["https://www.w3.org/2018/credentials#credentialSubject"]!!
+                            .jsonObject["@id"]!!
+                            .jsonPrimitive.content
+                    }.getOrNull() ?: return null
+                }
 
-	private suspend fun loadOcaFromMetadata(
+                CredentialType.W3C_VCDM -> {
+                    W3C.parse(credential.credential.getPayload()).docType
+                }
+
+                CredentialType.OpenBadge303 -> {
+                    W3C.OpenBadge303
+                        .parseSerialized(credential.credential.getPayload())
+                        .docType
+                }
+
+                CredentialType.Unknown -> {
+                    // Don't insert this credential if it's an unknown type
+                    return null
+                }
+            }
+
+        return CredentialInsertion(
+            identityName = identityName,
+            credentialName = RandomGenerator().generateAlphanumericString(12),
+            metadataJson = json.encodeToString(metadata),
+            keyMaterialType = metadata.keyMaterial.type,
+            credentialType = credentialType,
+            payload = credentialPayload,
+            docType = docType,
+            ocaBundleUrl = ocaBundleUrl,
+        )
+    }
+
+    protected fun executeCredentialInsertion(insertion: CredentialInsertion): CredentialEntity? =
+        credentialsRepository.insertCredential(
+            name = insertion.credentialName,
+            metadata = insertion.metadataJson,
+            keyMaterialType = insertion.keyMaterialType,
+            credentialType = insertion.credentialType,
+            payload = insertion.payload,
+            docType = insertion.docType,
+            ocaBundleUrl = insertion.ocaBundleUrl,
+            identityName = insertion.identityName,
+        )
+
+    protected suspend fun insertCredential(
+        identityName: String,
+        credential: Credential,
+        metadata: CredentialMetadata,
+    ): CredentialEntity? {
+        val insertion = buildCredentialInsertion(identityName, credential, metadata) ?: return null
+        return executeCredentialInsertion(insertion)
+    }
+
+    private suspend fun loadOcaFromMetadata(
         credentialIssuerMetadata: CredentialIssuerMetadataClaims,
         credential: Credential,
         metadata: CredentialMetadata,
-	): String? {
-		val credentialType = credential.credential.asMetadataFormat()
-		val credentialPayload = when (credential.credential) {
-			is CredentialFormat.Mdoc -> credential.credential.v1
-			is CredentialFormat.SdJwt -> credential.credential.v1
-			is CredentialFormat.BbsTermWise -> credential.credential.v1
-			is CredentialFormat.W3c -> credential.credential.v1
-            is CredentialFormat.OpenBadge -> credential.credential.v1
-		}
-		val docType = when (credentialType) {
-			CredentialType.SdJwt -> SdJwt.parse(credentialPayload).getMetadata().vct
-			CredentialType.Mdoc -> MdocUtils.getDocType(credentialPayload)
-			CredentialType.BbsTermwise -> Bbs.parse(credentialPayload).body()["@id"].asString() ?: return null
-			CredentialType.W3C_VCDM -> W3C.parse(credentialPayload).docType
-            CredentialType.OpenBadge303 -> W3C.OpenBadge303
-                .parse(Base64.UrlSafe.decode(credentialPayload)).docType
-            CredentialType.Unknown -> {
-				// Don't insert this credential if it's an unknown type
-				return null
-			}
-		}
-		val ocaBundle = ocaServiceController.getOcaFromMetadata("de", credentialIssuerMetadata, credential, metadata) ?: return null
-		val ocaUrl = "metadata://$docType"
-		ocaRepository.insertOrUpdateOca(ocaUrl, ocaBundle)
-		return ocaUrl
-	}
+    ): String? {
+        val credentialType = credential.credential.asMetadataFormat()
+        val credentialPayload =
+            when (credential.credential) {
+                is CredentialFormat.Mdoc -> credential.credential.v1
+                is CredentialFormat.SdJwt -> credential.credential.v1
+                is CredentialFormat.BbsTermWise -> credential.credential.v1
+                is CredentialFormat.W3c -> credential.credential.v1
+                is CredentialFormat.OpenBadge -> credential.credential.v1
+            }
+        val docType =
+            when (credentialType) {
+                CredentialType.SdJwt -> {
+                    SdJwt.parse(credentialPayload).getMetadata().vct
+                }
 
-	private suspend fun loadOcaBundleForCredential(credential: Credential): String? {
-		val credentialFormat = credential.credential
-		val ocaUrl = when (credentialFormat) {
-			is CredentialFormat.SdJwt -> {
-				val sdJwt = SdJwt.parse(credential.credential.getPayload())
-				val renderMetadata = sdJwt.getRenderMetadata()
-				renderMetadata?.render?.oca
-			}
-			is CredentialFormat.Mdoc -> return null
-			is CredentialFormat.BbsTermWise -> {
-				val bbs = Bbs.parse(credential.credential.getPayload()).body()
-				bbs["http://schema.org/ocaUrl"].asString()
-			}
-			is CredentialFormat.W3c -> {
-				val cred = W3C.parse(credential.credential.getPayload())
-				cred.asJson()["render"]["oca"].asString()
-			}
-            is CredentialFormat.OpenBadge -> return null
-		}
+                CredentialType.Mdoc -> {
+                    MdocUtils.getDocType(credentialPayload)
+                }
 
-		if (ocaUrl != null) {
-			val existing = ocaRepository.getForUrl(ocaUrl)
+                CredentialType.BbsTermwise -> {
+                    Bbs.parse(credentialPayload).body()["@id"].asString() ?: return null
+                }
 
-			val now = Clock.System.now().toEpochMilliseconds()
-			if (existing == null || now - existing.updatedAt >= 5.minutes.inWholeMilliseconds) {
-				try {
-					val ocaBundle = ocaServiceController.getOcaBundleForUrl(ocaUrl)
-					ocaRepository.insertOrUpdateOca(ocaUrl, ocaBundle)
-				} catch (e: ResponseException) {
-					return null
-				}
-			}
-			return ocaUrl
-		}
+                CredentialType.W3C_VCDM -> {
+                    W3C.parse(credentialPayload).docType
+                }
 
-		return null
-	}
+                CredentialType.OpenBadge303 -> {
+                    W3C.OpenBadge303
+                        .parse(Base64.UrlSafe.decode(credentialPayload))
+                        .docType
+                }
 
-	private fun CredentialFormat.getPayload(): String {
-		return when (this) {
-			is CredentialFormat.Mdoc -> this.v1
-			is CredentialFormat.SdJwt -> this.v1
-			is CredentialFormat.BbsTermWise -> this.v1
-			is CredentialFormat.W3c -> this.v1
+                CredentialType.Unknown -> {
+                    // Don't insert this credential if it's an unknown type
+                    return null
+                }
+            }
+        val ocaBundle =
+            ocaServiceController.getOcaFromMetadata("de", credentialIssuerMetadata, credential, metadata) ?: return null
+        val ocaUrl = "metadata://$docType"
+        ocaRepository.insertOrUpdateOca(ocaUrl, ocaBundle)
+        return ocaUrl
+    }
+
+    private suspend fun loadOcaBundleForCredential(credential: Credential): String? {
+        val credentialFormat = credential.credential
+        val ocaUrl =
+            when (credentialFormat) {
+                is CredentialFormat.SdJwt -> {
+                    val sdJwt = SdJwt.parse(credential.credential.getPayload())
+                    val renderMetadata = sdJwt.getRenderMetadata()
+                    renderMetadata?.render?.oca
+                }
+
+                is CredentialFormat.Mdoc -> {
+                    return null
+                }
+
+                is CredentialFormat.BbsTermWise -> {
+                    val bbs = Bbs.parse(credential.credential.getPayload()).body()
+                    bbs["http://schema.org/ocaUrl"].asString()
+                }
+
+                is CredentialFormat.W3c -> {
+                    val cred = W3C.parse(credential.credential.getPayload())
+                    cred.asJson()["render"]["oca"].asString()
+                }
+
+                is CredentialFormat.OpenBadge -> {
+                    return null
+                }
+            }
+
+        if (ocaUrl != null) {
+            val existing = ocaRepository.getForUrl(ocaUrl)
+
+            val now = Clock.System.now().toEpochMilliseconds()
+            if (existing == null || now - existing.updatedAt >= 5.minutes.inWholeMilliseconds) {
+                try {
+                    val ocaBundle = ocaServiceController.getOcaBundleForUrl(ocaUrl)
+                    ocaRepository.insertOrUpdateOca(ocaUrl, ocaBundle)
+                } catch (e: ResponseException) {
+                    return null
+                }
+            }
+            return ocaUrl
+        }
+
+        return null
+    }
+
+    private fun CredentialFormat.getPayload(): String =
+        when (this) {
+            is CredentialFormat.Mdoc -> this.v1
+            is CredentialFormat.SdJwt -> this.v1
+            is CredentialFormat.BbsTermWise -> this.v1
+            is CredentialFormat.W3c -> this.v1
             is CredentialFormat.OpenBadge -> this.v1
-		}
-	}
-
+        }
 }

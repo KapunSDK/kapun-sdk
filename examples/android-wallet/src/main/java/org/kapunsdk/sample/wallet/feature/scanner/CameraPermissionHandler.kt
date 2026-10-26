@@ -11,7 +11,7 @@ software distributed under the License is distributed on an
 "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
-under the License.   
+under the License.
  */
 package org.kapunsdk.sample.wallet.feature.scanner
 
@@ -32,67 +32,64 @@ import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
 import com.google.accompanist.permissions.shouldShowRationale
 
-
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
-fun CameraPermissionHandler(
-	onPermissionInSettingsChange: () -> Unit
-) {
-	var alreadyRequestedPermission by rememberSaveable { mutableStateOf(false) }
-	val cameraPermissionState = rememberPermissionState(Manifest.permission.CAMERA) {
-		alreadyRequestedPermission = true
-	}
+fun CameraPermissionHandler(onPermissionInSettingsChange: () -> Unit) {
+    var alreadyRequestedPermission by rememberSaveable { mutableStateOf(false) }
+    val cameraPermissionState =
+        rememberPermissionState(Manifest.permission.CAMERA) {
+            alreadyRequestedPermission = true
+        }
 
-	if (cameraPermissionState.status.isGranted) {
-		return
-	}
+    if (cameraPermissionState.status.isGranted) {
+        return
+    }
 
-	if (!alreadyRequestedPermission && !cameraPermissionState.status.shouldShowRationale) {
-		LaunchedEffect(Unit) {
-			cameraPermissionState.launchPermissionRequest()
-		}
-	} else if (cameraPermissionState.status.shouldShowRationale) {
-		CameraPermissionRationalContent(
-			onPermissionInSettingsChange = onPermissionInSettingsChange
-		)
-	} else {
-		CameraPermissionRationalContent(
-			onPermissionInSettingsChange = onPermissionInSettingsChange
-		)
-	}
+    if (!alreadyRequestedPermission && !cameraPermissionState.status.shouldShowRationale) {
+        LaunchedEffect(Unit) {
+            cameraPermissionState.launchPermissionRequest()
+        }
+    } else if (cameraPermissionState.status.shouldShowRationale) {
+        CameraPermissionRationalContent(
+            onPermissionInSettingsChange = onPermissionInSettingsChange,
+        )
+    } else {
+        CameraPermissionRationalContent(
+            onPermissionInSettingsChange = onPermissionInSettingsChange,
+        )
+    }
 }
 
 @Composable
-private fun CameraPermissionRationalContent(
-	onPermissionInSettingsChange: () -> Unit
-) {
-	Surface(
-		color = Color.White,
-		modifier = Modifier.fillMaxSize()
-	) {
-		Column(
-			verticalArrangement = Arrangement.Center,
-			horizontalAlignment = Alignment.CenterHorizontally,
-			modifier = Modifier
-				.fillMaxWidth()
-				.padding(horizontal = 48.dp),
-		) {
-			Text(
-				modifier = Modifier.padding(vertical = 4.dp),
-				text = "No Camera Access",
-				textAlign = TextAlign.Center,
-			)
+private fun CameraPermissionRationalContent(onPermissionInSettingsChange: () -> Unit) {
+    Surface(
+        color = Color.White,
+        modifier = Modifier.fillMaxSize(),
+    ) {
+        Column(
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 48.dp),
+        ) {
+            Text(
+                modifier = Modifier.padding(vertical = 4.dp),
+                text = "No Camera Access",
+                textAlign = TextAlign.Center,
+            )
 
-			Text(
-				modifier = Modifier.padding(bottom = 24.dp),
-				textAlign = TextAlign.Center,
-				text = "No Camera Access Text",
-			)
-			Button(
-				onClick = onPermissionInSettingsChange,
-			) {
-				Text("Grant")
-			}
-		}
-	}
+            Text(
+                modifier = Modifier.padding(bottom = 24.dp),
+                textAlign = TextAlign.Center,
+                text = "No Camera Access Text",
+            )
+            Button(
+                onClick = onPermissionInSettingsChange,
+            ) {
+                Text("Grant")
+            }
+        }
+    }
 }
