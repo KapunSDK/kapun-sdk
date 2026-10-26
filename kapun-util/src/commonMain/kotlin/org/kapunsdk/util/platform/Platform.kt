@@ -17,13 +17,13 @@ under the License.
 package org.kapunsdk.util.platform
 
 enum class PlatformType {
-	ANDROID,
-	IOS,
-	JVM,
+    ANDROID,
+    IOS,
+    JVM,
 }
 
 expect object Platform {
-	val os: PlatformType
+    val os: PlatformType
 
-	fun getCurrentLocale(): String
+    fun getCurrentLocale(): String
 }

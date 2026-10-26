@@ -16,32 +16,37 @@ under the License.
 
 package org.kapunsdk
 
+import org.kapunsdk.credentials.SdJwt
+import uniffi.kapun_credential_core_rust.SignatureCreator
 import kotlin.test.Test
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
-import org.kapunsdk.credentials.SdJwt
-import uniffi.kapun_credential_core_rust.SignatureCreator
 
 class SignatureCreatorBridgeTest {
     @Test
     fun signerCallbackIsRegisteredWithTheSdJwtLibrary() {
         var signedPayload: ByteArray? = null
-        val signer = object : SignatureCreator {
-            override fun alg(): String = "ES256"
+        val signer =
+            object : SignatureCreator {
+                override fun alg(): String = "ES256"
 
-            override fun sign(bytes: ByteArray): ByteArray {
-                signedPayload = bytes
-                return byteArrayOf(1, 2, 3)
+                override fun sign(bytes: ByteArray): ByteArray {
+                    signedPayload = bytes
+                    return byteArrayOf(1, 2, 3)
+                }
             }
-        }
 
-        val credential = SdJwt.parse(
-            "eyJhbGciOiJFUzI1NiJ9.eyJjbmYiOnsiandrIjp7fX19.c2ln~",
-        )
-        val presentation = credential.presentation().apply {
-            withNonce("nonce")
-            withAudience("audience")
-        }.build(signer.asNativeSdJwtSignatureCreator())
+        val credential =
+            SdJwt.parse(
+                "eyJhbGciOiJFUzI1NiJ9.eyJjbmYiOnsiandrIjp7fX19.c2ln~",
+            )
+        val presentation =
+            credential
+                .presentation()
+                .apply {
+                    withNonce("nonce")
+                    withAudience("audience")
+                }.build(signer.asNativeSdJwtSignatureCreator())
 
         assertTrue(presentation.endsWith(".AQID"))
         assertTrue(assertNotNull(signedPayload).isNotEmpty())

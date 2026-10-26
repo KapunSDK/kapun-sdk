@@ -16,16 +16,16 @@ under the License.
 
 package org.kapunsdk.visualization.oca.model
 
-import org.kapunsdk.visualization.oca.model.content.AttributeName
-import org.kapunsdk.visualization.oca.model.content.AttributeType
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import org.kapunsdk.visualization.oca.model.content.AttributeName
+import org.kapunsdk.visualization.oca.model.content.AttributeType
 
 @Serializable
 data class CaptureBase(
-	@SerialName("type") val type: String = "spec/capture_base/1.0",
-	@SerialName("digest") val digest: String = org.kapunsdk.visualization.oca.model.SAID_HASH_PLACEHOLDER,
-	@SerialName("classification") val classification: String = "GICS:45102010",
-	@SerialName("attributes") val attributes: Map<org.kapunsdk.visualization.oca.model.content.AttributeName, org.kapunsdk.visualization.oca.model.content.AttributeType>,
-	@SerialName("flagged_attributes") val flaggedAttributes: List<org.kapunsdk.visualization.oca.model.content.AttributeName> = emptyList(),
+    @SerialName("type") val type: String = "spec/capture_base/1.0",
+    @SerialName("digest") val digest: String = org.kapunsdk.visualization.oca.model.SAID_HASH_PLACEHOLDER,
+    @SerialName("classification") val classification: String = "GICS:45102010",
+    @SerialName("attributes") val attributes: Map<AttributeName, AttributeType>,
+    @SerialName("flagged_attributes") val flaggedAttributes: List<AttributeName> = emptyList(),
 )

@@ -16,12 +16,12 @@ under the License.
 
 package org.kapunsdk.visualization.oca.model.overlay.transformation
 
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import org.kapunsdk.visualization.oca.model.SAID_HASH_PLACEHOLDER
 import org.kapunsdk.visualization.oca.model.content.AttributeName
 import org.kapunsdk.visualization.oca.model.content.SAID
 import org.kapunsdk.visualization.oca.model.overlay.Overlay
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
 
 /**
  * TODO: This overlay is currently neither in the official OCA/Swiss OCA specification nor a fully finalized Ubique overlay.
@@ -29,12 +29,15 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class TemplateOverlay(
-	@SerialName("attributeTemplates") val attributeTemplates: Map<AttributeName, String>,
-	@SerialName("capture_base") override val captureBase: SAID,
-	@SerialName("type") override val type: String = "spec/overlays/template/1.0",
-	@SerialName("digest") override val digest: SAID = SAID_HASH_PLACEHOLDER,
+    @SerialName("attributeTemplates") val attributeTemplates: Map<AttributeName, String>,
+    @SerialName("capture_base") override val captureBase: SAID,
+    @SerialName("type") override val type: String = "spec/overlays/template/1.0",
+    @SerialName("digest") override val digest: SAID = SAID_HASH_PLACEHOLDER,
 ) : TransformationOverlay {
+    fun getTemplate(attributeName: AttributeName) = attributeTemplates[attributeName]
 
-	fun getTemplate(attributeName: AttributeName) = attributeTemplates[attributeName]
-	override fun updateDigest(digest: SAID, captureBase: SAID): Overlay = copy(digest = digest, captureBase = captureBase)
+    override fun updateDigest(
+        digest: SAID,
+        captureBase: SAID,
+    ): Overlay = copy(digest = digest, captureBase = captureBase)
 }

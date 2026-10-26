@@ -11,7 +11,7 @@ software distributed under the License is distributed on an
 "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
-under the License.   
+under the License.
  */
 package org.kapunsdk.proximity.ble.gatt
 
@@ -21,20 +21,21 @@ import org.kapunsdk.proximity.ble.gatt.BleGattCharacteristicDescriptor
 import kotlin.uuid.Uuid
 import kotlin.uuid.toKotlinUuid
 
-internal actual class BleGattCharacteristic(val characteristic: BluetoothGattCharacteristic, private val internalValue: ByteArray? = null) {
+internal actual class BleGattCharacteristic(
+    val characteristic: BluetoothGattCharacteristic,
+    private val internalValue: ByteArray? = null,
+) {
+    actual val uuid: Uuid?
+        get() = characteristic.uuid?.toKotlinUuid()
 
-	actual val uuid: Uuid?
-		get() = characteristic.uuid?.toKotlinUuid()
+    actual val value: ByteArray?
+        get() = internalValue ?: characteristic.value
 
-	actual val value: ByteArray?
-		get() = internalValue ?: characteristic.value
+    actual val descriptors: List<BleGattCharacteristicDescriptor>
+        get() = characteristic.descriptors
 
-	actual val descriptors: List<BleGattCharacteristicDescriptor>
-		get() = characteristic.descriptors
-
-	actual val supportsNotifications: Boolean
-		get() = characteristic.properties and BluetoothGattCharacteristic.PROPERTY_NOTIFY != 0
-
+    actual val supportsNotifications: Boolean
+        get() = characteristic.properties and BluetoothGattCharacteristic.PROPERTY_NOTIFY != 0
 }
 
 internal actual typealias BleGattCharacteristicDescriptor = BluetoothGattDescriptor

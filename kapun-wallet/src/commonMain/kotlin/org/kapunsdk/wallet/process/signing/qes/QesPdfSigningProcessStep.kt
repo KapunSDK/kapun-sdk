@@ -19,26 +19,24 @@ package org.kapunsdk.wallet.process.signing.qes
 import org.kapunsdk.wallet.process.ProcessStep
 
 sealed interface QesPdfSigningProcessStep : ProcessStep {
+    data class Error(
+        val errorMessage: String,
+        val errorCode: String? = null,
+        val cause: Exception? = null,
+        val retry: (() -> Unit)? = null,
+    ) : QesPdfSigningProcessStep
 
-	data class Error(
-		val errorMessage: String,
-		val errorCode: String? = null,
-		val cause: Exception? = null,
-		val retry: (() -> Unit)? = null,
-	) : QesPdfSigningProcessStep
+    data class InitiatingQes(
+        val pdfData: ByteArray,
+    ) : QesPdfSigningProcessStep
 
-	data class InitiatingQes(
-		val pdfData: ByteArray,
-	) : QesPdfSigningProcessStep
+    data class PresentationRequired(
+        val openId4VpString: String,
+        val pdfData: ByteArray,
+    ) : QesPdfSigningProcessStep
 
-	data class PresentationRequired(
-		val openId4VpString: String,
-		val pdfData: ByteArray,
-	) : QesPdfSigningProcessStep
-
-	data class Success(
-		val signedPdfData: ByteArray,
-		val transactionId: String,
-	) : QesPdfSigningProcessStep
-
+    data class Success(
+        val signedPdfData: ByteArray,
+        val transactionId: String,
+    ) : QesPdfSigningProcessStep
 }

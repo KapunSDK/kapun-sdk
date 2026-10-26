@@ -25,31 +25,52 @@ import kotlin.time.ExperimentalTime
 @OptIn(ExperimentalTime::class)
 class RevocationCache : KapunTrustKoinComponent {
     private val cacheDuration: Long = 5 * 1000 * 60
+
     companion object {
-        val koinModule = module {
-            singleOf(::RevocationCache)
-        }
+        val koinModule =
+            module {
+                singleOf(::RevocationCache)
+            }
     }
-    data class CachedEntry<T>(val isRevoked : T, val insertedAt: Long)
+
+    data class CachedEntry<T>(
+        val isRevoked: T,
+        val insertedAt: Long,
+    )
+
     private val entryCache = mutableMapOf<String, CachedEntry<Boolean>>()
     private val listCache = mutableMapOf<String, CachedEntry<String>>()
-    fun insertResult(url: String, index: Int, isRevoked: Boolean) {
+
+    fun insertResult(
+        url: String,
+        index: Int,
+        isRevoked: Boolean,
+    ) {
         entryCache["$url $index"] = CachedEntry(isRevoked, Clock.System.now().toEpochMilliseconds())
     }
-    fun getResult(url: String, index: Int) : Boolean? {
+
+    fun getResult(
+        url: String,
+        index: Int,
+    ): Boolean? {
         return entryCache["$url $index"]?.let {
-            if(it.insertedAt +  cacheDuration < Clock.System.now().toEpochMilliseconds()) {
+            if (it.insertedAt + cacheDuration < Clock.System.now().toEpochMilliseconds()) {
                 return null
             }
             it.isRevoked
         }
     }
-    fun insertList(url: String, list: String) {
+
+    fun insertList(
+        url: String,
+        list: String,
+    ) {
         listCache[url] = CachedEntry(list, Clock.System.now().toEpochMilliseconds())
     }
-    fun getList(url: String) : String? {
+
+    fun getList(url: String): String? {
         return listCache[url]?.let {
-            if(it.insertedAt +  cacheDuration < Clock.System.now().toEpochMilliseconds()) {
+            if (it.insertedAt + cacheDuration < Clock.System.now().toEpochMilliseconds()) {
                 return null
             }
             it.isRevoked

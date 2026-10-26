@@ -16,10 +16,10 @@ under the License.
 
 package org.kapunsdk.util.platform
 
-
 import java.util.Locale
 
 actual object Platform {
-	actual val os = PlatformType.ANDROID
-	actual fun getCurrentLocale() = Locale.getDefault().language
+    actual val os = PlatformType.ANDROID
+
+    actual fun getCurrentLocale() = Locale.getDefault().language
 }

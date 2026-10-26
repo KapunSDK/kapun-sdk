@@ -19,8 +19,9 @@ package org.kapunsdk.issuance.credential.offer.di
 import org.kapunsdk.issuance.credential.offer.CredentialOfferService
 import org.koin.dsl.module
 
-internal fun credentialOfferModule() = module {
-	includes(
-		CredentialOfferService.koinModule,
-	)
-}
+internal fun credentialOfferModule() =
+    module {
+        includes(
+            CredentialOfferService.koinModule,
+        )
+    }

@@ -31,45 +31,47 @@ import org.kapunsdk.wallet.process.ProcessStep
 import uniffi.kapun_wallet_rust.WalletBackend
 
 class EaaRefreshProcessHandler(
-	private val walletBackend: WalletBackend,
-	private val trustController: TrustFrameworkController,
-	private val credentialsRepository: CredentialsRepository,
-	private val identityRepository: IdentityRepository,
-	private val secureHardwareAccess: SecureHardwareAccess,
-	private val signingProvider: SigningProvider,
-	private val ocaRepository: OcaRepository,
-	private val ocaServiceController: OcaServiceController,
-	private val activityRepository: ActivityRepository,
-	private val keyValueRepository: KeyValueRepository
-): ProcessHandler {
+    private val walletBackend: WalletBackend,
+    private val trustController: TrustFrameworkController,
+    private val credentialsRepository: CredentialsRepository,
+    private val identityRepository: IdentityRepository,
+    private val secureHardwareAccess: SecureHardwareAccess,
+    private val signingProvider: SigningProvider,
+    private val ocaRepository: OcaRepository,
+    private val ocaServiceController: OcaServiceController,
+    private val activityRepository: ActivityRepository,
+    private val keyValueRepository: KeyValueRepository,
+) : ProcessHandler {
+    private var currentProcess: EaaRefreshProcess? = null
 
-	private var currentProcess: EaaRefreshProcess? = null
+    override suspend fun handleProcessStep(
+        current: ProcessStep?,
+        inputEvent: ProcessEvent,
+    ): ProcessStep? =
+        when {
+            inputEvent is EaaRefreshProcessEvent.RefreshRequests -> {
+                currentProcess =
+                    EaaRefreshProcess(
+                        walletBackend,
+                        trustController,
+                        credentialsRepository,
+                        identityRepository,
+                        secureHardwareAccess,
+                        signingProvider,
+                        ocaRepository,
+                        ocaServiceController,
+                        activityRepository,
+                        keyValueRepository,
+                    )
+                currentProcess?.startEaaRefresh(inputEvent.identity)
+            }
 
-	override suspend fun handleProcessStep(
-		current: ProcessStep?,
-		inputEvent: ProcessEvent,
-	): ProcessStep? {
-		return when {
-			inputEvent is EaaRefreshProcessEvent.RefreshRequests -> {
-				currentProcess = EaaRefreshProcess(
-					walletBackend,
-					trustController,
-					credentialsRepository,
-					identityRepository,
-					secureHardwareAccess,
-					signingProvider,
-					ocaRepository,
-					ocaServiceController,
-					activityRepository,
-					keyValueRepository,
-				)
-				currentProcess?.startEaaRefresh(inputEvent.identity)
-			}
-			else -> null
-		}
-	}
+            else -> {
+                null
+            }
+        }
 
-	override suspend fun cleanupHandler() {
-		currentProcess = null
-	}
+    override suspend fun cleanupHandler() {
+        currentProcess = null
+    }
 }

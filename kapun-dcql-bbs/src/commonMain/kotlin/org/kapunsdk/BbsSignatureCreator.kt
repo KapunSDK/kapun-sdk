@@ -23,6 +23,7 @@ internal fun CoreSignatureCreator?.asNativeBbsSignatureCreator(): NativeBbsSigna
     this?.let { delegate ->
         object : NativeBbsSignatureCreator {
             override fun alg(): String = delegate.alg()
+
             override fun sign(bytes: ByteArray): ByteArray = delegate.sign(bytes)
         }
     }

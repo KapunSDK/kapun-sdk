@@ -20,9 +20,12 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
-enum class TextShade(val colorHex: String) {
-	@SerialName("light")
-	LIGHT("#FFFFFF"),
-	@SerialName("dark")
-	DARK("#000000"),
+enum class TextShade(
+    val colorHex: String,
+) {
+    @SerialName("light")
+    LIGHT("#FFFFFF"),
+
+    @SerialName("dark")
+    DARK("#000000"),
 }

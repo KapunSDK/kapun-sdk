@@ -11,7 +11,7 @@ software distributed under the License is distributed on an
 "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
-under the License.   
+under the License.
  */
 package org.kapunsdk.sample.wallet
 
@@ -24,21 +24,20 @@ import org.koin.android.ext.koin.androidContext
 import org.koin.core.context.startKoin
 
 class WalletApplication : Application() {
+    override fun onCreate() {
+        super.onCreate()
 
-	override fun onCreate() {
-		super.onCreate()
+        // platformConsoleLogSink() restores the SDK's old unconditional console-logging
+        // behavior (Logcat here); a real host app would instead implement LogSink to forward
+        // into its own logging pipeline. Without any sink, the SDK logs nothing.
+        KapunSdk(this).initialize(logSink = platformConsoleLogSink())
+        KapunProximity(this).initialize()
 
-		// platformConsoleLogSink() restores the SDK's old unconditional console-logging
-		// behavior (Logcat here); a real host app would instead implement LogSink to forward
-		// into its own logging pipeline. Without any sink, the SDK logs nothing.
-		KapunSdk(this).initialize(logSink = platformConsoleLogSink())
-		KapunProximity(this).initialize()
-
-		startKoin {
-			androidContext(this@WalletApplication)
-			modules(
-				viewModelsModule(),
-			)
-		}
-	}
+        startKoin {
+            androidContext(this@WalletApplication)
+            modules(
+                viewModelsModule(),
+            )
+        }
+    }
 }

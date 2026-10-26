@@ -17,6 +17,6 @@ under the License.
 package org.kapunsdk.wallet.crypto
 
 enum class SecureHardwareAccessControl {
-	BIOMETRY,
-	NONE,
+    BIOMETRY,
+    NONE,
 }

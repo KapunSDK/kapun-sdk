@@ -11,36 +11,34 @@ software distributed under the License is distributed on an
 "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
-under the License.   
+under the License.
  */
 package org.kapunsdk.sample.verifier.feature.network
 
+import de.jensklingenberg.ktorfit.http.*
 import org.kapunsdk.sample.verifier.data.dto.VerificationDisclosureDto
 import org.kapunsdk.sample.verifier.data.dto.VerificationRequestDto
-import de.jensklingenberg.ktorfit.http.*
 
 interface VerifierService {
+    @FormUrlEncoded
+    @POST("v1/verifier/par")
+    suspend fun getVerificationRequest(
+        @Field("credentialRequest") credentialRequest: String,
+    ): VerificationRequestDto
 
-	@FormUrlEncoded
-	@POST("v1/verifier/par")
-	suspend fun getVerificationRequest(
-		@Field("credentialRequest") credentialRequest: String,
-	): VerificationRequestDto
+    @GET("v1/wallet/par/{requestUri}")
+    suspend fun getPresentationDefinition(
+        @Path("requestUri") requestUri: String,
+    ): String
 
-	@GET("v1/wallet/par/{requestUri}")
-	suspend fun getPresentationDefinition(
-		@Path("requestUri") requestUri: String
-	): String
+    @POST("v1/wallet/authorization")
+    suspend fun verifyDocuments(
+        @Body response: String,
+        @Header("Content-Type") contentType: String = "application/x-www-form-urlencoded",
+    )
 
-	@POST("v1/wallet/authorization")
-	suspend fun verifyDocuments(
-		@Body response: String,
-		@Header("Content-Type") contentType: String = "application/x-www-form-urlencoded",
-	)
-
-	@GET("v1/verifier/authorization")
-	suspend fun getAuthorization(
-		@Query("transactionId") transactionId: String? = null,
-	): VerificationDisclosureDto
-
+    @GET("v1/verifier/authorization")
+    suspend fun getAuthorization(
+        @Query("transactionId") transactionId: String? = null,
+    ): VerificationDisclosureDto
 }

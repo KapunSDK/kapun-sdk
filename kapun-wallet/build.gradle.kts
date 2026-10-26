@@ -18,13 +18,17 @@ plugins {
 // is - useful when comparing what a host app logs/displays against what was actually built.
 // The plugin regenerates on every build by default, so the commit hash stays accurate even
 // across builds with no other Kotlin/Rust changes.
-val gitCommit = runCatching {
-    providers.exec {
-        workingDir = rootDir
-        commandLine("git", "rev-parse", "--short", "HEAD")
-        isIgnoreExitValue = true
-    }.standardOutput.asText.get().trim()
-}.getOrNull()?.takeIf { it.isNotEmpty() } ?: "unknown"
+val gitCommit =
+    runCatching {
+        providers
+            .exec {
+                workingDir = rootDir
+                commandLine("git", "rev-parse", "--short", "HEAD")
+                isIgnoreExitValue = true
+            }.standardOutput.asText
+            .get()
+            .trim()
+    }.getOrNull()?.takeIf { it.isNotEmpty() } ?: "unknown"
 
 buildConfig {
     className("KapunSdkInfo")
@@ -40,18 +44,24 @@ kotlin {
         freeCompilerArgs.add("-Xexpect-actual-classes")
     }
 
-	sourceSets.all {
-		languageSettings {
-			optIn("kotlin.time.ExperimentalTime")
-		}
-	}
+    sourceSets.all {
+        languageSettings {
+            optIn("kotlin.time.ExperimentalTime")
+        }
+    }
 
-	jvmToolchain(17)
+    jvmToolchain(17)
 
     android {
         namespace = "org.kapunsdk.wallet"
-        compileSdk = libs.versions.android.compileSdk.get().toInt()
-        minSdk = libs.versions.android.minSdk.get().toInt()
+        compileSdk =
+            libs.versions.android.compileSdk
+                .get()
+                .toInt()
+        minSdk =
+            libs.versions.android.minSdk
+                .get()
+                .toInt()
 
         optimization {
             consumerKeepRules.publish = true
@@ -63,7 +73,7 @@ kotlin {
 
     listOf(
         iosArm64(),
-        iosSimulatorArm64()
+        iosSimulatorArm64(),
     ).forEach { iosTarget ->
         iosTarget.binaries.framework {
             baseName = "kapun-wallet"
@@ -123,7 +133,9 @@ kotlin {
 
             // Compose Resources (currently only used for tests, but doesn't work in commonTest)
             implementation("org.jetbrains.compose.runtime:runtime:${libs.versions.compose.multiplatform.get()}")
-            implementation("org.jetbrains.compose.components:components-resources:${libs.versions.compose.multiplatform.get()}")
+            implementation(
+                "org.jetbrains.compose.components:components-resources:${libs.versions.compose.multiplatform.get()}",
+            )
         }
 
         commonTest.dependencies {
@@ -161,14 +173,17 @@ skie {
 uniffi {
     bindgenFromGitTag(
         "https://github.com/UbiqueInnovation/uniffi-kotlin-multiplatform-bindings.git",
-        libs.versions.uniffi.bindgen.get()
+        libs.versions.uniffi.bindgen
+            .get(),
     )
     generateFromLibrary()
 }
 
 cargo {
     packageDirectory = layout.projectDirectory.dir("rust")
-    ndkVersion = libs.versions.android.ndk.get()
+    ndkVersion =
+        libs.versions.android.ndk
+            .get()
 }
 
 compose.resources {
@@ -178,6 +193,6 @@ compose.resources {
 }
 
 mavenPublishing {
-    coordinates(artifactId= property("ARTIFACT_ID").toString(), version= project.version.toString())
+    coordinates(artifactId = property("ARTIFACT_ID").toString(), version = project.version.toString())
     publishToMavenCentral(true)
 }

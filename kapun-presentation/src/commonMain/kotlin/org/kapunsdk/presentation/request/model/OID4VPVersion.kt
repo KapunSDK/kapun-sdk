@@ -25,21 +25,30 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 @Serializable(with = Oid4vpVersionSerializer::class)
-enum class OID4VPVersion(val version: Int) {
-    DRAFT_21(21), DRAFT_24(24), DRAFT_26(26), DRAFT_28(28), VERSION_ONE_DOT_ZERO(100);
+enum class OID4VPVersion(
+    val version: Int,
+) {
+    DRAFT_21(21),
+    DRAFT_24(24),
+    DRAFT_26(26),
+    DRAFT_28(28),
+    VERSION_ONE_DOT_ZERO(100),
+    ;
 
     companion object Companion {
-        fun fromVersion(version: Int): OID4VPVersion {
-            return values().find { it.version == version }
+        fun fromVersion(version: Int): OID4VPVersion =
+            values().find { it.version == version }
                 ?: throw IllegalArgumentException("Unknown oid4vp version: $version")
-        }
     }
 }
 
 class Oid4vpVersionSerializer : KSerializer<OID4VPVersion> {
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("Oid4vpVersion", PrimitiveKind.INT)
 
-    override fun serialize(encoder: Encoder, value: OID4VPVersion) {
+    override fun serialize(
+        encoder: Encoder,
+        value: OID4VPVersion,
+    ) {
         encoder.encodeInt(value.version)
     }
 

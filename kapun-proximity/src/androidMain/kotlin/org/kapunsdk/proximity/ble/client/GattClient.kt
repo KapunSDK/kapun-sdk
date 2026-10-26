@@ -11,7 +11,7 @@ software distributed under the License is distributed on an
 "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
-under the License.   
+under the License.
  */
 package org.kapunsdk.proximity.ble.client
 
@@ -23,10 +23,10 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.ParcelUuid
+import org.kapunsdk.proximity.ProximityError
+import org.kapunsdk.proximity.ble.ProximityBleOptions
 import org.kapunsdk.proximity.ble.gatt.BleGattCharacteristic
 import org.kapunsdk.proximity.ble.gatt.BleGattService
-import org.kapunsdk.proximity.ble.ProximityBleOptions
-import org.kapunsdk.proximity.ProximityError
 import org.kapunsdk.proximity.ble.server.ChunkAccumulator
 import org.kapunsdk.proximity.ble.server.ChunkProcessingResult
 import org.kapunsdk.proximity.protocol.BleTransportProtocol
@@ -46,8 +46,8 @@ internal class GattClient(
     private val serviceUuid: UUID,
     private val encodedEphemeralDeviceKey: ByteArray?, // TODO Use for session encryption
     private val options: ProximityBleOptions = ProximityBleOptions.Default,
-) : BluetoothGattCallback(), BleGattClient {
-
+) : BluetoothGattCallback(),
+    BleGattClient {
     companion object {
         private const val TAG = "GattClient"
 
@@ -88,28 +88,32 @@ internal class GattClient(
     private var scanner: BluetoothLeScanner? = null
     private var scannerListener: BleScannerListener? = null
 
-    private val scanCallback = object : ScanCallback() {
-        override fun onScanResult(callbackType: Int, result: ScanResult) {
-            // Ignore scan results if we're already connecting or connected
-            if (isConnecting || gatt != null) {
-                return
+    private val scanCallback =
+        object : ScanCallback() {
+            override fun onScanResult(
+                callbackType: Int,
+                result: ScanResult,
+            ) {
+                // Ignore scan results if we're already connecting or connected
+                if (isConnecting || gatt != null) {
+                    return
+                }
+
+                isConnecting = true
+                val device = result.device
+                Logger(TAG).debug("scan hit: rssi=${result.rssi} service=$serviceUuid")
+                connectToDevice(device)
+
+                stopScanning()
             }
 
-            isConnecting = true
-            val device = result.device
-            Logger(TAG).debug("scan hit: rssi=${result.rssi} service=$serviceUuid")
-            connectToDevice(device)
+            override fun onBatchScanResults(results: MutableList<ScanResult>?) {}
 
-            stopScanning()
+            override fun onScanFailed(errorCode: Int) {
+                Logger(TAG).error("scan failed: errorCode=$errorCode")
+                reportError(ProximityError.Unknown("BLE scan failed with error code $errorCode"))
+            }
         }
-
-        override fun onBatchScanResults(results: MutableList<ScanResult>?) {}
-
-        override fun onScanFailed(errorCode: Int) {
-            Logger(TAG).error("scan failed: errorCode=$errorCode")
-            reportError(ProximityError.Unknown("BLE scan failed with error code $errorCode"))
-        }
-    }
 
     override fun setListener(listener: BleGattClientListener?) {
         this.listener = listener
@@ -131,20 +135,24 @@ internal class GattClient(
     override fun startScanning(listener: BleScannerListener) {
         scannerListener = listener
 
-        val filter = ScanFilter.Builder()
-            .setServiceUuid(ParcelUuid(serviceUuid))
-            .build()
-        val settings = ScanSettings.Builder()
-            .setCallbackType(ScanSettings.CALLBACK_TYPE_ALL_MATCHES)
-            .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
-            .build()
+        val filter =
+            ScanFilter
+                .Builder()
+                .setServiceUuid(ParcelUuid(serviceUuid))
+                .build()
+        val settings =
+            ScanSettings
+                .Builder()
+                .setCallbackType(ScanSettings.CALLBACK_TYPE_ALL_MATCHES)
+                .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+                .build()
 
-		try {
-			val scanner = bluetoothManager.adapter.bluetoothLeScanner
-			if (!bluetoothManager.adapter.isEnabled || scanner == null) {
-				scannerListener?.onError("Bluetooth is turned off")
-				return
-			}
+        try {
+            val scanner = bluetoothManager.adapter.bluetoothLeScanner
+            if (!bluetoothManager.adapter.isEnabled || scanner == null) {
+                scannerListener?.onError("Bluetooth is turned off")
+                return
+            }
             Logger(TAG).debug("scan started: service=$serviceUuid")
             scanner.startScan(listOf(filter), settings, scanCallback)
             this.scanner = scanner
@@ -164,9 +172,7 @@ internal class GattClient(
         }
     }
 
-    override fun supportsSessionTermination(): Boolean {
-        return true
-    }
+    override fun supportsSessionTermination(): Boolean = true
 
     override fun disconnect() {
         if (inhibitCallbacks) return
@@ -197,7 +203,7 @@ internal class GattClient(
     override fun writeCharacteristic(
         charUuid: Uuid,
         data: ByteArray,
-        onProgress: ((sent: Int, total: Int) -> Unit)?
+        onProgress: ((sent: Int, total: Int) -> Unit)?,
     ) {
         val targetUuid = charUuid.toJavaUuid()
         val shouldDrain = writeQueues.wasEmpty(targetUuid)
@@ -216,7 +222,7 @@ internal class GattClient(
     override fun writeCharacteristicNonChunked(
         charUuid: Uuid,
         data: ByteArray,
-        onProgress: ((sent: Int, total: Int) -> Unit)?
+        onProgress: ((sent: Int, total: Int) -> Unit)?,
     ) {
         val targetUuid = charUuid.toJavaUuid()
         val shouldDrain = writeQueues.wasEmpty(targetUuid)
@@ -229,7 +235,10 @@ internal class GattClient(
         }
     }
 
-    override fun readDescriptor(charUuid: Uuid, descriptorUuid: Uuid) {
+    override fun readDescriptor(
+        charUuid: Uuid,
+        descriptorUuid: Uuid,
+    ) {
         val characteristic = requireGatt().getService(serviceUuid)?.getCharacteristic(charUuid.toJavaUuid())
         if (characteristic == null) {
             reportError(ProximityError.Unknown("Characteristic $charUuid not found"))
@@ -246,7 +255,11 @@ internal class GattClient(
     }
 
     @Suppress("DEPRECATION")
-    override fun writeDescriptor(charUuid: Uuid, descriptorUuid: Uuid, data: ByteArray) {
+    override fun writeDescriptor(
+        charUuid: Uuid,
+        descriptorUuid: Uuid,
+        data: ByteArray,
+    ) {
         val characteristic = requireGatt().getService(serviceUuid)?.getCharacteristic(charUuid.toJavaUuid())
         if (characteristic == null) {
             reportError(ProximityError.Unknown("Characteristic $charUuid not found"))
@@ -262,7 +275,11 @@ internal class GattClient(
         requireGatt().writeDescriptorCompat(descriptor, data)
     }
 
-    override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
+    override fun onConnectionStateChange(
+        gatt: BluetoothGatt,
+        status: Int,
+        newState: Int,
+    ) {
         if (inhibitCallbacks) return
 
         when (newState) {
@@ -284,7 +301,7 @@ internal class GattClient(
                         gatt.setPreferredPhy(
                             BluetoothDevice.PHY_LE_2M_MASK,
                             BluetoothDevice.PHY_LE_2M_MASK,
-                            BluetoothDevice.PHY_OPTION_NO_PREFERRED
+                            BluetoothDevice.PHY_OPTION_NO_PREFERRED,
                         )
                     }
 
@@ -303,6 +320,7 @@ internal class GattClient(
                     reportError(ProximityError.Unknown(e.message ?: e::class.simpleName ?: "Unknown error"))
                 }
             }
+
             BluetoothProfile.STATE_DISCONNECTED -> {
                 Logger(TAG).debug("gatt disconnected: status=$status")
                 cancelMtuWatchdog()
@@ -335,11 +353,12 @@ internal class GattClient(
      */
     private fun armMtuWatchdog(gatt: BluetoothGatt) {
         cancelMtuWatchdog()
-        val runnable = Runnable {
-            if (inhibitCallbacks || discoveryStarted) return@Runnable
-            Logger(TAG).warn("MTU exchange did not complete in ${MTU_TIMEOUT_MS}ms, discovering services anyway")
-            startServiceDiscovery(gatt)
-        }
+        val runnable =
+            Runnable {
+                if (inhibitCallbacks || discoveryStarted) return@Runnable
+                Logger(TAG).warn("MTU exchange did not complete in ${MTU_TIMEOUT_MS}ms, discovering services anyway")
+                startServiceDiscovery(gatt)
+            }
         mtuWatchdog = runnable
         mtuWatchdogHandler.postDelayed(runnable, MTU_TIMEOUT_MS)
     }
@@ -396,7 +415,10 @@ internal class GattClient(
     // The server will also be notified about the new MTU - if it's running Android
     // it'll be via BluetoothGattServerCallback.onMtuChanged(), see GattServer.java
     // for that in our implementation.
-    private fun requestMtuSafely(gatt: BluetoothGatt, size: Int = 515) {
+    private fun requestMtuSafely(
+        gatt: BluetoothGatt,
+        size: Int = 515,
+    ) {
         if (mtuRequested) return
         Logger(TAG).debug("requesting MTU: requested=$size")
         try {
@@ -410,12 +432,17 @@ internal class GattClient(
         }
     }
 
-
-    override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
+    override fun onServicesDiscovered(
+        gatt: BluetoothGatt,
+        status: Int,
+    ) {
         Logger(TAG).debug("services discovered: status=$status services=${gatt.services.size}")
         if (status != BluetoothGatt.GATT_SUCCESS) return
         val service = gatt.services.any { it.uuid == serviceUuid }
-        if (!service) { reportError(ProximityError.Unknown("Service $serviceUuid not discovered")); return }
+        if (!service) {
+            reportError(ProximityError.Unknown("Service $serviceUuid not discovered"))
+            return
+        }
 
         val callbackListener = listener ?: return
         if (inhibitCallbacks) return
@@ -434,16 +461,18 @@ internal class GattClient(
 
             gatt.setCharacteristicNotification(characteristic, shouldEnable)
 
-            val cccd = characteristic.getDescriptor(
-                MdlPeripheralServerModeTransportProtocol.characteristicConfigurationUuid.toJavaUuid()
-            )
+            val cccd =
+                characteristic.getDescriptor(
+                    MdlPeripheralServerModeTransportProtocol.characteristicConfigurationUuid.toJavaUuid(),
+                )
 
             if (cccd != null && shouldEnable) {
-                val value = if (supportsIndicate) {
-                    BluetoothGattDescriptor.ENABLE_INDICATION_VALUE
-                } else {
-                    BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
-                }
+                val value =
+                    if (supportsIndicate) {
+                        BluetoothGattDescriptor.ENABLE_INDICATION_VALUE
+                    } else {
+                        BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+                    }
                 coordinator.enqueue(cccd, value)
             }
         }
@@ -458,8 +487,11 @@ internal class GattClient(
         }
     }
 
-
-    override fun onMtuChanged(gatt: BluetoothGatt, mtu: Int, status: Int) {
+    override fun onMtuChanged(
+        gatt: BluetoothGatt,
+        mtu: Int,
+        status: Int,
+    ) {
         if (status != BluetoothGatt.GATT_SUCCESS) {
             Logger(TAG).error("MTU negotiation failed: status=$status")
             if (options.mtuBeforeDiscovery) {
@@ -486,26 +518,37 @@ internal class GattClient(
         }
     }
 
-    override fun onPhyUpdate(gatt: BluetoothGatt, txPhy: Int, rxPhy: Int, status: Int) {
+    override fun onPhyUpdate(
+        gatt: BluetoothGatt,
+        txPhy: Int,
+        rxPhy: Int,
+        status: Int,
+    ) {
         Logger(TAG).debug("phy updated: tx=${phyName(txPhy)} rx=${phyName(rxPhy)} status=$status")
     }
 
-    override fun onPhyRead(gatt: BluetoothGatt, txPhy: Int, rxPhy: Int, status: Int) {
+    override fun onPhyRead(
+        gatt: BluetoothGatt,
+        txPhy: Int,
+        rxPhy: Int,
+        status: Int,
+    ) {
         Logger(TAG).debug("phy read: tx=${phyName(txPhy)} rx=${phyName(rxPhy)} status=$status")
     }
 
-    private fun phyName(phy: Int): String = when (phy) {
-        BluetoothDevice.PHY_LE_1M -> "1M"
-        BluetoothDevice.PHY_LE_2M -> "2M"
-        BluetoothDevice.PHY_LE_CODED -> "CODED"
-        else -> "unknown($phy)"
-    }
+    private fun phyName(phy: Int): String =
+        when (phy) {
+            BluetoothDevice.PHY_LE_1M -> "1M"
+            BluetoothDevice.PHY_LE_2M -> "2M"
+            BluetoothDevice.PHY_LE_CODED -> "CODED"
+            else -> "unknown($phy)"
+        }
 
     @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
     override fun onCharacteristicRead(
         gatt: BluetoothGatt,
         characteristic: BluetoothGattCharacteristic,
-        status: Int
+        status: Int,
     ) {
         this.onCharacteristicRead(gatt, characteristic, characteristic.value, status)
     }
@@ -514,22 +557,24 @@ internal class GattClient(
         gatt: BluetoothGatt,
         characteristic: BluetoothGattCharacteristic,
         value: ByteArray,
-        status: Int
+        status: Int,
     ) {
         if (inhibitCallbacks) return
         val callbackListener = listener ?: return
         when (val result = chunkAccumulator.consume(characteristic.uuid, value)) {
             is ChunkProcessingResult.Complete -> {
                 callbackListener.onCharacteristicRead(
-                    BleGattCharacteristic(characteristic, result.payload)
+                    BleGattCharacteristic(characteristic, result.payload),
                 )
             }
+
             ChunkProcessingResult.Waiting -> {
                 gatt.readCharacteristic(characteristic)
             }
+
             is ChunkProcessingResult.Single -> {
                 callbackListener.onCharacteristicRead(
-                    BleGattCharacteristic(characteristic, result.payload)
+                    BleGattCharacteristic(characteristic, result.payload),
                 )
             }
         }
@@ -538,7 +583,7 @@ internal class GattClient(
     override fun onCharacteristicWrite(
         gatt: BluetoothGatt,
         characteristic: BluetoothGattCharacteristic,
-        status: Int
+        status: Int,
     ) {
         // If the characteristic write was completed, check if this characteristic has more chunks in the writing queue or else notify the listener about a successful write
         val charUuid = characteristic.uuid
@@ -549,13 +594,12 @@ internal class GattClient(
         } else {
             drainWritingQueue(characteristic.uuid)
         }
-
     }
 
     @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
     override fun onCharacteristicChanged(
         gatt: BluetoothGatt,
-        characteristic: BluetoothGattCharacteristic
+        characteristic: BluetoothGattCharacteristic,
     ) {
         this.onCharacteristicChanged(gatt, characteristic, characteristic.value)
     }
@@ -563,20 +607,24 @@ internal class GattClient(
     override fun onCharacteristicChanged(
         gatt: BluetoothGatt,
         characteristic: BluetoothGattCharacteristic,
-        value: ByteArray
+        value: ByteArray,
     ) {
         if (inhibitCallbacks) return
         val callbackListener = listener ?: return
         when (val result = chunkAccumulator.consume(characteristic.uuid, value)) {
             is ChunkProcessingResult.Complete -> {
                 callbackListener.onCharacteristicChanged(
-                    BleGattCharacteristic(characteristic, result.payload)
+                    BleGattCharacteristic(characteristic, result.payload),
                 )
             }
-            ChunkProcessingResult.Waiting -> Unit
+
+            ChunkProcessingResult.Waiting -> {
+                Unit
+            }
+
             is ChunkProcessingResult.Single -> {
                 callbackListener.onCharacteristicChanged(
-                    BleGattCharacteristic(characteristic, result.payload)
+                    BleGattCharacteristic(characteristic, result.payload),
                 )
             }
         }
@@ -593,7 +641,11 @@ internal class GattClient(
         }
     }
 
-    override fun onDescriptorWrite(gatt: BluetoothGatt, descriptor: BluetoothGattDescriptor, status: Int) {
+    override fun onDescriptorWrite(
+        gatt: BluetoothGatt,
+        descriptor: BluetoothGattDescriptor,
+        status: Int,
+    ) {
         if (!inhibitCallbacks) {
             listener?.onDescriptorWrite(descriptor)
         }
@@ -625,26 +677,25 @@ internal class GattClient(
         reportError(ProximityError.Unknown(message))
     }
 
-    private fun requireGatt(): BluetoothGatt {
-        return gatt ?: throw IllegalStateException("Gatt not set")
-    }
+    private fun requireGatt(): BluetoothGatt = gatt ?: throw IllegalStateException("Gatt not set")
 
     private fun connectToDevice(device: BluetoothDevice) {
         reportPeerConnecting()
 
         try {
             Logger(TAG).debug("connectGatt issued: preferLe2MPhy=${options.preferLe2MPhy}")
-            gatt = if (options.preferLe2MPhy) {
-                device.connectGatt(
-                    context,
-                    false,
-                    this,
-                    BluetoothDevice.TRANSPORT_LE,
-                    BluetoothDevice.PHY_LE_2M_MASK or BluetoothDevice.PHY_LE_1M_MASK
-                )
-            } else {
-                device.connectGatt(context, false, this, BluetoothDevice.TRANSPORT_LE)
-            }
+            gatt =
+                if (options.preferLe2MPhy) {
+                    device.connectGatt(
+                        context,
+                        false,
+                        this,
+                        BluetoothDevice.TRANSPORT_LE,
+                        BluetoothDevice.PHY_LE_2M_MASK or BluetoothDevice.PHY_LE_1M_MASK,
+                    )
+                } else {
+                    device.connectGatt(context, false, this, BluetoothDevice.TRANSPORT_LE)
+                }
         } catch (e: SecurityException) {
             reportError(ProximityError.Unknown(e.message ?: e::class.simpleName ?: "Unknown error"))
         } finally {
@@ -675,9 +726,11 @@ internal class GattClient(
         }
     }
 
-    private fun findCharacteristic(charUuid: UUID): BluetoothGattCharacteristic? {
-        return characteristics.singleOrNull { it.uuid?.toJavaUuid() == charUuid }?.characteristic
-    }
+    private fun findCharacteristic(charUuid: UUID): BluetoothGattCharacteristic? =
+        characteristics
+            .singleOrNull {
+                it.uuid?.toJavaUuid() == charUuid
+            }?.characteristic
 
     private fun drainWritingQueue(charUuid: UUID) {
         val chunk = writeQueues.poll(charUuid) ?: return
@@ -695,6 +748,7 @@ internal class GattClient(
                 [https://medium.com/android-news/lessons-for-first-time-android-bluetooth-le-developers-i-learned-the-hard-way-fee07646624]
                 calling bluetoothDevice.disconnect() right before bluetoothDevice.close() is redundant and can result in issues in some devices. Try using only close() instead.
                  */
+
 //                requireGatt().disconnect()
                 requireGatt().close()
             } catch (e: SecurityException) {
@@ -723,7 +777,7 @@ internal class GattClient(
                 }
                 chunk.progress?.advance(chunk.payloadSize)
                 Logger(TAG).debug(
-                    "tx chunk: char=$charUuid bytes=${chunk.payloadSize} queued=${writeQueues.size(charUuid)}"
+                    "tx chunk: char=$charUuid bytes=${chunk.payloadSize} queued=${writeQueues.size(charUuid)}",
                 )
             } catch (e: SecurityException) {
                 reportError(ProximityError.Unknown(e.message ?: e::class.simpleName ?: "Unknown error"))
@@ -731,7 +785,10 @@ internal class GattClient(
         }
     }
 
-    private fun BluetoothGatt.writeDescriptorCompat(descriptor: BluetoothGattDescriptor, data: ByteArray) {
+    private fun BluetoothGatt.writeDescriptorCompat(
+        descriptor: BluetoothGattDescriptor,
+        data: ByteArray,
+    ) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             writeDescriptor(descriptor, data)
         } else {
@@ -745,13 +802,13 @@ internal class GattClient(
 
     private fun BluetoothGatt.writeCharacteristicCompat(
         characteristic: BluetoothGattCharacteristic,
-        data: ByteArray
-    ): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        data: ByteArray,
+    ): Boolean =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             writeCharacteristic(
                 characteristic,
                 data,
-                BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
+                BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE,
             ) == BluetoothStatusCodes.SUCCESS
         } else {
             @Suppress("DEPRECATION")
@@ -760,14 +817,16 @@ internal class GattClient(
                 writeCharacteristic(characteristic)
             }
         }
-    }
 
     private class WriteQueueManager {
         private val queues = mutableMapOf<UUID, ArrayDeque<PendingWrite>>()
 
         fun wasEmpty(uuid: UUID): Boolean = queues[uuid]?.isEmpty() ?: true
 
-        fun enqueue(uuid: UUID, data: PendingWrite) {
+        fun enqueue(
+            uuid: UUID,
+            data: PendingWrite,
+        ) {
             queues.getOrPut(uuid) { ArrayDeque() }.addLast(data)
         }
 
@@ -793,16 +852,15 @@ internal class GattClient(
     private data class PendingWrite(
         val payload: ByteArray,
         val progress: WriteProgress? = null,
-        val payloadSize: Int = payload.size
+        val payloadSize: Int = payload.size,
     ) {
-        fun isShutdownMessage(): Boolean {
-            return payload.size == 1 && payload.single() == TransportProtocol.SHUTDOWN_MESSAGE.single()
-        }
+        fun isShutdownMessage(): Boolean =
+            payload.size == 1 && payload.single() == TransportProtocol.SHUTDOWN_MESSAGE.single()
     }
 
     private class WriteProgress(
         private val total: Int,
-        private val onProgress: ((sent: Int, total: Int) -> Unit)?
+        private val onProgress: ((sent: Int, total: Int) -> Unit)?,
     ) {
         private var sent: Int = 0
 
@@ -818,11 +876,11 @@ internal class GattClient(
 
     private data class PendingDescriptor(
         val descriptor: BluetoothGattDescriptor,
-        val value: ByteArray
+        val value: ByteArray,
     )
 
     private inner class Coordinator(
-        private val onAllDescriptorsWritten: (BluetoothGatt) -> Unit
+        private val onAllDescriptorsWritten: (BluetoothGatt) -> Unit,
     ) {
         private val queue = ArrayDeque<PendingDescriptor>()
         private var inFlight = false
@@ -834,7 +892,10 @@ internal class GattClient(
             completionDeferred = false
         }
 
-        fun enqueue(descriptor: BluetoothGattDescriptor, value: ByteArray) {
+        fun enqueue(
+            descriptor: BluetoothGattDescriptor,
+            value: ByteArray,
+        ) {
             queue.addLast(PendingDescriptor(descriptor, value))
         }
 

@@ -19,6 +19,9 @@ package org.kapunsdk.credentials
 import org.kapunsdk.credentials.mdoc.MDocVerificationException.FailedToVerifyX509ChainException
 import org.kapunsdk.proximity.documents.DocumentRequest
 import org.kapunsdk.util.extensions.*
+import uniffi.kapun_credential_core_rust.SignatureCreator
+import uniffi.kapun_credential_core_rust.currentDateTimeString
+import uniffi.kapun_credential_core_rust.dateTimeStringInDays
 import uniffi.kapun_crypto_rust.VerificationKey
 import uniffi.kapun_crypto_rust.X509Certificate
 import uniffi.kapun_crypto_rust.X509PublicKey
@@ -26,55 +29,66 @@ import uniffi.kapun_crypto_rust.base64UrlDecode
 import uniffi.kapun_crypto_rust.base64UrlEncode
 import uniffi.kapun_crypto_rust.extractCerts
 import uniffi.kapun_crypto_rust.sha256Rs
-import uniffi.kapun_util_rust.JsonNumber
 import uniffi.kapun_dcql_mdoc_rust.MdocRust
-import uniffi.kapun_util_rust.OrderedMap
-import uniffi.kapun_credential_core_rust.SignatureCreator
-import uniffi.kapun_util_rust.Value
-import uniffi.kapun_credential_core_rust.currentDateTimeString
-import uniffi.kapun_credential_core_rust.dateTimeStringInDays
-import uniffi.kapun_util_rust.decodeCbor
 import uniffi.kapun_dcql_mdoc_rust.decodeMdoc
-import uniffi.kapun_util_rust.encodeCbor
 import uniffi.kapun_dcql_mdoc_rust.random32Bytes
+import uniffi.kapun_util_rust.JsonNumber
+import uniffi.kapun_util_rust.OrderedMap
+import uniffi.kapun_util_rust.Value
+import uniffi.kapun_util_rust.decodeCbor
+import uniffi.kapun_util_rust.encodeCbor
 
 sealed interface MdocErrors {
-    data class InvalidFormat(val msg: String) : MdocErrors, Throwable(msg)
-    data class UnsupportedAlgorithm(val alg: String) : MdocErrors,
-        Throwable(message = "Alg $alg is unsupported")
+    data class InvalidFormat(
+        val msg: String,
+    ) : Throwable(msg),
+        MdocErrors
+
+    data class UnsupportedAlgorithm(
+        val alg: String,
+    ) : Throwable(message = "Alg $alg is unsupported"),
+        MdocErrors
 }
 
-class Mdoc(val mdoc: MdocRust) {
+class Mdoc(
+    val mdoc: MdocRust,
+) {
     companion object {
         val MDOC_FORMATS: Array<String> = arrayOf("mso_mdoc")
-        fun mdlPresentation(documentRequest: DocumentRequest, sessionTranscript: Value, signers: List<SignatureCreator>, mdocs: List<Mdoc>): ByteArray? {
-            if(documentRequest !is DocumentRequest.Mdl) {
+
+        fun mdlPresentation(
+            documentRequest: DocumentRequest,
+            sessionTranscript: Value,
+            signers: List<SignatureCreator>,
+            mdocs: List<Mdoc>,
+        ): ByteArray? {
+            if (documentRequest !is DocumentRequest.Mdl) {
                 return null
             }
             val documents = mutableListOf<Value>()
-            for((mdoc, signer) in mdocs.zip(signers)) {
+            for ((mdoc, signer) in mdocs.zip(signers)) {
                 val docType = mdoc.doctype()!!
                 val mdlRequest = documentRequest.documents.find { it.documentType == docType }!!
                 val token = mdoc.getMdlToken(mdlRequest, sessionTranscript, signer).getOrNull()!!
                 documents.add(token)
             }
-            return encodeCbor(mapOf(
-                "version" to "1.0",
-                "documents" to documents,
-                "status" to 0
-            ).toCbor())
+            return encodeCbor(
+                mapOf(
+                    "version" to "1.0",
+                    "documents" to documents,
+                    "status" to 0,
+                ).toCbor(),
+            )
         }
 
-        fun parse(data: String): Mdoc {
-            return Mdoc(decodeMdoc(data))
-        }
+        fun parse(data: String): Mdoc = Mdoc(decodeMdoc(data))
 
         fun create(
             properties: Value,
             signer: SignatureCreator,
             docType: String,
             certificateChain: List<ByteArray>,
-            deviceKey: Value
+            deviceKey: Value,
         ): Result<Mdoc> {
             val valueDigests = mutableMapOf<String, MutableMap<Int, Value>>()
             val namespaces = mutableMapOf<String, MutableList<Value>>()
@@ -85,14 +99,15 @@ class Mdoc(val mdoc: MdocRust) {
                 var counter = 0
                 for (v in entry.value.asOrderedObject()!!.entries) {
                     val randomData = random32Bytes()
-                    val dataElement = encodeCbor(
-                        mapOf(
-                            "digestID" to counter,
-                            "random" to randomData,
-                            "elementIdentifier" to v.key,
-                            "elementValue" to v.value
-                        ).toCbor()
-                    )
+                    val dataElement =
+                        encodeCbor(
+                            mapOf(
+                                "digestID" to counter,
+                                "random" to randomData,
+                                "elementIdentifier" to v.key,
+                                "elementValue" to v.value,
+                            ).toCbor(),
+                        )
                     val isDataItem = sha256Rs(encodeCbor((24 to dataElement).toCbor())).toCbor()
                     namespaceEntries.put(counter, isDataItem)
                     namespacesList.add((24 to dataElement).toCbor())
@@ -105,57 +120,63 @@ class Mdoc(val mdoc: MdocRust) {
             if (deviceKey["kty"].asString() != "EC") {
                 return Result.failure(MdocErrors.UnsupportedAlgorithm(deviceKey["kty"].asString()!!))
             }
-            val deviceKey = mapOf(
-                1 to 2,
-                -1 to 1,
-                -2 to base64UrlDecode(deviceKey["x"].asString()!!),
-                -3 to base64UrlDecode(deviceKey["y"].asString()!!),
-            )
+            val deviceKey =
+                mapOf(
+                    1 to 2,
+                    -1 to 1,
+                    -2 to base64UrlDecode(deviceKey["x"].asString()!!),
+                    -3 to base64UrlDecode(deviceKey["y"].asString()!!),
+                )
             val now = currentDateTimeString()
             val exp = dateTimeStringInDays(14UL)
-            val mso = mapOf(
-                "version" to "1.0",
-                "digestAlgorithm" to "SHA-256",
-                "valueDigests" to valueDigests,
-                "deviceKeyInfo" to mapOf(
-                    "deviceKey" to deviceKey
-                ),
-                "docType" to docType,
-                "validityInfo" to mapOf(
-                    "signed" to (0 to now),
-                    "validFrom" to (0 to now),
-                    "validUntil" to (0 to exp)
-                )
-
-            ).toCbor()
+            val mso =
+                mapOf(
+                    "version" to "1.0",
+                    "digestAlgorithm" to "SHA-256",
+                    "valueDigests" to valueDigests,
+                    "deviceKeyInfo" to
+                        mapOf(
+                            "deviceKey" to deviceKey,
+                        ),
+                    "docType" to docType,
+                    "validityInfo" to
+                        mapOf(
+                            "signed" to (0 to now),
+                            "validFrom" to (0 to now),
+                            "validUntil" to (0 to exp),
+                        ),
+                ).toCbor()
             val protectedHeaders = mapOf(1 to -7).toCbor()
             val coseSign1 = encodeCbor(coseSign1(protectedHeaders, mso))
             val signature = signer.sign(coseSign1)
 
-            val issuerAuth = listOf(
-                // algorithm
-                encodeCbor(protectedHeaders),
-                // x5c
-                mapOf(
-                    33 to if (certificateChain.size == 1) {
-                        certificateChain[0]
-                    } else {
-                        certificateChain
-                    }
-                ),
-                // payload
-                encodeCbor((24 to encodeCbor(mso)).toCbor()),
-                // signature
-                signature
-            ).toCbor()
-            val mdoc = base64UrlEncode(
-                encodeCbor(
+            val issuerAuth =
+                listOf(
+                    // algorithm
+                    encodeCbor(protectedHeaders),
+                    // x5c
                     mapOf(
-                        "issuerAuth" to issuerAuth,
-                        "nameSpaces" to namespaces
-                    ).toCbor()
+                        33 to
+                            if (certificateChain.size == 1) {
+                                certificateChain[0]
+                            } else {
+                                certificateChain
+                            },
+                    ),
+                    // payload
+                    encodeCbor((24 to encodeCbor(mso)).toCbor()),
+                    // signature
+                    signature,
+                ).toCbor()
+            val mdoc =
+                base64UrlEncode(
+                    encodeCbor(
+                        mapOf(
+                            "issuerAuth" to issuerAuth,
+                            "nameSpaces" to namespaces,
+                        ).toCbor(),
+                    ),
                 )
-            )
             return Result.success(Mdoc.parse(mdoc))
         }
     }
@@ -179,7 +200,7 @@ class Mdoc(val mdoc: MdocRust) {
     fun getSessionTranscript(
         cliendIdHash: ByteArray,
         responseUriHash: ByteArray,
-        nonce: String
+        nonce: String,
     ): Value {
         val handover = listOf(cliendIdHash, responseUriHash, nonce).toCbor()
         return listOf(null, null, handover).toCbor()
@@ -191,17 +212,21 @@ class Mdoc(val mdoc: MdocRust) {
         jwkThumbprint: ByteArray?,
         responseUri: String,
     ): Value {
-        val handoverInfoBytes = encodeCbor(listOf(
-            clientId,
-            nonce,
-            jwkThumbprint,
-            responseUri
-        ).toCbor())
+        val handoverInfoBytes =
+            encodeCbor(
+                listOf(
+                    clientId,
+                    nonce,
+                    jwkThumbprint,
+                    responseUri,
+                ).toCbor(),
+            )
 
-        val handover = listOf(
-            "OpenID4VPHandover",
-            sha256Rs(handoverInfoBytes)
-        ).toCbor()
+        val handover =
+            listOf(
+                "OpenID4VPHandover",
+                sha256Rs(handoverInfoBytes),
+            ).toCbor()
 
         return listOf(null, null, handover).toCbor()
     }
@@ -209,31 +234,33 @@ class Mdoc(val mdoc: MdocRust) {
     fun deviceSignature(
         signer: SignatureCreator,
         docType: String,
-        sessionTranscript: Value
+        sessionTranscript: Value,
     ): Value {
         val emptyMapBytes = encodeCbor(Value.OrderedObject(OrderedMap(listOf()))).toCbor()
         val taggedNameSpace = Pair(24, emptyMapBytes).toCbor()
-        val deviceAuthentication = listOf(
-            "DeviceAuthentication",
-            sessionTranscript,
-            docType,
-            taggedNameSpace
-        ).toCbor()
+        val deviceAuthentication =
+            listOf(
+                "DeviceAuthentication",
+                sessionTranscript,
+                docType,
+                taggedNameSpace,
+            ).toCbor()
         val deviceAuthenticationBytes =
             encodeCbor(Pair(24, encodeCbor(deviceAuthentication)).toCbor()).toCbor()
         val protectedHeaderBytes = encodeCbor(mapOf(1 to -7).toCbor()).toCbor()
-        val sigStructure = listOf(
-            "Signature1",
-            protectedHeaderBytes,
-            ByteArray(0),
-            deviceAuthenticationBytes
-        ).toCbor()
+        val sigStructure =
+            listOf(
+                "Signature1",
+                protectedHeaderBytes,
+                ByteArray(0),
+                deviceAuthenticationBytes,
+            ).toCbor()
         val signature = signer.sign(encodeCbor(sigStructure))
         return listOf(
             protectedHeaderBytes,
             mapOf<String, String>(),
             null,
-            signature
+            signature,
         ).toCbor()
     }
 
@@ -247,17 +274,20 @@ class Mdoc(val mdoc: MdocRust) {
             val match = namespaceRegex.matchEntire(attr.key) ?: continue
             val namespaceName = match.groups["namespace"]?.value ?: continue
             val theNamespace = this.mdoc.originalDecoded["nameSpaces"][namespaceName]
-            val attrPath = attr.key.replace("\$['${namespaceName}']", "")
+            val attrPath = attr.key.replace("\$['$namespaceName']", "")
             val pathSegments = mutableListOf<Any>()
             for (m in attributePath.findAll(attrPath)) {
                 val p = m.groups["path"]?.value ?: return Result.failure(Throwable("invalid path"))
                 pathSegments.add(p)
             }
             val attrName = pathSegments.firstOrNull() ?: return Result.failure(Throwable("invalid path"))
-            val pair = theNamespace.asArray()
-                ?.map { value ->
-                    Pair(value, decodeCbor(value.asTag()!!.value[0].asBytes()!!))
-                }?.first { it.second["elementIdentifier"].asString()!! == attrName } ?:  return Result.failure(Throwable("Namespace is NOT an array!"))
+            val pair =
+                theNamespace
+                    .asArray()
+                    ?.map { value ->
+                        Pair(value, decodeCbor(value.asTag()!!.value[0].asBytes()!!))
+                    }?.first { it.second["elementIdentifier"].asString()!! == attrName }
+                    ?: return Result.failure(Throwable("Namespace is NOT an array!"))
 
             val namespaceElements = namespaces.getOrPut(namespaceName) { mutableListOf() }
             namespaceElements.add(pair.first.toCbor())
@@ -265,8 +295,8 @@ class Mdoc(val mdoc: MdocRust) {
         return Result.success(
             mapOf(
                 "issuerAuth" to originalIssuerAuth,
-                "nameSpaces" to namespaces
-            ).toCbor()
+                "nameSpaces" to namespaces,
+            ).toCbor(),
         )
     }
 
@@ -277,10 +307,12 @@ class Mdoc(val mdoc: MdocRust) {
 
         for (attr in documentRequest.requestedDocumentItems) {
             val theNamespace = this.mdoc.originalDecoded["nameSpaces"][attr.namespace]
-            val pair = theNamespace.asArray()!!
-                .map { value ->
-                    Pair(value, decodeCbor(value.asTag()!!.value[0].asBytes()!!))
-                }.first { it.second["elementIdentifier"].asString()!! == attr.elementIdentifier }
+            val pair =
+                theNamespace
+                    .asArray()!!
+                    .map { value ->
+                        Pair(value, decodeCbor(value.asTag()!!.value[0].asBytes()!!))
+                    }.first { it.second["elementIdentifier"].asString()!! == attr.elementIdentifier }
 
             val namespaceElements = namespaces.getOrPut(attr.namespace) { mutableListOf() }
             namespaceElements.add(pair.first.toCbor())
@@ -288,18 +320,19 @@ class Mdoc(val mdoc: MdocRust) {
         return Result.success(
             mapOf(
                 "issuerAuth" to originalIssuerAuth,
-                "nameSpaces" to namespaces
-            ).toCbor()
+                "nameSpaces" to namespaces,
+            ).toCbor(),
         )
     }
 
     fun getMdlToken(
         documentRequest: DocumentRequest.MdlDocument,
         sessionTranscript: Value,
-        signer: SignatureCreator
+        signer: SignatureCreator,
     ): Result<Value> {
-        val issuerSigned = this.getIssuerSigned(documentRequest).getOrNull()
-            ?: return Result.failure(Throwable("Failed to build IssuerSigned"))
+        val issuerSigned =
+            this.getIssuerSigned(documentRequest).getOrNull()
+                ?: return Result.failure(Throwable("Failed to build IssuerSigned"))
         val coseSign1 = this.deviceSignature(signer, this.doctype()!!, sessionTranscript)
         val deviceNameSpacesBytes = encodeCbor(mapOf<String, String>().toCbor()).toCbor()
         return Result.success(getPreparedDocument(coseSign1, issuerSigned, deviceNameSpacesBytes))
@@ -310,45 +343,54 @@ class Mdoc(val mdoc: MdocRust) {
         clientIdHash: ByteArray,
         responseUriHash: ByteArray,
         nonce: String,
-        signer: SignatureCreator
+        signer: SignatureCreator,
     ): Result<String> {
-        val issuerSigned = getIssuerSigned(attributes).getOrNull() ?: return Result.failure(
-            Throwable("Failed to build IssuerSigned")
-        )
+        val issuerSigned =
+            getIssuerSigned(attributes).getOrNull() ?: return Result.failure(
+                Throwable("Failed to build IssuerSigned"),
+            )
         val sessionTranscript = this.getSessionTranscript(clientIdHash, responseUriHash, nonce)
         val token = this.buildToken(signer, issuerSigned, sessionTranscript)
         return Result.success(
-            base64UrlEncode(encodeCbor(token))
+            base64UrlEncode(encodeCbor(token)),
         )
     }
 
     fun getPreparedDocument(
         coseSign1: Value,
         issuerSigned: Value,
-        deviceNameSpacesBytes: Value
-    ): Value {
-        return mapOf(
+        deviceNameSpacesBytes: Value,
+    ): Value =
+        mapOf(
             "docType" to this.doctype(),
             "issuerSigned" to issuerSigned,
-            "deviceSigned" to mapOf(
-                "nameSpaces" to Pair(24, deviceNameSpacesBytes),
-                "deviceAuth" to mapOf(
-                    "deviceSignature" to coseSign1
-                )
-            ),
+            "deviceSigned" to
+                mapOf(
+                    "nameSpaces" to Pair(24, deviceNameSpacesBytes),
+                    "deviceAuth" to
+                        mapOf(
+                            "deviceSignature" to coseSign1,
+                        ),
+                ),
         ).toCbor()
-    }
 
-    fun buildToken(signer: SignatureCreator, issuerSigned: Value, sessionTranscript: Value): Value {
+    fun buildToken(
+        signer: SignatureCreator,
+        issuerSigned: Value,
+        sessionTranscript: Value,
+    ): Value {
         val coseSign1 = this.deviceSignature(signer, this.doctype()!!, sessionTranscript)
         val deviceNameSpacesBytes = encodeCbor(mapOf<String, String>().toCbor()).toCbor()
         val document = getPreparedDocument(coseSign1, issuerSigned, deviceNameSpacesBytes)
-        val vpToken = mapOf(
-            "version" to this.version(), "documents" to listOf(
-                document,
-            ),
-            "status" to 0
-        ).toCbor()
+        val vpToken =
+            mapOf(
+                "version" to this.version(),
+                "documents" to
+                    listOf(
+                        document,
+                    ),
+                "status" to 0,
+            ).toCbor()
         return vpToken
     }
 
@@ -356,13 +398,19 @@ class Mdoc(val mdoc: MdocRust) {
         val unprotectedHeader = this.mdoc.originalDecoded["issuerAuth"][1]
         val x5Chain =
             unprotectedHeader.asOrderedObject()?.get(Value.Number(JsonNumber.Integer(33))) ?: return Result.failure(
-				FailedToVerifyX509ChainException()
+                FailedToVerifyX509ChainException(),
             )
-        val certs = if(x5Chain.isArray()) {
-            x5Chain.asArray()?.map { extractCerts(it.asBytes()?: return Result.failure(FailedToVerifyX509ChainException())).firstOrNull() ?: return Result.failure(FailedToVerifyX509ChainException())}
-        } else {
-            extractCerts(x5Chain.asBytes()?: return Result.failure(FailedToVerifyX509ChainException()))
-        } ?: return Result.failure(FailedToVerifyX509ChainException())
+        val certs =
+            if (x5Chain.isArray()) {
+                x5Chain.asArray()?.map {
+                    extractCerts(
+                        it.asBytes() ?: return Result.failure(FailedToVerifyX509ChainException()),
+                    ).firstOrNull()
+                        ?: return Result.failure(FailedToVerifyX509ChainException())
+                }
+            } else {
+                extractCerts(x5Chain.asBytes() ?: return Result.failure(FailedToVerifyX509ChainException()))
+            } ?: return Result.failure(FailedToVerifyX509ChainException())
         return Result.success(certs)
     }
 
@@ -377,9 +425,7 @@ class Mdoc(val mdoc: MdocRust) {
         return decodeCbor(taggedValue.value[0].asBytes()!!)
     }
 
-    fun getSignature(): ByteArray {
-        return this.mdoc.originalDecoded["issuerAuth"][3].asBytes()!!
-    }
+    fun getSignature(): ByteArray = this.mdoc.originalDecoded["issuerAuth"][3].asBytes()!!
 
     fun verify(): Result<Boolean> {
         val chain = this.extractX5c().getOrThrow()[0]
@@ -396,11 +442,13 @@ class Mdoc(val mdoc: MdocRust) {
     }
 }
 
-fun coseSign1(protectedHeaders: Value, mso: Value): Value {
-    return listOf(
+fun coseSign1(
+    protectedHeaders: Value,
+    mso: Value,
+): Value =
+    listOf(
         "Signature1",
         encodeCbor(protectedHeaders),
         ByteArray(0),
-        encodeCbor((24 to encodeCbor(mso)).toCbor())
+        encodeCbor((24 to encodeCbor(mso)).toCbor()),
     ).toCbor()
-}

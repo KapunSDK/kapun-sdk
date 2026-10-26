@@ -19,13 +19,12 @@ package org.kapunsdk.issuance
 import org.kapunsdk.util.network.KapunNetworkConfiguration
 
 actual class KapunIssuance {
-	actual fun initialize() {
-		initialize(KapunNetworkConfiguration())
-	}
+    actual fun initialize() {
+        initialize(KapunNetworkConfiguration())
+    }
 
-	actual fun initialize(networkConfiguration: KapunNetworkConfiguration) {
-	}
+    actual fun initialize(networkConfiguration: KapunNetworkConfiguration) {
+    }
 
-	actual fun setUntrustedCertificatesAllowed(allow: Boolean) = Unit
-
+    actual fun setUntrustedCertificatesAllowed(allow: Boolean) = Unit
 }

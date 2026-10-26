@@ -16,20 +16,29 @@ under the License.
 
 package org.kapunsdk.visualization.oca.model.content
 
-import org.kapunsdk.visualization.oca.serialization.CardinalitySerializer
 import kotlinx.serialization.Serializable
+import org.kapunsdk.visualization.oca.serialization.CardinalitySerializer
 
 @Serializable(with = CardinalitySerializer::class)
 sealed interface Cardinality {
-	@Serializable
-	data class Exactly(val entries: Int) : Cardinality
+    @Serializable
+    data class Exactly(
+        val entries: Int,
+    ) : Cardinality
 
-	@Serializable
-	data class AtLeast(val entries: Int) : Cardinality
+    @Serializable
+    data class AtLeast(
+        val entries: Int,
+    ) : Cardinality
 
-	@Serializable
-	data class Between(val min: Int, val max: Int) : Cardinality
+    @Serializable
+    data class Between(
+        val min: Int,
+        val max: Int,
+    ) : Cardinality
 
-	@Serializable
-	data class AtMost(val entries: Int) : Cardinality
+    @Serializable
+    data class AtMost(
+        val entries: Int,
+    ) : Cardinality
 }

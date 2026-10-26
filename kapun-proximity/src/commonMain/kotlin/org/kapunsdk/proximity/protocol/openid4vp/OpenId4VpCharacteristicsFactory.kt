@@ -11,14 +11,12 @@ software distributed under the License is distributed on an
 "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
-under the License.   
+under the License.
  */
 package org.kapunsdk.proximity.protocol.openid4vp
 
 import org.kapunsdk.proximity.ble.gatt.BleGattCharacteristic
 
 internal expect class OpenId4VpCharacteristicsFactory {
-
-	internal fun createServerCharacteristics(): List<BleGattCharacteristic>
-
+    internal fun createServerCharacteristics(): List<BleGattCharacteristic>
 }

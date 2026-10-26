@@ -16,11 +16,13 @@ under the License.
 
 package org.kapunsdk.wallet.process.issuance.eaa
 
+import io.ktor.client.plugins.ClientRequestException
+import io.ktor.http.HttpStatusCode
+import kotlinx.serialization.json.*
 import org.kapunsdk.credentials.models.credential.CredentialMetadata
 import org.kapunsdk.credentials.models.credential.CredentialType
 import org.kapunsdk.credentials.models.identity.IdentityModel
 import org.kapunsdk.credentials.models.metadata.KeyMaterial
-
 import org.kapunsdk.credentials.models.metadata.Tokens
 import org.kapunsdk.issuance.metadata.data.CredentialConfiguration
 import org.kapunsdk.issuance.metadata.data.CredentialIssuerMetadata
@@ -48,14 +50,11 @@ import org.kapunsdk.wallet.crypto.SigningProvider
 import org.kapunsdk.wallet.extensions.asErrorState
 import org.kapunsdk.wallet.extensions.decodeMetadata
 import org.kapunsdk.wallet.keyvalue.KeyValueRepository
-import io.ktor.client.plugins.ClientRequestException
-import io.ktor.http.HttpStatusCode
-import kotlinx.serialization.json.*
 import uniffi.kapun_wallet_rust.*
 
 open class EaaIssuanceProcess(
-	private val walletBackend: WalletBackend,
-	private val signingProvider: SigningProvider,
+    private val walletBackend: WalletBackend,
+    private val signingProvider: SigningProvider,
     private val issuerRepository: IssuerRepository,
     private val identityRepository: IdentityRepository,
     private val activityRepository: ActivityRepository,
@@ -70,51 +69,55 @@ open class EaaIssuanceProcess(
     private val ocaServiceController: OcaServiceController,
     private val db: KapunDatabase,
 ) : org.kapunsdk.wallet.process.issuance.IssuanceProcess(
-    trustController,
-    credentialsRepository,
-    deferredCredentialsRepository,
-    ocaRepository,
-    ocaServiceController,
-    json,
-) {
-
+        trustController,
+        credentialsRepository,
+        deferredCredentialsRepository,
+        ocaRepository,
+        ocaServiceController,
+        json,
+    ) {
     private lateinit var issuance: Oid4VciIssuance
 
     suspend fun startIssuance(
         credentialOfferString: String,
-    ): org.kapunsdk.wallet.process.issuance.eaa.EaaIssuanceProcessStep {
-        return try {
+    ): org.kapunsdk.wallet.process.issuance.eaa.EaaIssuanceProcessStep =
+        try {
             initializeMetadata(credentialOfferString).getOrThrow()
 
-            org.kapunsdk.wallet.process.issuance.eaa.EaaIssuanceProcessStep.ConnectionDetails(trustFlow.agentInformation)
+            org.kapunsdk.wallet.process.issuance.eaa.EaaIssuanceProcessStep.ConnectionDetails(
+                trustFlow.agentInformation,
+            )
         } catch (e: ApiException) {
             val info = e.asErrorState()
             org.kapunsdk.wallet.process.issuance.eaa.EaaIssuanceProcessStep.Error(
                 errorMessage = info.messageOrCode,
                 errorCode = info.code,
-                cause = info.cause
+                cause = info.cause,
             )
-        }catch (e: ClientRequestException) {
+        } catch (e: ClientRequestException) {
             if (e.response.status == HttpStatusCode.NotFound) {
                 org.kapunsdk.wallet.process.issuance.eaa.EaaIssuanceProcessStep.Error(
                     errorMessage = "The credential offer is expired. Please regenerate it and try again.",
-                    errorCode = e.response.status.value.toString(),
-                    cause = e
+                    errorCode =
+                        e.response.status.value
+                            .toString(),
+                    cause = e,
                 )
             } else {
                 org.kapunsdk.wallet.process.issuance.eaa.EaaIssuanceProcessStep.Error(
                     errorMessage = e.message,
-                    errorCode = e.response.status.value.toString(),
-                    cause = e
+                    errorCode =
+                        e.response.status.value
+                            .toString(),
+                    cause = e,
                 )
             }
         } catch (e: Exception) {
             org.kapunsdk.wallet.process.issuance.eaa.EaaIssuanceProcessStep.Error(
                 errorMessage = e.message ?: e::class.simpleName ?: "Unknown Error",
-                cause = e
+                cause = e,
             )
         }
-    }
 
     suspend fun startDeferred(transactionId: String): org.kapunsdk.wallet.process.issuance.eaa.EaaIssuanceProcessStep {
         return try {
@@ -123,8 +126,12 @@ open class EaaIssuanceProcess(
             val identity = identityRepository.getById(identityEntity.id)!!
             val deferredCredential = deferredCredentialsRepository.getForTransactionId(transactionId)!!
             val subjects = deferredCredential.decodeMetadata()!!
-            credentialIssuerMetadata  = json.decodeFromString(identity.issuer.credentialIssuerMetadata)
-            trustFlowFromSaved(credentialIssuerMetadata.claims.credentialIssuer, json.decodeFromString(identity.credentialConfigurationIds!!), credentialIssuerMetadata)
+            credentialIssuerMetadata = json.decodeFromString(identity.issuer.credentialIssuerMetadata)
+            trustFlowFromSaved(
+                credentialIssuerMetadata.claims.credentialIssuer,
+                json.decodeFromString(identity.credentialConfigurationIds!!),
+                credentialIssuerMetadata,
+            )
 
             val oidcMetadata =
                 OidcMetadata(
@@ -137,30 +144,34 @@ open class EaaIssuanceProcess(
                 secureHardwareAccess.getHardwareSigner(identity.tokens.dpopKeyReference)!!
 
             issuance = Oid4VciIssuance.fromMetadata(oidcMetadata, walletBackend, dpopSigner)
-            val everything =  issuance.pollDeferredCredentials(
-                DeviceBoundTokens(
-                    identity.tokens.accessToken,
-                    identity.tokens.refreshToken,
-                    null,
-                    identity.tokens.dpopKeyReference
-                ), transactionId
-            )
-			val credentials = everything.credentials()
-			if (credentials.isNotEmpty()) {
-				val credentialInsertions = mutableListOf<CredentialInsertion>()
-				for ((credential, signer) in credentials zip subjects) {
-					val metadata = signer.copy(credentialType = credential.credential.asMetadataFormat())
-					val insertion = buildCredentialInsertion(identity.name, credential, metadata) ?: continue
-					credentialInsertions += insertion
-				}
+            val everything =
+                issuance.pollDeferredCredentials(
+                    DeviceBoundTokens(
+                        identity.tokens.accessToken,
+                        identity.tokens.refreshToken,
+                        null,
+                        identity.tokens.dpopKeyReference,
+                    ),
+                    transactionId,
+                )
+            val credentials = everything.credentials()
+            if (credentials.isNotEmpty()) {
+                val credentialInsertions = mutableListOf<CredentialInsertion>()
+                for ((credential, signer) in credentials zip subjects) {
+                    val metadata = signer.copy(credentialType = credential.credential.asMetadataFormat())
+                    val insertion = buildCredentialInsertion(identity.name, credential, metadata) ?: continue
+                    credentialInsertions += insertion
+                }
 
-				val insertedCredentialIds = db.transactionWithResult {
-					val result = credentialInsertions.mapNotNull { insertion ->
-						executeCredentialInsertion(insertion)?.id
-					}
-                    deferredCredentialsRepository.useTransactionId(transactionId)
-					return@transactionWithResult result
-				}
+                val insertedCredentialIds =
+                    db.transactionWithResult {
+                        val result =
+                            credentialInsertions.mapNotNull { insertion ->
+                                executeCredentialInsertion(insertion)?.id
+                            }
+                        deferredCredentialsRepository.useTransactionId(transactionId)
+                        return@transactionWithResult result
+                    }
 
                 if (insertedCredentialIds.isNotEmpty()) {
                     activityRepository.insertIssuance(
@@ -178,34 +189,49 @@ open class EaaIssuanceProcess(
 
                     val updatedIdentity = identityRepository.getById(identity.id)
                     if (updatedIdentity == null) {
-                        org.kapunsdk.wallet.process.issuance.eaa.EaaIssuanceProcessStep.Error("Failed to insert identity")
+                        org.kapunsdk.wallet.process.issuance.eaa.EaaIssuanceProcessStep.Error(
+                            "Failed to insert identity",
+                        )
                     } else {
                         val uiModel = viewModelFactory.getIdentityUiModel(updatedIdentity)
                         if (uiModel != null) {
-                            org.kapunsdk.wallet.process.issuance.eaa.EaaIssuanceProcessStep.CredentialOffer(trustFlow.agentInformation, uiModel)
+                            org.kapunsdk.wallet.process.issuance.eaa.EaaIssuanceProcessStep.CredentialOffer(
+                                trustFlow.agentInformation,
+                                uiModel,
+                            )
                         } else {
-                            org.kapunsdk.wallet.process.issuance.eaa.EaaIssuanceProcessStep.Error("Inserted identity could not be parsed")
+                            org.kapunsdk.wallet.process.issuance.eaa.EaaIssuanceProcessStep.Error(
+                                "Inserted identity could not be parsed",
+                            )
                         }
                     }
                 } else {
-                    org.kapunsdk.wallet.process.issuance.eaa.EaaIssuanceProcessStep.Error("No credentials inserted")
+                    org.kapunsdk.wallet.process.issuance.eaa.EaaIssuanceProcessStep
+                        .Error("No credentials inserted")
                 }
             } else {
-                org.kapunsdk.wallet.process.issuance.eaa.EaaIssuanceProcessStep.Error(errorMessage = "Not Ready")
+                org.kapunsdk.wallet.process.issuance.eaa.EaaIssuanceProcessStep
+                    .Error(errorMessage = "Not Ready")
             }
         } catch (e: ApiException) {
             val info = e.asErrorState()
-            org.kapunsdk.wallet.process.issuance.eaa.EaaIssuanceProcessStep.Error(errorMessage = info.messageOrCode, errorCode = info.code, cause = info.cause)
+            org.kapunsdk.wallet.process.issuance.eaa.EaaIssuanceProcessStep.Error(
+                errorMessage = info.messageOrCode,
+                errorCode = info.code,
+                cause = info.cause,
+            )
         } catch (e: Exception) {
             org.kapunsdk.wallet.process.issuance.eaa.EaaIssuanceProcessStep.Error(
                 errorMessage = e.message ?: e::class.simpleName ?: "Unknown Error",
-                cause = e
+                cause = e,
             )
         }
     }
 
-    suspend fun loadCredentialPreview(oidcSettings: OidcSettings): org.kapunsdk.wallet.process.issuance.eaa.EaaIssuanceProcessStep {
-        return try {
+    suspend fun loadCredentialPreview(
+        oidcSettings: OidcSettings,
+    ): org.kapunsdk.wallet.process.issuance.eaa.EaaIssuanceProcessStep =
+        try {
             // For software key use SoftwareKeyPair().asNativeSigner()
             val signer = signingProvider.createHardwareSigner(SecureHardwareAccessControl.NONE)
             issuance = Oid4VciIssuance.initIssuance(oidcSettings, walletBackend, signer)
@@ -220,36 +246,39 @@ open class EaaIssuanceProcess(
                 else -> {
                     org.kapunsdk.wallet.process.issuance.eaa.EaaIssuanceProcessStep.CredentialOfferPreview(
                         trustFlow.agentInformation,
-                        authType
+                        authType,
                     )
                 }
             }
-
         } catch (e: ApiException) {
             val info = e.asErrorState()
-            org.kapunsdk.wallet.process.issuance.eaa.EaaIssuanceProcessStep.Error(errorMessage = info.messageOrCode, errorCode = info.code, cause = info.cause)
+            org.kapunsdk.wallet.process.issuance.eaa.EaaIssuanceProcessStep.Error(
+                errorMessage = info.messageOrCode,
+                errorCode = info.code,
+                cause = info.cause,
+            )
         } catch (e: Exception) {
             org.kapunsdk.wallet.process.issuance.eaa.EaaIssuanceProcessStep.Error(
                 errorMessage = e.message ?: e::class.simpleName ?: "Unknown Error",
-                cause = e
+                cause = e,
             )
         }
-    }
 
-    suspend fun continueWithEaaIssuance(): org.kapunsdk.wallet.process.issuance.eaa.EaaIssuanceProcessStep {
-        return try {
+    suspend fun continueWithEaaIssuance(): org.kapunsdk.wallet.process.issuance.eaa.EaaIssuanceProcessStep =
+        try {
             val credentialOfferJson = json.encodeToString(credentialOffer)
             // Use the already parsed credential offer to avoid fetching it twice
-            val authorizationStep = issuance.initializeIssuanceWithCredentialOfferJson(
-                credentialOfferJson,
-                authorizationServerMetadata.codeChallengeMethodsSupported,
-                authorizationServerMetadata.authorizationChallengeEndpoint != null,
-                authorizationServerMetadata.pushedAuthorizationRequestEndpoint,
-                authorizationServerMetadata.authorizationEndpoint,
-                authorizationServerMetadata.authorizationChallengeEndpoint,
-                null,
-                authorizationServerMetadata.tokenEndpointAuthMethodsSupported,
-            )
+            val authorizationStep =
+                issuance.initializeIssuanceWithCredentialOfferJson(
+                    credentialOfferJson,
+                    authorizationServerMetadata.codeChallengeMethodsSupported,
+                    authorizationServerMetadata.authorizationChallengeEndpoint != null,
+                    authorizationServerMetadata.pushedAuthorizationRequestEndpoint,
+                    authorizationServerMetadata.authorizationEndpoint,
+                    authorizationServerMetadata.authorizationChallengeEndpoint,
+                    null,
+                    authorizationServerMetadata.tokenEndpointAuthMethodsSupported,
+                )
 
             when (authorizationStep) {
                 is AuthorizationStep.None -> {
@@ -260,12 +289,14 @@ open class EaaIssuanceProcess(
                     org.kapunsdk.wallet.process.issuance.eaa.EaaIssuanceProcessStep.TransactionCode(
                         isNumeric = authorizationStep.numeric,
                         length = authorizationStep.length?.toInt(),
-                        description = authorizationStep.description
+                        description = authorizationStep.description,
                     )
                 }
 
                 is AuthorizationStep.BrowseUrl -> {
-                    org.kapunsdk.wallet.process.issuance.eaa.EaaIssuanceProcessStep.PushedAuthorization(authorizationStep.url)
+                    org.kapunsdk.wallet.process.issuance.eaa.EaaIssuanceProcessStep.PushedAuthorization(
+                        authorizationStep.url,
+                    )
                 }
 
                 is AuthorizationStep.Finished -> {
@@ -276,229 +307,257 @@ open class EaaIssuanceProcess(
                     org.kapunsdk.wallet.process.issuance.eaa.EaaIssuanceProcessStep.Presentation(
                         authorizationStep.presentation,
                         authorizationStep.scope,
-                        authorizationStep.authSession
+                        authorizationStep.authSession,
                     )
                 }
             }
         } catch (e: ApiException) {
             val info = e.asErrorState()
-            org.kapunsdk.wallet.process.issuance.eaa.EaaIssuanceProcessStep.Error(errorMessage = info.messageOrCode, errorCode = info.code, cause = info.cause)
+            org.kapunsdk.wallet.process.issuance.eaa.EaaIssuanceProcessStep.Error(
+                errorMessage = info.messageOrCode,
+                errorCode = info.code,
+                cause = info.cause,
+            )
         } catch (e: Exception) {
             org.kapunsdk.wallet.process.issuance.eaa.EaaIssuanceProcessStep.Error(
                 errorMessage = e.message ?: e::class.simpleName ?: "Unknown Error",
-                cause = e
+                cause = e,
             )
         }
-    }
 
     suspend fun continueAfterPresentation(
         authSession: String,
         scope: String,
-        pdiSession: String?
-    ): org.kapunsdk.wallet.process.issuance.eaa.EaaIssuanceProcessStep {
-        return try {
-            val step = issuance.continueAuthorization(
-                authSession,
-                scope,
-                authorizationServerMetadata.authorizationChallengeEndpoint,
-                pdiSession,
-            )
+        pdiSession: String?,
+    ): org.kapunsdk.wallet.process.issuance.eaa.EaaIssuanceProcessStep =
+        try {
+            val step =
+                issuance.continueAuthorization(
+                    authSession,
+                    scope,
+                    authorizationServerMetadata.authorizationChallengeEndpoint,
+                    pdiSession,
+                )
 
             if (step is AuthorizationStep.Finished) {
                 finalizeEaaIssuance(authorizationCode = step.code)
             } else {
-                org.kapunsdk.wallet.process.issuance.eaa.EaaIssuanceProcessStep.Error(errorMessage = "Unexpected error, we did not get code after presentation")
+                org.kapunsdk.wallet.process.issuance.eaa.EaaIssuanceProcessStep.Error(
+                    errorMessage = "Unexpected error, we did not get code after presentation",
+                )
             }
         } catch (e: ApiException) {
             val info = e.asErrorState()
-            org.kapunsdk.wallet.process.issuance.eaa.EaaIssuanceProcessStep.Error(errorMessage = info.messageOrCode, errorCode = info.code, cause = info.cause)
+            org.kapunsdk.wallet.process.issuance.eaa.EaaIssuanceProcessStep.Error(
+                errorMessage = info.messageOrCode,
+                errorCode = info.code,
+                cause = info.cause,
+            )
         } catch (e: Exception) {
             org.kapunsdk.wallet.process.issuance.eaa.EaaIssuanceProcessStep.Error(
                 errorMessage = e.message ?: e::class.simpleName ?: "Unknown Error",
-                cause = e
+                cause = e,
             )
         }
-    }
 
     suspend fun finalizeEaaIssuance(
         transactionCode: String? = null,
-        authorizationCode: String? = null
+        authorizationCode: String? = null,
     ): org.kapunsdk.wallet.process.issuance.eaa.EaaIssuanceProcessStep {
         return try {
             // Always fallback to 1 credential, if the batch credential endpoint isn't available
             var numberOfCredentials =
-                credentialIssuerMetadata.claims.batchCredentialIssuance?.batchSize?.let { it / 2 }
+                credentialIssuerMetadata.claims.batchCredentialIssuance
+                    ?.batchSize
+                    ?.let { it / 2 }
                     ?: 1
-			numberOfCredentials = maxOf(numberOfCredentials, 1)
+            numberOfCredentials = maxOf(numberOfCredentials, 1)
 
-            val credentials = issuance.finalizeIssuance(
-                code = authorizationCode,
-                txCode = transactionCode,
-                numCredentialsPerType = numberOfCredentials.toUInt(),
-                signerFactory = object : SignerFactory {
-                    override fun newSigner(keyType: KeyType) =
-                        signingProvider.createSigner(keyType)
-                            ?: throw Exception("Could not create signer for key type: ${keyType.name}")
-                },
-                authorizationServerMetadata.dpopSigningAlgValuesSupported,
-                authorizationServerMetadata.tokenEndpoint,
-                // if the authorization code is null, we are in a preauthorized code flow
-                authorizationCode == null,
-                authorizationServerMetadata.preAuthorizedGrandAnonymousAccessSupported ?: false
-            )
+            val credentials =
+                issuance.finalizeIssuance(
+                    code = authorizationCode,
+                    txCode = transactionCode,
+                    numCredentialsPerType = numberOfCredentials.toUInt(),
+                    signerFactory =
+                        object : SignerFactory {
+                            override fun newSigner(keyType: KeyType) =
+                                signingProvider.createSigner(keyType)
+                                    ?: throw Exception("Could not create signer for key type: ${keyType.name}")
+                        },
+                    authorizationServerMetadata.dpopSigningAlgValuesSupported,
+                    authorizationServerMetadata.tokenEndpoint,
+                    // if the authorization code is null, we are in a preauthorized code flow
+                    authorizationCode == null,
+                    authorizationServerMetadata.preAuthorizedGrandAnonymousAccessSupported ?: false,
+                )
 
             val tokens = Tokens.fromNative(credentials.tokens())
             val oidcMetadata = issuance.getOidcMetadata()
 
-            val issuer = issuerRepository.insert(
-                issuance.getIssuerUrl(),
-                oidcMetadata.credentialIssuerMetadata,
-                json.encodeToString(authorizationServerMetadata),
-            )
+            val issuer =
+                issuerRepository.insert(
+                    issuance.getIssuerUrl(),
+                    oidcMetadata.credentialIssuerMetadata,
+                    json.encodeToString(authorizationServerMetadata),
+                )
 
             val identityName = RandomGenerator().generateAlphanumericString(15)
-            val identity = identityRepository.insertIdentity(
-                identityName,
-                tokens,
-                oidcMetadata.oidcSettings,
-                issuer.url,
-                oidcMetadata.credentialConfigurationIds,
-                isPid = false
-            )
-            //TODO: currently we only ever have one configuration if deferred issuance
+            val identity =
+                identityRepository.insertIdentity(
+                    identityName,
+                    tokens,
+                    oidcMetadata.oidcSettings,
+                    issuer.url,
+                    oidcMetadata.credentialConfigurationIds,
+                    isPid = false,
+                )
+            // TODO: currently we only ever have one configuration if deferred issuance
             // we should make deferred issuance a bit more lenient to all the possible values
             if (credentials.transactionIds().isNotEmpty()) {
                 val d = credentials.deferred().first()
                 val credConfig =
                     credentialIssuerMetadata.claims.credentialConfigurationsSupported[d.credentialConfigurationId]
-                val credentialMetadatas = credentials.subjects().map { signer ->
-                    if (signer.privateKeyExportable()) {
-                        CredentialMetadata(
-                            keyMaterial = KeyMaterial.Local.SoftwareBacked(
-                                privateKey = signer.privateKey()
-                            ),
-                            credentialType = when (credConfig?.format) {
-                                "dc+sd-jwt", "vc+sd-jwt" -> CredentialType.SdJwt
-                                "mso_mdoc" -> CredentialType.Mdoc
-                                "zkp_vc" -> CredentialType.BbsTermwise
-                                "jwt_vc_json" -> CredentialType.W3C_VCDM
-                                else -> CredentialType.Unknown
-                            }
-                        )
-                    } else {
-                        CredentialMetadata(
-                            keyMaterial = KeyMaterial.Local.HardwareBacked(
-                                deviceKeyReference = signer.keyReference(),
-                                publicKey = signer.publicKey()
-                            ),
-                            credentialType = when (credConfig?.format) {
-                                "dc+sd-jwt", "vc+sd-jwt" -> CredentialType.SdJwt
-                                "mso_mdoc" -> CredentialType.Mdoc
-                                "zkp_vc" -> CredentialType.BbsTermwise
-                                "jwt_vc_json" -> CredentialType.W3C_VCDM
-                                else -> CredentialType.Unknown
-                            }
-                        )
+                val credentialMetadatas =
+                    credentials.subjects().map { signer ->
+                        if (signer.privateKeyExportable()) {
+                            CredentialMetadata(
+                                keyMaterial =
+                                    KeyMaterial.Local.SoftwareBacked(
+                                        privateKey = signer.privateKey(),
+                                    ),
+                                credentialType =
+                                    when (credConfig?.format) {
+                                        "dc+sd-jwt", "vc+sd-jwt" -> CredentialType.SdJwt
+                                        "mso_mdoc" -> CredentialType.Mdoc
+                                        "zkp_vc" -> CredentialType.BbsTermwise
+                                        "jwt_vc_json" -> CredentialType.W3C_VCDM
+                                        else -> CredentialType.Unknown
+                                    },
+                            )
+                        } else {
+                            CredentialMetadata(
+                                keyMaterial =
+                                    KeyMaterial.Local.HardwareBacked(
+                                        deviceKeyReference = signer.keyReference(),
+                                        publicKey = signer.publicKey(),
+                                    ),
+                                credentialType =
+                                    when (credConfig?.format) {
+                                        "dc+sd-jwt", "vc+sd-jwt" -> CredentialType.SdJwt
+                                        "mso_mdoc" -> CredentialType.Mdoc
+                                        "zkp_vc" -> CredentialType.BbsTermwise
+                                        "jwt_vc_json" -> CredentialType.W3C_VCDM
+                                        else -> CredentialType.Unknown
+                                    },
+                            )
+                        }
                     }
-                }
-                val doctype = when (credConfig) {
-                    is CredentialConfiguration.Mdoc -> credConfig.doctype
-                    is CredentialConfiguration.SdJwt -> credConfig.vct
-                    is CredentialConfiguration.Bbs -> credConfig.vct ?: ""
-                    is CredentialConfiguration.SdJwtVcdm -> ""
-                    is CredentialConfiguration.Unknown -> ""
-                    null -> ""
-                }
-
-                val deferredEntry = insertDeferredCredential(
-                    identityName,
-                    d.transactionCode,
-                    doctype,
-                    credentialMetadatas
-                )
-
-	                return if (deferredEntry == null) {
-	                    EaaIssuanceProcessStep.Error("Failed to insert identity")
-	                } else {
-	                    val updatedIdentity = identityRepository.getById(identity.id)
-	                    val card = extractDeferredCardDetails(updatedIdentity, identityName, ocaServiceController, ocaRepository)
-	                    val uiModel = viewModelFactory.getIdentityUiModel(deferredEntry, card)
-
-	                    if (uiModel != null) {
-	                        EaaIssuanceProcessStep.CredentialOffer(trustFlow.agentInformation, uiModel)
-	                    } else {
-	                        EaaIssuanceProcessStep.Error("Inserted identity could not be parsed")
-	                    }
-	                }
-	            }
-
-            val credentialInsertions = if (credentials.subjects().isNotEmpty()) {
-                (credentials.credentials() zip credentials.subjects()).mapNotNull { (credential, signer) ->
-
-                    val credentialMetadata = if (signer.privateKeyExportable()) {
-                        CredentialMetadata(
-                            keyMaterial = KeyMaterial.Local.SoftwareBacked(
-                                privateKey = signer.privateKey()
-                            ),
-                            credentialType = credential.credential.asMetadataFormat()
-                        )
-                    } else {
-                        CredentialMetadata(
-                            keyMaterial = KeyMaterial.Local.HardwareBacked(
-                                deviceKeyReference = signer.keyReference(),
-                                publicKey = signer.publicKey()
-                            ),
-                            credentialType = credential.credential.asMetadataFormat()
-                        )
+                val doctype =
+                    when (credConfig) {
+                        is CredentialConfiguration.Mdoc -> credConfig.doctype
+                        is CredentialConfiguration.SdJwt -> credConfig.vct
+                        is CredentialConfiguration.Bbs -> credConfig.vct ?: ""
+                        is CredentialConfiguration.SdJwtVcdm -> ""
+                        is CredentialConfiguration.Unknown -> ""
+                        null -> ""
                     }
 
-                    buildCredentialInsertion(identity.name, credential, credentialMetadata)
-                }
-            } else {
-                credentials.credentials().mapNotNull { credential ->
-                    val credentialMetadata = CredentialMetadata(KeyMaterial.Local.ClaimBased(), credential.credential.asMetadataFormat())
-                    buildCredentialInsertion(identity.name, credential, credentialMetadata)
-                }
-            }
-
-            val insertedCredentialIds = db.transactionWithResult {
-                val insertedIds = credentialInsertions.mapNotNull { insertion ->
-                    executeCredentialInsertion(insertion)?.id
-                }
-
-                if (insertedIds.isNotEmpty()) {
-                    activityRepository.insertIssuance(
-                        baseUrl = trustFlow.agentInformation.domain,
-                        identityJwt = trustFlow.agentInformation.identityTrust,
-                        issuanceJwt = trustFlow.agentInformation.issuanceTrust,
-                        isVerified = trustFlow.agentInformation.isVerified,
-                        isTrusted = trustFlow.agentInformation.isTrusted,
-                        identityId = identity.id,
-                        credentialId = insertedIds.last(),
-                        frameworkId = trustFlow.agentInformation.trustFrameworkId,
-                        agentDisplayName = trustFlow.agentInformation.displayName,
-                        agentLogoUri = trustFlow.agentInformation.logoUri,
+                val deferredEntry =
+                    insertDeferredCredential(
+                        identityName,
+                        d.transactionCode,
+                        doctype,
+                        credentialMetadatas,
                     )
-                }
 
-                insertedIds
+                return if (deferredEntry == null) {
+                    EaaIssuanceProcessStep.Error("Failed to insert identity")
+                } else {
+                    val updatedIdentity = identityRepository.getById(identity.id)
+                    val card =
+                        extractDeferredCardDetails(updatedIdentity, identityName, ocaServiceController, ocaRepository)
+                    val uiModel = viewModelFactory.getIdentityUiModel(deferredEntry, card)
+
+                    if (uiModel != null) {
+                        EaaIssuanceProcessStep.CredentialOffer(trustFlow.agentInformation, uiModel)
+                    } else {
+                        EaaIssuanceProcessStep.Error("Inserted identity could not be parsed")
+                    }
+                }
             }
 
+            val credentialInsertions =
+                if (credentials.subjects().isNotEmpty()) {
+                    (credentials.credentials() zip credentials.subjects()).mapNotNull { (credential, signer) ->
+
+                        val credentialMetadata =
+                            if (signer.privateKeyExportable()) {
+                                CredentialMetadata(
+                                    keyMaterial =
+                                        KeyMaterial.Local.SoftwareBacked(
+                                            privateKey = signer.privateKey(),
+                                        ),
+                                    credentialType = credential.credential.asMetadataFormat(),
+                                )
+                            } else {
+                                CredentialMetadata(
+                                    keyMaterial =
+                                        KeyMaterial.Local.HardwareBacked(
+                                            deviceKeyReference = signer.keyReference(),
+                                            publicKey = signer.publicKey(),
+                                        ),
+                                    credentialType = credential.credential.asMetadataFormat(),
+                                )
+                            }
+
+                        buildCredentialInsertion(identity.name, credential, credentialMetadata)
+                    }
+                } else {
+                    credentials.credentials().mapNotNull { credential ->
+                        val credentialMetadata =
+                            CredentialMetadata(KeyMaterial.Local.ClaimBased(), credential.credential.asMetadataFormat())
+                        buildCredentialInsertion(identity.name, credential, credentialMetadata)
+                    }
+                }
+
+            val insertedCredentialIds =
+                db.transactionWithResult {
+                    val insertedIds =
+                        credentialInsertions.mapNotNull { insertion ->
+                            executeCredentialInsertion(insertion)?.id
+                        }
+
+                    if (insertedIds.isNotEmpty()) {
+                        activityRepository.insertIssuance(
+                            baseUrl = trustFlow.agentInformation.domain,
+                            identityJwt = trustFlow.agentInformation.identityTrust,
+                            issuanceJwt = trustFlow.agentInformation.issuanceTrust,
+                            isVerified = trustFlow.agentInformation.isVerified,
+                            isTrusted = trustFlow.agentInformation.isTrusted,
+                            identityId = identity.id,
+                            credentialId = insertedIds.last(),
+                            frameworkId = trustFlow.agentInformation.trustFrameworkId,
+                            agentDisplayName = trustFlow.agentInformation.displayName,
+                            agentLogoUri = trustFlow.agentInformation.logoUri,
+                        )
+                    }
+
+                    insertedIds
+                }
 
             if (insertedCredentialIds.isNotEmpty()) {
-
-	                val updatedIdentity = identityRepository.getById(identity.id)
-	                if (updatedIdentity == null) {
-	                    EaaIssuanceProcessStep.Error("Failed to insert identity")
-	                } else {
-	                    val uiModel = viewModelFactory.getIdentityUiModel(updatedIdentity)
-	                    if (uiModel != null) {
-	                        EaaIssuanceProcessStep.CredentialOffer(trustFlow.agentInformation, uiModel)
-	                    } else {
-	                        EaaIssuanceProcessStep.Error("Inserted identity could not be parsed")
-	                    }
-	                }
-	            } else {
+                val updatedIdentity = identityRepository.getById(identity.id)
+                if (updatedIdentity == null) {
+                    EaaIssuanceProcessStep.Error("Failed to insert identity")
+                } else {
+                    val uiModel = viewModelFactory.getIdentityUiModel(updatedIdentity)
+                    if (uiModel != null) {
+                        EaaIssuanceProcessStep.CredentialOffer(trustFlow.agentInformation, uiModel)
+                    } else {
+                        EaaIssuanceProcessStep.Error("Inserted identity could not be parsed")
+                    }
+                }
+            } else {
                 EaaIssuanceProcessStep.Error("No credentials inserted")
             }
         } catch (e: ApiException) {
@@ -507,7 +566,7 @@ open class EaaIssuanceProcess(
         } catch (e: Exception) {
             EaaIssuanceProcessStep.Error(
                 errorMessage = e.message ?: e::class.simpleName ?: "Unknown Error",
-                cause = e
+                cause = e,
             )
         }
     }
@@ -519,18 +578,25 @@ open class EaaIssuanceProcess(
         return EaaIssuanceProcessStep.Success
     }
 
-    private suspend fun extractDeferredCardDetails(updatedIdentity: IdentityModel?, identityName: String, ocaServiceController: OcaServiceController, ocaRepository: OcaRepository) : LayoutData.Card {
+    private suspend fun extractDeferredCardDetails(
+        updatedIdentity: IdentityModel?,
+        identityName: String,
+        ocaServiceController: OcaServiceController,
+        ocaRepository: OcaRepository,
+    ): LayoutData.Card {
         val json = Json { ignoreUnknownKeys = true }
 
         if (updatedIdentity != null) {
-            val jsonElem = updatedIdentity.issuer.credentialIssuerMetadata.let {
-                json.parseToJsonElement(
-                    it
-                )
-            }
-            val ids = updatedIdentity.credentialConfigurationIds
-                ?.let { json.parseToJsonElement(it) }
-                ?.jsonArray
+            val jsonElem =
+                updatedIdentity.issuer.credentialIssuerMetadata.let {
+                    json.parseToJsonElement(
+                        it,
+                    )
+                }
+            val ids =
+                updatedIdentity.credentialConfigurationIds
+                    ?.let { json.parseToJsonElement(it) }
+                    ?.jsonArray
 
             val id = ids?.firstOrNull()?.jsonPrimitive?.content
             val credConfigs = jsonElem.jsonObject["credential_configurations_supported"]!!.jsonObject
@@ -538,19 +604,31 @@ open class EaaIssuanceProcess(
 
             if (selectedConfig != null) {
                 val vctUrl = selectedConfig["vct"].toString()
-                val vctJson = runCatching { ocaServiceController.getDataFromUrl(vctUrl) }.getOrNull() ?: return deferredCard(identityName)
+                val vctJson =
+                    runCatching { ocaServiceController.getDataFromUrl(vctUrl) }.getOrNull()
+                        ?: return deferredCard(identityName)
                 val ocaUrl = findUriRecursively(Json.parseToJsonElement(vctJson), "oca")
-                val ocaJson = ocaUrl?.let { runCatching {   ocaServiceController.getDataFromUrl(it) }.getOrNull() } ?: return deferredCard(identityName)
+                val ocaJson =
+                    ocaUrl?.let { runCatching { ocaServiceController.getDataFromUrl(it) }.getOrNull() }
+                        ?: return deferredCard(identityName)
 
                 ocaRepository.insertOrUpdateOca(identityName, ocaJson)
-                val ocaProcessor = OcaProcessor(userLanguage = viewModelFactory.getStringResourceProvider().getString("language_key"), payload = ocaJson, ocaBundle = json.decodeFromString<OcaBundleJson>(ocaJson))
+                val ocaProcessor =
+                    OcaProcessor(
+                        userLanguage = viewModelFactory.getStringResourceProvider().getString("language_key"),
+                        payload = ocaJson,
+                        ocaBundle = json.decodeFromString<OcaBundleJson>(ocaJson),
+                    )
                 return ocaProcessor.process(LayoutType.CARD) as LayoutData.Card
             }
         }
         return deferredCard(identityName)
     }
 
-    private fun findUriRecursively(element: JsonElement?, key: String): String? {
+    private fun findUriRecursively(
+        element: JsonElement?,
+        key: String,
+    ): String? {
         return when (element) {
             is JsonObject -> {
                 if (key in element) {
@@ -561,10 +639,14 @@ open class EaaIssuanceProcess(
                 }
                 element.values.firstNotNullOfOrNull { findUriRecursively(it, key) }
             }
+
             is JsonArray -> {
                 element.firstNotNullOfOrNull { findUriRecursively(it, key) }
             }
-            else -> null
+
+            else -> {
+                null
+            }
         }
     }
 }

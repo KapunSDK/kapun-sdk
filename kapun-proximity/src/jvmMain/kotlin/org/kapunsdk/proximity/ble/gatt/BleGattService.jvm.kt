@@ -20,8 +20,8 @@ import org.kapunsdk.proximity.ble.gatt.BleGattCharacteristic
 import kotlin.uuid.Uuid
 
 internal actual class BleGattService {
-	actual val uuid: Uuid?
-		get() = TODO("Not yet implemented")
-	actual val characteristics: List<BleGattCharacteristic>
-		get() = TODO("Not yet implemented")
+    actual val uuid: Uuid?
+        get() = TODO("Not yet implemented")
+    actual val characteristics: List<BleGattCharacteristic>
+        get() = TODO("Not yet implemented")
 }

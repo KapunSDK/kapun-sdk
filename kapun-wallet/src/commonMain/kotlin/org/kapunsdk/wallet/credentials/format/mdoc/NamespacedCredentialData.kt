@@ -16,9 +16,9 @@ under the License.
 
 package org.kapunsdk.wallet.credentials.format.mdoc
 
-import org.kapunsdk.wallet.extensions.toAttributeValue
-import org.kapunsdk.visualization.oca.processing.AttributeValue
 import com.android.identity.cbor.*
+import org.kapunsdk.visualization.oca.processing.AttributeValue
+import org.kapunsdk.wallet.extensions.toAttributeValue
 import uniffi.kapun_wallet_rust.VerifiableCredential
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
@@ -27,59 +27,64 @@ import kotlin.io.encoding.ExperimentalEncodingApi
  * Similar to the [com.android.identity.document.NameSpacedData] class
  */
 class NamespacedCredentialData(
-	val data: Map<String, Map<String, AttributeValue<*>>>,
+    val data: Map<String, Map<String, AttributeValue<*>>>,
 ) {
+    fun contains(
+        namespace: String,
+        elementIdentifier: String,
+    ) = data[namespace]?.containsKey(elementIdentifier) ?: false
 
-	fun contains(namespace: String, elementIdentifier: String) = data[namespace]?.containsKey(elementIdentifier) ?: false
+    operator fun get(
+        namespace: String,
+        elementIdentifier: String,
+    ): AttributeValue<*>? = data[namespace]?.get(elementIdentifier)
 
-	operator fun get(namespace: String, elementIdentifier: String): AttributeValue<*>? = data[namespace]?.get(elementIdentifier)
+    companion object {
+        @OptIn(ExperimentalEncodingApi::class)
+        fun fromCredential(credential: VerifiableCredential): NamespacedCredentialData {
+            val base64 = Base64.UrlSafe.withPadding(Base64.PaddingOption.PRESENT_OPTIONAL)
+            val decoded = Cbor.decode(base64.decode(credential.payload))
+            return fromDataItem(decoded["nameSpaces"])
+        }
 
-	companion object {
+        private fun fromDataItem(mapDataItem: DataItem): NamespacedCredentialData {
+            val ret = mutableMapOf<String, MutableMap<String, AttributeValue<*>>>()
+            require(mapDataItem is CborMap)
+            for (nameSpaceNameItem in mapDataItem.items.keys) {
+                require(nameSpaceNameItem is Tstr)
+                val namespaceName = nameSpaceNameItem.asTstr
+                val dataElementToValueMap = mutableMapOf<String, AttributeValue<*>>()
+                when (val dataElementItems = mapDataItem[namespaceName]) {
+                    is CborMap -> {
+                        dataElementItems.items.keys.forEach { dataElementNameItem ->
+                            require(dataElementNameItem is Tstr)
+                            val dataElementName = dataElementNameItem.asTstr
+                            val taggedValueItem = dataElementItems[dataElementNameItem]
 
-		@OptIn(ExperimentalEncodingApi::class)
-		fun fromCredential(credential: VerifiableCredential): NamespacedCredentialData {
-			val base64 = Base64.UrlSafe.withPadding(Base64.PaddingOption.PRESENT_OPTIONAL)
-			val decoded = Cbor.decode(base64.decode(credential.payload))
-			return fromDataItem(decoded["nameSpaces"])
-		}
+                            require(taggedValueItem is Tagged && taggedValueItem.tagNumber == Tagged.ENCODED_CBOR)
+                            val valueItem = taggedValueItem.taggedItem
+                            dataElementToValueMap[dataElementName] = valueItem.toAttributeValue()
+                        }
+                    }
 
-		private fun fromDataItem(mapDataItem: DataItem): NamespacedCredentialData {
-			val ret = mutableMapOf<String, MutableMap<String, AttributeValue<*>>>()
-			require(mapDataItem is CborMap)
-			for (nameSpaceNameItem in mapDataItem.items.keys) {
-				require(nameSpaceNameItem is Tstr)
-				val namespaceName = nameSpaceNameItem.asTstr
-				val dataElementToValueMap = mutableMapOf<String, AttributeValue<*>>()
-				when (val dataElementItems = mapDataItem[namespaceName]) {
-					is CborMap -> {
-						dataElementItems.items.keys.forEach { dataElementNameItem ->
-							require(dataElementNameItem is Tstr)
-							val dataElementName = dataElementNameItem.asTstr
-							val taggedValueItem = dataElementItems[dataElementNameItem]
+                    is CborArray -> {
+                        dataElementItems.items.forEach { dataElementItem ->
+                            require(dataElementItem is Tagged && dataElementItem.tagNumber == Tagged.ENCODED_CBOR)
+                            val taggedItem = dataElementItem.asTaggedEncodedCbor
+                            val elementIdentifier = taggedItem["elementIdentifier"].asTstr
+                            val elementValue = taggedItem["elementValue"].toAttributeValue()
+                            dataElementToValueMap[elementIdentifier] = elementValue
+                        }
+                    }
 
-							require(taggedValueItem is Tagged && taggedValueItem.tagNumber == Tagged.ENCODED_CBOR)
-							val valueItem = taggedValueItem.taggedItem
-							dataElementToValueMap[dataElementName] = valueItem.toAttributeValue()
-						}
-					}
-					is CborArray -> {
-						dataElementItems.items.forEach { dataElementItem ->
-							require(dataElementItem is Tagged && dataElementItem.tagNumber == Tagged.ENCODED_CBOR)
-							val taggedItem = dataElementItem.asTaggedEncodedCbor
-							val elementIdentifier = taggedItem["elementIdentifier"].asTstr
-							val elementValue = taggedItem["elementValue"].toAttributeValue()
-							dataElementToValueMap[elementIdentifier] = elementValue
-						}
-					}
-					else -> {
-						throw IllegalArgumentException("Data elements is must be either map or array")
-					}
-				}
+                    else -> {
+                        throw IllegalArgumentException("Data elements is must be either map or array")
+                    }
+                }
 
-				ret[namespaceName] = dataElementToValueMap
-			}
-			return NamespacedCredentialData(ret)
-		}
-	}
-
+                ret[namespaceName] = dataElementToValueMap
+            }
+            return NamespacedCredentialData(ret)
+        }
+    }
 }

@@ -16,37 +16,36 @@ under the License.
 
 package org.kapunsdk.issuance.metadata.data
 
-import org.kapunsdk.util.extensions.jsonPrimitiveOrNull
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.json.JsonContentPolymorphicSerializer
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
+import org.kapunsdk.util.extensions.jsonPrimitiveOrNull
 
 internal class CredentialConfigurationSerializer :
-	JsonContentPolymorphicSerializer<CredentialConfiguration>(CredentialConfiguration::class) {
+    JsonContentPolymorphicSerializer<CredentialConfiguration>(CredentialConfiguration::class) {
+    companion object {
+        private const val FORMAT_MDOC = "mso_mdoc"
+        private const val FORMAT_SD_JWT = "dc+sd-jwt"
+        private const val FORMAT_LEGACY_SD_JWT = "vc+sd-jwt"
+        private const val FORMAT_ZKP_VC = "zkp_vc"
+        private const val FORMAT_W3C_VCDM = "vc+sd-jwt"
+    }
 
-	companion object {
-		private const val FORMAT_MDOC = "mso_mdoc"
-		private const val FORMAT_SD_JWT = "dc+sd-jwt"
-		private const val FORMAT_LEGACY_SD_JWT = "vc+sd-jwt"
-		private const val FORMAT_ZKP_VC = "zkp_vc"
-		private const val FORMAT_W3C_VCDM = "vc+sd-jwt"
-	}
+    override fun selectDeserializer(element: JsonElement): DeserializationStrategy<CredentialConfiguration> {
+        val json = element.jsonObject
+        val format = json.getValue("format").jsonPrimitiveOrNull()?.contentOrNull
 
-	override fun selectDeserializer(element: JsonElement): DeserializationStrategy<CredentialConfiguration> {
-		val json = element.jsonObject
-		val format = json.getValue("format").jsonPrimitiveOrNull()?.contentOrNull
+        if (format == FORMAT_W3C_VCDM && (json["vct"] == null)) {
+            return CredentialConfiguration.SdJwtVcdm.serializer()
+        }
 
-		if (format == FORMAT_W3C_VCDM && (json["vct"] == null)) {
-			return CredentialConfiguration.SdJwtVcdm.serializer()
-		}
-
-		return when (format) {
-			FORMAT_MDOC -> CredentialConfiguration.Mdoc.serializer()
-			FORMAT_SD_JWT, FORMAT_LEGACY_SD_JWT -> CredentialConfiguration.SdJwt.serializer()
-			FORMAT_ZKP_VC -> CredentialConfiguration.Bbs.serializer()
-			else -> CredentialConfiguration.Unknown.serializer()
-		}
-	}
+        return when (format) {
+            FORMAT_MDOC -> CredentialConfiguration.Mdoc.serializer()
+            FORMAT_SD_JWT, FORMAT_LEGACY_SD_JWT -> CredentialConfiguration.SdJwt.serializer()
+            FORMAT_ZKP_VC -> CredentialConfiguration.Bbs.serializer()
+            else -> CredentialConfiguration.Unknown.serializer()
+        }
+    }
 }

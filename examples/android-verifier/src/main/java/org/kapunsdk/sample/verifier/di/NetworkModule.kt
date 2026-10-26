@@ -11,12 +11,10 @@ software distributed under the License is distributed on an
 "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
-under the License.   
+under the License.
  */
 package org.kapunsdk.sample.verifier.di
 
-
-import org.kapunsdk.sample.verifier.feature.network.createVerifierService
 import de.jensklingenberg.ktorfit.Ktorfit
 import de.jensklingenberg.ktorfit.converter.FlowConverterFactory
 import de.jensklingenberg.ktorfit.converter.ResponseConverterFactory
@@ -26,39 +24,41 @@ import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
+import org.kapunsdk.sample.verifier.feature.network.createVerifierService
 import org.koin.dsl.module
 
-val networkModule = module {
+val networkModule =
+    module {
 
-	single {
-		val ktorfit: Ktorfit = get()
-		ktorfit.createVerifierService()
-	}
+        single {
+            val ktorfit: Ktorfit = get()
+            ktorfit.createVerifierService()
+        }
 
-	single {
-		val httpClient: HttpClient = get()
-		ktorfitBuilder {
+        single {
+            val httpClient: HttpClient = get()
+            ktorfitBuilder {
 
-			httpClient(httpClient)
-			converterFactories(
-				FlowConverterFactory(),
-				ResponseConverterFactory()
-			)
-		}.build()
-	}
+                httpClient(httpClient)
+                converterFactories(
+                    FlowConverterFactory(),
+                    ResponseConverterFactory(),
+                )
+            }.build()
+        }
 
-	single {
-		HttpClient(OkHttp) {
-			expectSuccess = true
-			install(ContentNegotiation) {
-				json(
-					Json {
-						isLenient = true
-						ignoreUnknownKeys = true
-						explicitNulls = false
-					}
-				)
-			}
-		}
-	}
-}
+        single {
+            HttpClient(OkHttp) {
+                expectSuccess = true
+                install(ContentNegotiation) {
+                    json(
+                        Json {
+                            isLenient = true
+                            ignoreUnknownKeys = true
+                            explicitNulls = false
+                        },
+                    )
+                }
+            }
+        }
+    }

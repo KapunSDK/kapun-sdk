@@ -26,22 +26,23 @@ import uniffi.kapun_util_rust.Value
 import uniffi.kapun_wallet_rust.AgentInfo
 import uniffi.kapun_wallet_rust.ApiException
 
-//TODO: iOS probably needs to restructure a bit more on the presentation flow
+// TODO: iOS probably needs to restructure a bit more on the presentation flow
 @Deprecated("Deprecated with the new ProcessStep pipeline")
 sealed interface PresentationWorkflow : ProcessWorkflow {
+    data object Idle : PresentationWorkflow
 
-    data object Idle: PresentationWorkflow
+    data class Loading(
+        val previous: ProcessWorkflow,
+    ) : PresentationWorkflow
 
-    data class Loading(val previous: ProcessWorkflow) : PresentationWorkflow
-
-    data object NoMatchingCredential: PresentationWorkflow
+    data object NoMatchingCredential : PresentationWorkflow
 
     data class ShowAgentDetails(
-		val verificationTrustData: TrustData.Verification,
-		val agentInfo: AgentInfo,
-		val checkType: ConnectionCheckType,
-		private val process: PresentationProcessKt,
-		private val nextInternal: (TrustData.Verification, PresentationProcessKt, AgentInfo) -> Unit,
+        val verificationTrustData: TrustData.Verification,
+        val agentInfo: AgentInfo,
+        val checkType: ConnectionCheckType,
+        private val process: PresentationProcessKt,
+        private val nextInternal: (TrustData.Verification, PresentationProcessKt, AgentInfo) -> Unit,
     ) : PresentationWorkflow {
         fun next() {
             nextInternal(verificationTrustData, process, agentInfo)
@@ -49,26 +50,35 @@ sealed interface PresentationWorkflow : ProcessWorkflow {
     }
 
     data class CredentialSelection(
-		val verificationTrustData: TrustData.Verification,
-		private val state: PresentationProcessKt,
-		val viewModel: PresentationUiModel,
-		val isProximityPresentation: Boolean,
-		val nextInternal: (TrustData.Verification, PresentationProcessKt, HashMap<String,CredentialSelectionUiModel>) -> Unit,
+        val verificationTrustData: TrustData.Verification,
+        private val state: PresentationProcessKt,
+        val viewModel: PresentationUiModel,
+        val isProximityPresentation: Boolean,
+        val nextInternal: (
+            TrustData.Verification,
+            PresentationProcessKt,
+            HashMap<String, CredentialSelectionUiModel>,
+        ) -> Unit,
     ) : PresentationWorkflow {
-        fun next(selection: HashMap<String,CredentialSelectionUiModel>) {
+        fun next(selection: HashMap<String, CredentialSelectionUiModel>) {
             nextInternal(this.verificationTrustData, this.state, selection)
         }
     }
 
     data class EnterPin(
-		private val verificationTrustData: TrustData.Verification,
-		private val state: PresentationProcessKt,
-		private val viewModel: Map.Entry<String, CredentialSelectionUiModel>,
-		private val credentialsWithPin:  MutableList<Map.Entry<String, CredentialSelectionUiModel>>,
-		private val credentialsWithFrost:  MutableList<Map.Entry<String, CredentialSelectionUiModel>>,
-		val nextInternal: (TrustData.Verification, PresentationProcessKt, MutableList<Map.Entry<String, CredentialSelectionUiModel>>, MutableList<Map.Entry<String, CredentialSelectionUiModel>>) -> Unit,
-		val needsBiometry: Boolean = false,
-		val error: PresentationError? = null,
+        private val verificationTrustData: TrustData.Verification,
+        private val state: PresentationProcessKt,
+        private val viewModel: Map.Entry<String, CredentialSelectionUiModel>,
+        private val credentialsWithPin: MutableList<Map.Entry<String, CredentialSelectionUiModel>>,
+        private val credentialsWithFrost: MutableList<Map.Entry<String, CredentialSelectionUiModel>>,
+        val nextInternal: (
+            TrustData.Verification,
+            PresentationProcessKt,
+            MutableList<Map.Entry<String, CredentialSelectionUiModel>>,
+            MutableList<Map.Entry<String, CredentialSelectionUiModel>>,
+        ) -> Unit,
+        val needsBiometry: Boolean = false,
+        val error: PresentationError? = null,
     ) : PresentationWorkflow {
         fun next(pin: String) {
             this.state.putPin(viewModel.key, pin)
@@ -77,23 +87,41 @@ sealed interface PresentationWorkflow : ProcessWorkflow {
     }
 
     data class EnterPassphrase(
-		private val verificationTrustData: TrustData.Verification,
-		private val state: PresentationProcessKt,
-		private val viewModel: Map.Entry<String, CredentialSelectionUiModel>,
-		private val credentialsWithFrost:  MutableList<Map.Entry<String, CredentialSelectionUiModel>>,
-		val nextInternal: (TrustData.Verification, PresentationProcessKt, MutableList<Map.Entry<String, CredentialSelectionUiModel>>, MutableList<Map.Entry<String, CredentialSelectionUiModel>>) -> Unit,
-		val error: PresentationError? = null,
+        private val verificationTrustData: TrustData.Verification,
+        private val state: PresentationProcessKt,
+        private val viewModel: Map.Entry<String, CredentialSelectionUiModel>,
+        private val credentialsWithFrost: MutableList<Map.Entry<String, CredentialSelectionUiModel>>,
+        val nextInternal: (
+            TrustData.Verification,
+            PresentationProcessKt,
+            MutableList<Map.Entry<String, CredentialSelectionUiModel>>,
+            MutableList<Map.Entry<String, CredentialSelectionUiModel>>,
+        ) -> Unit,
+        val error: PresentationError? = null,
     ) : PresentationWorkflow {
         fun next(passphrase: String) {
             state.putPassphrase(viewModel.key, passphrase)
-            nextInternal(this.verificationTrustData, this.state, mutableListOf() ,credentialsWithFrost)
+            nextInternal(this.verificationTrustData, this.state, mutableListOf(), credentialsWithFrost)
         }
     }
 
-    data class Success(val message: String, val redirectUri: String? = null, val presentationDuringIssuanceSession: String? = null) :
-		PresentationWorkflow
-    data class DcApiSuccess(val vpToken: Value) : PresentationWorkflow
-    data class ProximitySuccess(val token: ByteArray) : PresentationWorkflow
+    data class Success(
+        val message: String,
+        val redirectUri: String? = null,
+        val presentationDuringIssuanceSession: String? = null,
+    ) : PresentationWorkflow
 
-    data class Error(val code : String, val error : ApiException? = null, val retry: (() -> Unit)? = null) : PresentationWorkflow
+    data class DcApiSuccess(
+        val vpToken: Value,
+    ) : PresentationWorkflow
+
+    data class ProximitySuccess(
+        val token: ByteArray,
+    ) : PresentationWorkflow
+
+    data class Error(
+        val code: String,
+        val error: ApiException? = null,
+        val retry: (() -> Unit)? = null,
+    ) : PresentationWorkflow
 }

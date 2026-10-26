@@ -21,17 +21,16 @@ import uniffi.kapun_wallet_rust.NativeSigner
 import uniffi.kapun_wallet_rust.SoftwareKeyPair
 
 class SoftwareSignerFactory : NativeSignerFactory {
-
-	override fun createSigner(
-		keyMaterial: KeyMaterial,
-		pin: String?,
-		frostBlob: String?,
-		passphrase: String?,
-		email: String?
-	): NativeSigner? {
-		return if (keyMaterial is KeyMaterial.Local.SoftwareBacked) {
-			SoftwareKeyPair.fromPrivateKey(keyMaterial.privateKey).asNativeSigner()
-		} else null
-	}
-
+    override fun createSigner(
+        keyMaterial: KeyMaterial,
+        pin: String?,
+        frostBlob: String?,
+        passphrase: String?,
+        email: String?,
+    ): NativeSigner? =
+        if (keyMaterial is KeyMaterial.Local.SoftwareBacked) {
+            SoftwareKeyPair.fromPrivateKey(keyMaterial.privateKey).asNativeSigner()
+        } else {
+            null
+        }
 }

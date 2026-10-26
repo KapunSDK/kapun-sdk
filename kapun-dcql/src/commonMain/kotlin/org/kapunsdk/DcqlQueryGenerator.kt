@@ -20,37 +20,37 @@ import uniffi.kapun_credential_core_rust.PointerPart
 import uniffi.kapun_dcql_rust.ClaimsQuery
 
 enum class AttributeType {
-	STRING,
-	NUMBER,
-	BOOLEAN,
-	DATE,
-	TIME,
-	DATETIME,
-	LOCATION,
-	DATEOFBIRTH,  // For age proofs,
-	IMAGE,
-	OTHER
+    STRING,
+    NUMBER,
+    BOOLEAN,
+    DATE,
+    TIME,
+    DATETIME,
+    LOCATION,
+    DATEOFBIRTH, // For age proofs,
+    IMAGE,
+    OTHER,
 }
 
 data class Attribute(
-	val id: Int,
-	val name: String,
-	val type: AttributeType,
-	val displayName: Map<String, String>,
+    val id: Int,
+    val name: String,
+    val type: AttributeType,
+    val displayName: Map<String, String>,
 )
 
-fun sdJwtDcqlClaimsFromAttributes(attributes: List<Attribute>): List<ClaimsQuery> {
-	return dcqlFromAttributes(attributes)
-}
+fun sdJwtDcqlClaimsFromAttributes(attributes: List<Attribute>): List<ClaimsQuery> = dcqlFromAttributes(attributes)
 
-fun mDocDcqlClaimsFromAttributes(attributes: List<Attribute>): List<ClaimsQuery> {
-	return dcqlFromAttributes(attributes, "org.iso.18013.5.1")
-}
+fun mDocDcqlClaimsFromAttributes(attributes: List<Attribute>): List<ClaimsQuery> =
+    dcqlFromAttributes(attributes, "org.iso.18013.5.1")
 
-private fun dcqlFromAttributes(attributes: List<Attribute>, claimPathPrefix: String? = null): List<ClaimsQuery> {
-	return attributes.map {
-		val path = claimPathPrefix?.let { p -> listOf(PointerPart.String(p), PointerPart.String(it.name)) }
-			?: listOf(PointerPart.String(it.name))
-		ClaimsQuery(path = path)
-	}
-}
+private fun dcqlFromAttributes(
+    attributes: List<Attribute>,
+    claimPathPrefix: String? = null,
+): List<ClaimsQuery> =
+    attributes.map {
+        val path =
+            claimPathPrefix?.let { p -> listOf(PointerPart.String(p), PointerPart.String(it.name)) }
+                ?: listOf(PointerPart.String(it.name))
+        ClaimsQuery(path = path)
+    }

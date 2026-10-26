@@ -16,35 +16,58 @@ under the License.
 
 package org.kapunsdk.wallet.process.presentation
 
+import io.ktor.http.Url
 import org.kapunsdk.presentation.request.PresentationRequest
 import org.kapunsdk.trust.TrustFlow
 import org.kapunsdk.trust.TrustFrameworkController
-import io.ktor.http.Url
 
 abstract class PresentationProcess(
-	private val trustController2: TrustFrameworkController,
+    private val trustController2: TrustFrameworkController,
 ) {
+    protected lateinit var trustFlow: TrustFlow
 
-	protected lateinit var trustFlow: TrustFlow
+    protected suspend fun initializeMetadata(
+        qrCodeData: String,
+        origin: String? = null,
+        presentationRequest: PresentationRequest,
+        originalRequest: String?,
+    ): Result<Unit> {
+        val url =
+            runCatching { Url(qrCodeData) }.getOrNull() ?: run {
+                trustFlow =
+                    startVerificationFlow(
+                        "",
+                        presentationRequest,
+                        originalRequest,
+                    ).getOrElse { return Result.failure(it) }
+                return Result.success(Unit)
+            }
+        val requestUri =
+            url.parameters["request_uri"] ?: run {
+                trustFlow =
+                    startVerificationFlow(
+                        url.host,
+                        presentationRequest,
+                        originalRequest,
+                    ).getOrElse { return Result.failure(it) }
+                return Result.success(Unit)
+            }
 
-	protected suspend fun initializeMetadata(qrCodeData: String, origin: String? = null, presentationRequest: PresentationRequest, originalRequest: String?): Result<Unit> {
-		val url = runCatching { Url(qrCodeData) }.getOrNull() ?: run {
-			trustFlow = startVerificationFlow("", presentationRequest, originalRequest).getOrElse { return Result.failure(it) }
-			return Result.success(Unit)
-		}
-		val requestUri = url.parameters["request_uri"] ?: run {
-			trustFlow = startVerificationFlow(url.host, presentationRequest, originalRequest).getOrElse { return Result.failure(it) }
-			return Result.success(Unit)
-		}
+        trustFlow =
+            startVerificationFlow(
+                requestUri,
+                presentationRequest,
+                originalRequest,
+            ).getOrElse { return Result.failure(it) }
+        return Result.success(Unit)
+    }
 
-		trustFlow = startVerificationFlow(requestUri, presentationRequest, originalRequest).getOrElse { return Result.failure(it) }
-		return Result.success(Unit)
-	}
-
-	protected open suspend fun startVerificationFlow(requestUri: String, presentationRequest: PresentationRequest, originalRequest: String?): Result<TrustFlow> {
-		return runCatching {
-			trustController2.startVerificationFlow(requestUri, presentationRequest, originalRequest)
-		}
-	}
-
+    protected open suspend fun startVerificationFlow(
+        requestUri: String,
+        presentationRequest: PresentationRequest,
+        originalRequest: String?,
+    ): Result<TrustFlow> =
+        runCatching {
+            trustController2.startVerificationFlow(requestUri, presentationRequest, originalRequest)
+        }
 }

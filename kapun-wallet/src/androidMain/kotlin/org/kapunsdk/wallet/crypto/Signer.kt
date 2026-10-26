@@ -26,60 +26,68 @@ import java.security.KeyPair
 import java.security.Signature
 import java.security.interfaces.ECPublicKey
 
-internal class Signer(private val keyPair: KeyPair, private val alias: String) : NativeSigner {
-	override fun keyReference(): ByteArray {
-		return alias.encodeToByteArray()
-	}
+internal class Signer(
+    private val keyPair: KeyPair,
+    private val alias: String,
+) : NativeSigner {
+    override fun keyReference(): ByteArray = alias.encodeToByteArray()
 
-	override fun privateKey(): ByteArray {
-		throw SigningException.InvalidSecret()
-	}
+    override fun privateKey(): ByteArray = throw SigningException.InvalidSecret()
 
-	override fun sign(msg: String): ByteArray {
-		val bytes = msg.toByteArray(charset = Charsets.UTF_8)
-		return signBytes(bytes)
-	}
+    override fun sign(msg: String): ByteArray {
+        val bytes = msg.toByteArray(charset = Charsets.UTF_8)
+        return signBytes(bytes)
+    }
 
-	override fun signBytes(msg: ByteArray): ByteArray {
-		val ecdsa = Signature.getInstance("SHA256withECDSA")
-		ecdsa.initSign(keyPair.private)
-		ecdsa.update(msg)
-		return ecdsa.sign().extractRawSignature()
-	}
+    override fun signBytes(msg: ByteArray): ByteArray {
+        val ecdsa = Signature.getInstance("SHA256withECDSA")
+        ecdsa.initSign(keyPair.private)
+        ecdsa.update(msg)
+        return ecdsa.sign().extractRawSignature()
+    }
 
-	override fun publicKey(): ByteArray {
-		val publicKey = keyPair.public as ECPublicKey
-		val x = publicKey.w.affineX.toByteArray().toFixedLength(32)
-		val y = publicKey.w.affineY.toByteArray().toFixedLength(32)
-		return byteArrayOf(4) + x + y
-	}
+    override fun publicKey(): ByteArray {
+        val publicKey = keyPair.public as ECPublicKey
+        val x =
+            publicKey.w.affineX
+                .toByteArray()
+                .toFixedLength(32)
+        val y =
+            publicKey.w.affineY
+                .toByteArray()
+                .toFixedLength(32)
+        return byteArrayOf(4) + x + y
+    }
 
-	override fun keyId(): String = "HardwareKey"
+    override fun keyId(): String = "HardwareKey"
 
-	override fun jwtHeader(): String {
-		val jwk = bytesToEcJwk(this.publicKey())
-		return "{\"typ\":\"openid4vci-proof+jwt\",\"alg\":\"ES256\", \"jwk\" : $jwk}"
-	}
+    override fun jwtHeader(): String {
+        val jwk = bytesToEcJwk(this.publicKey())
+        return "{\"typ\":\"openid4vci-proof+jwt\",\"alg\":\"ES256\", \"jwk\" : $jwk}"
+    }
 
-	override fun alg(): String = "ES256"
-	override fun publicKeyJwk(): String {
-		return bytesToEcJwk(this.publicKey()) ?: "{}"
-	}
+    override fun alg(): String = "ES256"
 
-	override fun privateKeyExportable(): Boolean {
-		return false
-	}
+    override fun publicKeyJwk(): String = bytesToEcJwk(this.publicKey()) ?: "{}"
 
-	override fun keyAttestation(): String? {
-		return KeyRepository.getKeyAttestation(this.alias)
-	}
+    override fun privateKeyExportable(): Boolean = false
 
-	companion object {
-		fun generateLocal(): Signer = Signer(KeyRepository.generateES256KeyPair(), "localKey")
-		fun fromKeyPair(keyPair: KeyPair, alias: String): Signer = Signer(keyPair, alias)
-		fun createHardwareBound(context: Context, accessControl: SecureHardwareAccessControl): Signer {
-			val (keyPair, alias) = KeyRepository.createKeyPair(context, accessControl)
-			return Signer(keyPair, alias)
-		}
-	}
+    override fun keyAttestation(): String? = KeyRepository.getKeyAttestation(this.alias)
+
+    companion object {
+        fun generateLocal(): Signer = Signer(KeyRepository.generateES256KeyPair(), "localKey")
+
+        fun fromKeyPair(
+            keyPair: KeyPair,
+            alias: String,
+        ): Signer = Signer(keyPair, alias)
+
+        fun createHardwareBound(
+            context: Context,
+            accessControl: SecureHardwareAccessControl,
+        ): Signer {
+            val (keyPair, alias) = KeyRepository.createKeyPair(context, accessControl)
+            return Signer(keyPair, alias)
+        }
+    }
 }

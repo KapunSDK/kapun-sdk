@@ -22,63 +22,74 @@ import org.kapunsdk.wallet.crypto.factories.NativeSignerFactory
 import uniffi.kapun_wallet_rust.*
 
 class SigningProvider(
-	private val signerFactories: List<NativeSignerFactory>,
-	private val batchSignerFactories: List<BatchSignerFactory>,
-	private val secureHardwareAccess: SecureHardwareAccess,
+    private val signerFactories: List<NativeSignerFactory>,
+    private val batchSignerFactories: List<BatchSignerFactory>,
+    private val secureHardwareAccess: SecureHardwareAccess,
 ) {
+    fun getSecureSubject(
+        keyMaterial: KeyMaterial,
+        frostBlob: String? = null,
+        pin: String? = null,
+        passphrase: String? = null,
+        email: String? = null,
+    ): SecureSubject? {
+        val nativeSigner =
+            when (keyMaterial) {
+                is KeyMaterial.Local -> {
+                    getNativeSigner(keyMaterial)
+                }
 
-	fun getSecureSubject(
-		keyMaterial: KeyMaterial,
-		frostBlob: String? = null,
-		pin: String? = null,
-		passphrase: String? = null,
-		email: String? = null,
-	): SecureSubject? {
-		val nativeSigner = when (keyMaterial) {
-			is KeyMaterial.Local -> getNativeSigner(keyMaterial)
-			is KeyMaterial.Cloud -> getNativeSigner(keyMaterial, pin = pin)
-			is KeyMaterial.Frost -> getNativeSigner(keyMaterial, frostBlob = frostBlob, email = email, passphrase = passphrase)
-			is KeyMaterial.Unusable -> getNativeSigner(keyMaterial)
-		}
+                is KeyMaterial.Cloud -> {
+                    getNativeSigner(keyMaterial, pin = pin)
+                }
 
-		return nativeSigner?.let { SecureSubject.withSigner(it) }
-	}
+                is KeyMaterial.Frost -> {
+                    getNativeSigner(
+                        keyMaterial,
+                        frostBlob = frostBlob,
+                        email = email,
+                        passphrase = passphrase,
+                    )
+                }
 
-	fun getNativeSigner(
-		keyMaterial: KeyMaterial,
-		pin: String? = null,
-		frostBlob: String? = null,
-		passphrase: String? = null,
-		email: String? = null,
-	): NativeSigner? {
-		return signerFactories.firstNotNullOfOrNull {
-			it.createSigner(keyMaterial, pin, frostBlob, passphrase, email)
-		}
-	}
+                is KeyMaterial.Unusable -> {
+                    getNativeSigner(keyMaterial)
+                }
+            }
 
-	fun getBatchSigner(
-		keyMaterial: KeyMaterial,
-		pin: String? = null,
-		frostBlob: String? = null,
-		passphrase: String? = null,
-		email: String? = null,
-	): BatchSigner? {
-		return batchSignerFactories.firstNotNullOfOrNull {
-			it.createBatchSigner(keyMaterial, pin, frostBlob, passphrase, email)
-		}
-	}
+        return nativeSigner?.let { SecureSubject.withSigner(it) }
+    }
 
-	fun createSigner(keyType: KeyType): NativeSigner? {
-		return when (keyType) {
-			KeyType.SOFTWARE -> SoftwareKeyPair().asNativeSigner()
-			KeyType.DEVICE_BOUND -> secureHardwareAccess.newHardwareSigner(SecureHardwareAccessControl.BIOMETRY)
-			KeyType.REMOTE_HSM -> null
-			KeyType.NONE -> null
-		}
-	}
+    fun getNativeSigner(
+        keyMaterial: KeyMaterial,
+        pin: String? = null,
+        frostBlob: String? = null,
+        passphrase: String? = null,
+        email: String? = null,
+    ): NativeSigner? =
+        signerFactories.firstNotNullOfOrNull {
+            it.createSigner(keyMaterial, pin, frostBlob, passphrase, email)
+        }
 
-	fun createHardwareSigner(accessControl: SecureHardwareAccessControl): NativeSigner {
-		return secureHardwareAccess.newHardwareSigner(accessControl)
-	}
+    fun getBatchSigner(
+        keyMaterial: KeyMaterial,
+        pin: String? = null,
+        frostBlob: String? = null,
+        passphrase: String? = null,
+        email: String? = null,
+    ): BatchSigner? =
+        batchSignerFactories.firstNotNullOfOrNull {
+            it.createBatchSigner(keyMaterial, pin, frostBlob, passphrase, email)
+        }
 
+    fun createSigner(keyType: KeyType): NativeSigner? =
+        when (keyType) {
+            KeyType.SOFTWARE -> SoftwareKeyPair().asNativeSigner()
+            KeyType.DEVICE_BOUND -> secureHardwareAccess.newHardwareSigner(SecureHardwareAccessControl.BIOMETRY)
+            KeyType.REMOTE_HSM -> null
+            KeyType.NONE -> null
+        }
+
+    fun createHardwareSigner(accessControl: SecureHardwareAccessControl): NativeSigner =
+        secureHardwareAccess.newHardwareSigner(accessControl)
 }

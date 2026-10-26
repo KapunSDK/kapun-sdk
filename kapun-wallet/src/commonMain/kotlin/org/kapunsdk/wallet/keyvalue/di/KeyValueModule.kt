@@ -19,8 +19,9 @@ package org.kapunsdk.wallet.keyvalue.di
 import org.kapunsdk.wallet.keyvalue.KeyValueRepository
 import org.koin.dsl.module
 
-internal fun keyValueModule() = module {
-	includes(
-		KeyValueRepository.koinModule,
-	)
-}
+internal fun keyValueModule() =
+    module {
+        includes(
+            KeyValueRepository.koinModule,
+        )
+    }

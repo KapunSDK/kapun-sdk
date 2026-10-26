@@ -18,26 +18,27 @@ package org.kapunsdk.wallet
 
 /** Configures UniFFI component bindings to use the wallet's aggregate Android library. */
 internal object KapunNativeLibrary {
-	private const val WALLET_LIBRARY = "kapun_wallet_rust"
+    private const val WALLET_LIBRARY = "kapun_wallet_rust"
 
-	private val bundledComponents = listOf(
-		"kapun_util_rust",
-		"kapun_crypto_rust",
-		"kapun_credential_core_rust",
-		"kapun_dcql_rust",
-		"kapun_dcql_bbs_rust",
-		"kapun_dcql_mdoc_rust",
-		"kapun_dcql_sdjwt_rust",
-		"kapun_dcql_w3c_rust",
-		"kapun_dcql_openbadges_rust",
-		"kapun_issuance_rust",
-		"kapun_presentation_rust",
-		"kapun_trust_rust",
-	)
+    private val bundledComponents =
+        listOf(
+            "kapun_util_rust",
+            "kapun_crypto_rust",
+            "kapun_credential_core_rust",
+            "kapun_dcql_rust",
+            "kapun_dcql_bbs_rust",
+            "kapun_dcql_mdoc_rust",
+            "kapun_dcql_sdjwt_rust",
+            "kapun_dcql_w3c_rust",
+            "kapun_dcql_openbadges_rust",
+            "kapun_issuance_rust",
+            "kapun_presentation_rust",
+            "kapun_trust_rust",
+        )
 
-	fun configure() {
-		bundledComponents.forEach { component ->
-			System.setProperty("uniffi.component.$component.libraryOverride", WALLET_LIBRARY)
-		}
-	}
+    fun configure() {
+        bundledComponents.forEach { component ->
+            System.setProperty("uniffi.component.$component.libraryOverride", WALLET_LIBRARY)
+        }
+    }
 }

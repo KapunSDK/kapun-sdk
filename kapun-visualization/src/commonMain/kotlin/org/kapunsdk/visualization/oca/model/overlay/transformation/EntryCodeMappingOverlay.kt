@@ -16,22 +16,26 @@ under the License.
 
 package org.kapunsdk.visualization.oca.model.overlay.transformation
 
-import org.kapunsdk.visualization.oca.model.SAID_HASH_PLACEHOLDER
-import org.kapunsdk.visualization.oca.model.content.AttributeName
-import org.kapunsdk.visualization.oca.model.content.SAID
-import org.kapunsdk.visualization.oca.model.overlay.Overlay
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonNames
+import org.kapunsdk.visualization.oca.model.SAID_HASH_PLACEHOLDER
+import org.kapunsdk.visualization.oca.model.content.AttributeName
+import org.kapunsdk.visualization.oca.model.content.SAID
+import org.kapunsdk.visualization.oca.model.overlay.Overlay
 
 @OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class EntryCodeMappingOverlay(
-	@JsonNames("attribute_entry_codes_mapping", "attr_entry_codes_mapping") val attributeEntryCodeMapping: Map<AttributeName, List<String>>,
-	@SerialName("capture_base") override val captureBase: SAID,
-	@SerialName("type") override val type: String = "spec/overlays/entry_code_mapping/1.0",
-	@SerialName("digest") override val digest: SAID = SAID_HASH_PLACEHOLDER,
+    @JsonNames("attribute_entry_codes_mapping", "attr_entry_codes_mapping") val attributeEntryCodeMapping:
+        Map<AttributeName, List<String>>,
+    @SerialName("capture_base") override val captureBase: SAID,
+    @SerialName("type") override val type: String = "spec/overlays/entry_code_mapping/1.0",
+    @SerialName("digest") override val digest: SAID = SAID_HASH_PLACEHOLDER,
 ) : TransformationOverlay {
-	override fun updateDigest(digest: SAID, captureBase: SAID): Overlay = copy(digest = digest, captureBase = captureBase)
+    override fun updateDigest(
+        digest: SAID,
+        captureBase: SAID,
+    ): Overlay = copy(digest = digest, captureBase = captureBase)
 }

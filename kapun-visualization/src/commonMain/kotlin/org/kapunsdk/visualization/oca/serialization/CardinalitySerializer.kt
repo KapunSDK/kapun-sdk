@@ -16,35 +16,51 @@ under the License.
 
 package org.kapunsdk.visualization.oca.serialization
 
-import org.kapunsdk.visualization.oca.model.content.Cardinality
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
+import org.kapunsdk.visualization.oca.model.content.Cardinality
 
 internal object CardinalitySerializer : KSerializer<Cardinality> {
+    override val descriptor = PrimitiveSerialDescriptor("Cardinality", PrimitiveKind.STRING)
 
-	override val descriptor = PrimitiveSerialDescriptor("Cardinality", PrimitiveKind.STRING)
+    override fun deserialize(decoder: Decoder): Cardinality {
+        val value = decoder.decodeString()
+        return when (val delimiterIndex = value.indexOf("-")) {
+            -1 -> {
+                Cardinality.Exactly(value.toInt())
+            }
 
-	override fun deserialize(decoder: Decoder): Cardinality {
-		val value = decoder.decodeString()
-		return when (val delimiterIndex = value.indexOf("-")) {
-			-1 -> Cardinality.Exactly(value.toInt())
-			0 -> Cardinality.AtMost(value.drop(1).toInt())
-			value.lastIndex -> Cardinality.AtLeast(value.dropLast(1).toInt())
-			else -> Cardinality.Between(value.substring(0, delimiterIndex).toInt(), value.substring(delimiterIndex + 1).toInt())
-		}
-	}
+            0 -> {
+                Cardinality.AtMost(value.drop(1).toInt())
+            }
 
-	override fun serialize(encoder: Encoder, value: Cardinality) {
-		val serialized = when (value) {
-			is Cardinality.AtLeast -> "${value.entries}-"
-			is Cardinality.AtMost -> "-${value.entries}"
-			is Cardinality.Between -> "${value.min}-${value.max}"
-			is Cardinality.Exactly -> value.entries.toString()
-		}
-		encoder.encodeString(serialized)
-	}
+            value.lastIndex -> {
+                Cardinality.AtLeast(value.dropLast(1).toInt())
+            }
 
+            else -> {
+                Cardinality.Between(
+                    value.substring(0, delimiterIndex).toInt(),
+                    value.substring(delimiterIndex + 1).toInt(),
+                )
+            }
+        }
+    }
+
+    override fun serialize(
+        encoder: Encoder,
+        value: Cardinality,
+    ) {
+        val serialized =
+            when (value) {
+                is Cardinality.AtLeast -> "${value.entries}-"
+                is Cardinality.AtMost -> "-${value.entries}"
+                is Cardinality.Between -> "${value.min}-${value.max}"
+                is Cardinality.Exactly -> value.entries.toString()
+            }
+        encoder.encodeString(serialized)
+    }
 }

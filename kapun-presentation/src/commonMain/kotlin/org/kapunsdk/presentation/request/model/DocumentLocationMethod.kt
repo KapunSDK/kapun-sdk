@@ -23,5 +23,5 @@ import kotlinx.serialization.Serializable
 data class DocumentLocationMethod(
     @SerialName("document_access_mode")
     val documentAccessMode: String,
-    val oneTimePassword: String?
+    val oneTimePassword: String?,
 )

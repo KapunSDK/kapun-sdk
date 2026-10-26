@@ -18,48 +18,66 @@ package org.kapunsdk.wallet.credentials.credential
 
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
-import org.kapunsdk.credentials.models.identity.DeferredIdentity
-import org.kapunsdk.wallet.DeferredCredentialEntity
-import org.kapunsdk.wallet.KapunDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.flow.map
+import org.kapunsdk.credentials.models.identity.DeferredIdentity
+import org.kapunsdk.wallet.DeferredCredentialEntity
+import org.kapunsdk.wallet.KapunDatabase
 import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.module
 
-class DeferredCredentialsRepository private constructor(db: KapunDatabase)  {
-	companion object {
-		val koinModule = module {
-			singleOf(::DeferredCredentialsRepository)
-		}
-	}
+class DeferredCredentialsRepository private constructor(
+    db: KapunDatabase,
+) {
+    companion object {
+        val koinModule =
+            module {
+                singleOf(::DeferredCredentialsRepository)
+            }
+    }
 
-	private val queries = db.deferredCredentialQueries
-	private val identities = db.identityQueries
+    private val queries = db.deferredCredentialQueries
+    private val identities = db.identityQueries
 
-	fun getAll()= queries.getAll().executeAsList().map {
-		it.toIdentityModel()
-	}
-	fun getAllAsFlow() = queries.getAll().asFlow().mapToList(Dispatchers.IO).map {
-		it.map { it.toIdentityModel() }
-	}
-	fun insert(identityName: String, transactionId: String, metadata: String, docType: String) = queries.transactionWithResult {
-		queries.insert(transactionId, metadata, docType, identityName)
-		queries.getForTransactionId(transactionId).executeAsOneOrNull()?.toIdentityModel()
-	}
-	fun useTransactionId(transactionId: String) = queries.useTransactionId(transactionId)
-	fun getForTransactionId(transactionId: String) = queries.getForTransactionId(transactionId).executeAsOneOrNull()
-	fun getIdentityForTransactionId(transactionId: String) = queries.transactionWithResult {
-		val df = queries.getForTransactionId(transactionId).executeAsOneOrNull() ?: return@transactionWithResult null
-		return@transactionWithResult  identities.getById(df.fk_identity_id).executeAsOneOrNull()
-	}
+    fun getAll() =
+        queries.getAll().executeAsList().map {
+            it.toIdentityModel()
+        }
 
-	private fun DeferredCredentialEntity.toIdentityModel() = DeferredIdentity(
-		this.id,
-		this.transaction_id,
-		this.metadata,
-		this.doc_type,
-		getIdentityForTransactionId(this.transaction_id)?.name ?: this.transaction_id ,
-		this.used != 0L
-	)
+    fun getAllAsFlow() =
+        queries.getAll().asFlow().mapToList(Dispatchers.IO).map {
+            it.map { it.toIdentityModel() }
+        }
+
+    fun insert(
+        identityName: String,
+        transactionId: String,
+        metadata: String,
+        docType: String,
+    ) = queries.transactionWithResult {
+        queries.insert(transactionId, metadata, docType, identityName)
+        queries.getForTransactionId(transactionId).executeAsOneOrNull()?.toIdentityModel()
+    }
+
+    fun useTransactionId(transactionId: String) = queries.useTransactionId(transactionId)
+
+    fun getForTransactionId(transactionId: String) = queries.getForTransactionId(transactionId).executeAsOneOrNull()
+
+    fun getIdentityForTransactionId(transactionId: String) =
+        queries.transactionWithResult {
+            val df =
+                queries.getForTransactionId(transactionId).executeAsOneOrNull() ?: return@transactionWithResult null
+            return@transactionWithResult identities.getById(df.fk_identity_id).executeAsOneOrNull()
+        }
+
+    private fun DeferredCredentialEntity.toIdentityModel() =
+        DeferredIdentity(
+            this.id,
+            this.transaction_id,
+            this.metadata,
+            this.doc_type,
+            getIdentityForTransactionId(this.transaction_id)?.name ?: this.transaction_id,
+            this.used != 0L,
+        )
 }

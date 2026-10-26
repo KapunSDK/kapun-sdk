@@ -16,32 +16,28 @@ under the License.
 
 package org.kapunsdk.util.json
 
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.kapunsdk.credentials.ClaimsPointer
 import org.kapunsdk.credentials.SdJwt
 import org.kapunsdk.credentials.W3C
 import org.kapunsdk.credentials.asSelector
 import org.kapunsdk.credentials.get
-
 import org.kapunsdk.credentials.toClaimsPointer
 import org.kapunsdk.util.extensions.asArray
 import org.kapunsdk.util.extensions.asLong
 import org.kapunsdk.util.extensions.asString
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import uniffi.kapun_crypto_rust.base64UrlDecode
-import uniffi.kapun_crypto_rust.SoftwareKeyPair
-import uniffi.kapun_dcql_sdjwt_rust.BuilderException
-
+import org.kapunsdk.util.extensions.get
 import uniffi.kapun_credential_core_rust.PointerPart
+import uniffi.kapun_crypto_rust.SoftwareKeyPair
+import uniffi.kapun_crypto_rust.base64UrlDecode
+import uniffi.kapun_dcql_sdjwt_rust.BuilderException
 import uniffi.kapun_util_rust.Value
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
-
-import org.kapunsdk.util.extensions.get
 import kotlin.test.assertFailsWith
-
+import kotlin.test.assertNull
 
 class SdJwtTests {
     @Test
@@ -57,94 +53,102 @@ class SdJwtTests {
 
     @Test
     fun sdJwtVcHeaderUsesDcSdJwtTyp() {
-        val claims: Value = Json.decodeFromString(
-            """
-            {
-              "iss": "https://issuer.example.com",
-              "vct": "test",
-              "given_name": "John"
-            }
-            """.trimIndent()
-        )
-        val sdJwt = SdJwt.create(
-            claims,
-            listOf(listOf("given_name").toClaimsPointer()!!),
-            "default",
-            TestSigner(SoftwareKeyPair()),
-            null
-        )!!
+        val claims: Value =
+            Json.decodeFromString(
+                """
+                {
+                  "iss": "https://issuer.example.com",
+                  "vct": "test",
+                  "given_name": "John"
+                }
+                """.trimIndent(),
+            )
+        val sdJwt =
+            SdJwt.create(
+                claims,
+                listOf(listOf("given_name").toClaimsPointer()!!),
+                "default",
+                TestSigner(SoftwareKeyPair()),
+                null,
+            )!!
 
         assertEquals("dc+sd-jwt", sdJwt.innerJwt.originalJwt.headerTyp())
     }
 
     @Test
     fun sdJwtVcCanOmitKidHeader() {
-        val claims: Value = Json.decodeFromString(
-            """
-            {
-              "iss": "https://issuer.example.com",
-              "vct": "test",
-              "given_name": "John"
-            }
-            """.trimIndent()
-        )
-        val sdJwt = SdJwt.create(
-            claims,
-            listOf(listOf("given_name").toClaimsPointer()!!),
-            null,
-            TestSigner(SoftwareKeyPair()),
-            null
-        )!!
+        val claims: Value =
+            Json.decodeFromString(
+                """
+                {
+                  "iss": "https://issuer.example.com",
+                  "vct": "test",
+                  "given_name": "John"
+                }
+                """.trimIndent(),
+            )
+        val sdJwt =
+            SdJwt.create(
+                claims,
+                listOf(listOf("given_name").toClaimsPointer()!!),
+                null,
+                TestSigner(SoftwareKeyPair()),
+                null,
+            )!!
 
         assertNull(sdJwt.innerJwt.originalJwt.headerKid())
     }
 
     @Test
     fun w3cSdJwtHeaderUsesVcSdJwtTyp() {
-        val claims: Value = Json.decodeFromString(
-            """
-            {
-              "@context": ["https://www.w3.org/ns/credentials/v2"],
-              "type": ["VerifiableCredential", "TestCredential"],
-              "issuer": "https://issuer.example.com",
-              "credentialSubject": {
-                "given_name": "John"
-              }
-            }
-            """.trimIndent()
-        )
-        val credential = W3C.SdJwt.create(
-            claims,
-            listOf(listOf("credentialSubject", "given_name").toClaimsPointer()!!),
-            "default",
-            TestSigner(SoftwareKeyPair()),
-            null
-        )!!
+        val claims: Value =
+            Json.decodeFromString(
+                """
+                {
+                  "@context": ["https://www.w3.org/ns/credentials/v2"],
+                  "type": ["VerifiableCredential", "TestCredential"],
+                  "issuer": "https://issuer.example.com",
+                  "credentialSubject": {
+                    "given_name": "John"
+                  }
+                }
+                """.trimIndent(),
+            )
+        val credential =
+            W3C.SdJwt.create(
+                claims,
+                listOf(listOf("credentialSubject", "given_name").toClaimsPointer()!!),
+                "default",
+                TestSigner(SoftwareKeyPair()),
+                null,
+            )!!
 
         assertEquals("vc+sd-jwt", credential.inner.originalJwt.headerTyp())
     }
 
     @Test
     fun w3cSdJwtCanOmitKidHeader() {
-        val claims: Value = Json.decodeFromString(
-            """
-            {
-              "@context": ["https://www.w3.org/ns/credentials/v2"],
-              "type": ["VerifiableCredential", "TestCredential"],
-              "issuer": "https://issuer.example.com",
-              "credentialSubject": {
-                "given_name": "John"
-              }
-            }
-            """.trimIndent()
-        )
-        val credential = W3C.SdJwt.create(
-            claims,
-            listOf(listOf("credentialSubject", "given_name").toClaimsPointer()!!),
-            null,
-            TestSigner(SoftwareKeyPair()),
-            null
-        )!!
+        val claims: Value =
+            Json.decodeFromString(
+                """
+                {
+                  "@context": ["https://www.w3.org/ns/credentials/v2"],
+                  "type": ["VerifiableCredential", "TestCredential"],
+                  "issuer": "https://issuer.example.com",
+                  "credentialSubject": {
+                    "given_name": "John"
+                  }
+                }
+                """.trimIndent(),
+            )
+        val credential =
+            W3C.SdJwt.create(
+                claims,
+                listOf(listOf("credentialSubject", "given_name").toClaimsPointer()!!),
+                null,
+                TestSigner(SoftwareKeyPair()),
+                null,
+            )!!
 
         assertNull(credential.inner.originalJwt.headerKid())
     }
@@ -153,10 +157,11 @@ class SdJwtTests {
     fun recursiveDisclosure() {
         val jwt = "eyJhbGciOiAiRVMyNTYiLCAidHlwIjogImV4YW1wbGUrc2Qtand0In0.eyJfc2QiOiBbIkNyUWU3UzVrcUJBSHQtbk1ZWGdjNmJkdDJTSDVhVFkxc1VfTS1QZ2tqUEkiLCAiSnpZakg0c3ZsaUgwUjNQeUVNZmVadTZKdDY5dTVxZWhabzdGN0VQWWxTRSIsICJQb3JGYnBLdVZ1Nnh5bUphZ3ZrRnNGWEFiUm9jMkpHbEFVQTJCQTRvN2NJIiwgIlRHZjRvTGJnd2Q1SlFhSHlLVlFaVTlVZEdFMHc1cnREc3JaemZVYW9tTG8iLCAiWFFfM2tQS3QxWHlYN0tBTmtxVlI2eVoyVmE1TnJQSXZQWWJ5TXZSS0JNTSIsICJYekZyendzY002R242Q0pEYzZ2Vks4QmtNbmZHOHZPU0tmcFBJWmRBZmRFIiwgImdiT3NJNEVkcTJ4Mkt3LXc1d1BFemFrb2I5aFYxY1JEMEFUTjNvUUw5Sk0iLCAianN1OXlWdWx3UVFsaEZsTV8zSmx6TWFTRnpnbGhRRzBEcGZheVF3TFVLNCJdLCAiaXNzIjogImh0dHBzOi8vaXNzdWVyLmV4YW1wbGUuY29tIiwgImlhdCI6IDE2ODMwMDAwMDAsICJleHAiOiAxODgzMDAwMDAwLCAic3ViIjogInVzZXJfNDIiLCAibmF0aW9uYWxpdGllcyI6IFt7Ii4uLiI6ICJwRm5kamtaX1ZDem15VGE2VWpsWm8zZGgta284YUlLUWM5RGxHemhhVllvIn0sIHsiLi4uIjogIjdDZjZKa1B1ZHJ5M2xjYndIZ2VaOGtoQXYxVTFPU2xlclAwVmtCSnJXWjAifV0sICJfc2RfYWxnIjogInNoYS0yNTYiLCAiY25mIjogeyJqd2siOiB7Imt0eSI6ICJFQyIsICJjcnYiOiAiUC0yNTYiLCAieCI6ICJUQ0FFUjE5WnZ1M09IRjRqNFc0dmZTVm9ISVAxSUxpbERsczd2Q2VHZW1jIiwgInkiOiAiWnhqaVdXYlpNUUdIVldLVlE0aGJTSWlyc1ZmdWVjQ0U2dDRqVDlGMkhaUSJ9fX0.qsI0EJs0DdWOwWjl4acRpVISStrvl1mwrumox26e-hRVtoEPy520qw1QX5pMdcZ0rKrpAuWJW0RRmKueQwaK5Q~WyIyR0xDNDJzS1F2ZUNmR2ZyeU5STjl3IiwgImdpdmVuX25hbWUiLCAiSm9obiJd~WyJlbHVWNU9nM2dTTklJOEVZbnN4QV9BIiwgImZhbWlseV9uYW1lIiwgIkRvZSJd~WyI2SWo3dE0tYTVpVlBHYm9TNXRtdlZBIiwgImVtYWlsIiwgImpvaG5kb2VAZXhhbXBsZS5jb20iXQ~WyJlSThaV205UW5LUHBOUGVOZW5IZGhRIiwgInBob25lX251bWJlciIsICIrMS0yMDItNTU1LTAxMDEiXQ~WyJRZ19PNjR6cUF4ZTQxMmExMDhpcm9BIiwgInBob25lX251bWJlcl92ZXJpZmllZCIsIHRydWVd~WyJBSngtMDk1VlBycFR0TjRRTU9xUk9BIiwgImFkZHJlc3MiLCB7InN0cmVldF9hZGRyZXNzIjogIjEyMyBNYWluIFN0IiwgImxvY2FsaXR5IjogIkFueXRvd24iLCAicmVnaW9uIjogIkFueXN0YXRlIiwgImNvdW50cnkiOiAiVVMifV0~WyJQYzMzSk0yTGNoY1VfbEhnZ3ZfdWZRIiwgImJpcnRoZGF0ZSIsICIxOTQwLTAxLTAxIl0~WyJHMDJOU3JRZmpGWFE3SW8wOXN5YWpBIiwgInVwZGF0ZWRfYXQiLCAxNTcwMDAwMDAwXQ~WyJsa2x4RjVqTVlsR1RQVW92TU5JdkNBIiwgIlVTIl0~WyJuUHVvUW5rUkZxM0JJZUFtN0FuWEZBIiwgIkRFIl0~"
         val sdjwt = SdJwt.parse(jwt)
-        val allNationalities = listOf(PointerPart.String("nationalities"),PointerPart.Null(false))
+        val allNationalities = listOf(PointerPart.String("nationalities"), PointerPart.Null(false))
         val presentation = sdjwt.presentation()
         presentation.addDisclosure(allNationalities)
     }
+
     @Test
     fun testError() {
         val jwt = "eyJhbGciOiAiRVMyNTYiLCAidHlwIjogImV4YW1wbGUrc2Qtand0In0.eyJfc2QiOiBbIkNyUWU3UzVrcUJBSHQtbk1ZWGdjNmJkdDJTSDVhVFkxc1VfTS1QZ2tqUEkiLCAiSnpZakg0c3ZsaUgwUjNQeUVNZmVadTZKdDY5dTVxZWhabzdGN0VQWWxTRSIsICJQb3JGYnBLdVZ1Nnh5bUphZ3ZrRnNGWEFiUm9jMkpHbEFVQTJCQTRvN2NJIiwgIlRHZjRvTGJnd2Q1SlFhSHlLVlFaVTlVZEdFMHc1cnREc3JaemZVYW9tTG8iLCAiWFFfM2tQS3QxWHlYN0tBTmtxVlI2eVoyVmE1TnJQSXZQWWJ5TXZSS0JNTSIsICJYekZyendzY002R242Q0pEYzZ2Vks4QmtNbmZHOHZPU0tmcFBJWmRBZmRFIiwgImdiT3NJNEVkcTJ4Mkt3LXc1d1BFemFrb2I5aFYxY1JEMEFUTjNvUUw5Sk0iLCAianN1OXlWdWx3UVFsaEZsTV8zSmx6TWFTRnpnbGhRRzBEcGZheVF3TFVLNCJdLCAiaXNzIjogImh0dHBzOi8vaXNzdWVyLmV4YW1wbGUuY29tIiwgImlhdCI6IDE2ODMwMDAwMDAsICJleHAiOiAxODgzMDAwMDAwLCAic3ViIjogInVzZXJfNDIiLCAibmF0aW9uYWxpdGllcyI6IFt7Ii4uLiI6ICJwRm5kamtaX1ZDem15VGE2VWpsWm8zZGgta284YUlLUWM5RGxHemhhVllvIn0sIHsiLi4uIjogIjdDZjZKa1B1ZHJ5M2xjYndIZ2VaOGtoQXYxVTFPU2xlclAwVmtCSnJXWjAifV0sICJfc2RfYWxnIjogInNoYS0yNTYiLCAiY25mIjogeyJqd2siOiB7Imt0eSI6ICJFQyIsICJjcnYiOiAiUC0yNTYiLCAieCI6ICJUQ0FFUjE5WnZ1M09IRjRqNFc0dmZTVm9ISVAxSUxpbERsczd2Q2VHZW1jIiwgInkiOiAiWnhqaVdXYlpNUUdIVldLVlE0aGJTSWlyc1ZmdWVjQ0U2dDRqVDlGMkhaUSJ9fX0.qsI0EJs0DdWOwWjl4acRpVISStrvl1mwrumox26e-hRVtoEPy520qw1QX5pMdcZ0rKrpAuWJW0RRmKueQwaK5Q~WyIyR0xDNDJzS1F2ZUNmR2ZyeU5STjl3IiwgImdpdmVuX25hbWUiLCAiSm9obiJd~WyJlbHVWNU9nM2dTTklJOEVZbnN4QV9BIiwgImZhbWlseV9uYW1lIiwgIkRvZSJd~WyI2SWo3dE0tYTVpVlBHYm9TNXRtdlZBIiwgImVtYWlsIiwgImpvaG5kb2VAZXhhbXBsZS5jb20iXQ~WyJlSThaV205UW5LUHBOUGVOZW5IZGhRIiwgInBob25lX251bWJlciIsICIrMS0yMDItNTU1LTAxMDEiXQ~WyJRZ19PNjR6cUF4ZTQxMmExMDhpcm9BIiwgInBob25lX251bWJlcl92ZXJpZmllZCIsIHRydWVd~WyJBSngtMDk1VlBycFR0TjRRTU9xUk9BIiwgImFkZHJlc3MiLCB7InN0cmVldF9hZGRyZXNzIjogIjEyMyBNYWluIFN0IiwgImxvY2FsaXR5IjogIkFueXRvd24iLCAicmVnaW9uIjogIkFueXN0YXRlIiwgImNvdW50cnkiOiAiVVMifV0~WyJQYzMzSk0yTGNoY1VfbEhnZ3ZfdWZRIiwgImJpcnRoZGF0ZSIsICIxOTQwLTAxLTAxIl0~WyJHMDJOU3JRZmpGWFE3SW8wOXN5YWpBIiwgInVwZGF0ZWRfYXQiLCAxNTcwMDAwMDAwXQ~WyJsa2x4RjVqTVlsR1RQVW92TU5JdkNBIiwgIlVTIl0~WyJuUHVvUW5rUkZxM0JJZUFtN0FuWEZBIiwgIkRFIl0~"
@@ -167,12 +172,13 @@ class SdJwtTests {
         }
     }
 
-    @Test
     // https://www.ietf.org/archive/id/draft-ietf-oauth-selective-disclosure-jwt-14.html#name-considerations-on-nested-da
+    @Test
     fun testNestedObjects() {
         val kb = SoftwareKeyPair()
-        val kbValue : Value = Json.decodeFromString(kb.jwkString())
-        val jsonString = "{\n" +
+        val kbValue: Value = Json.decodeFromString(kb.jwkString())
+        val jsonString =
+            "{\n" +
                 "  \"sub\": \"6c5c0a49-b589-431d-bae7-219122a9ec2c\",\n" +
                 "  \"address\": {\n" +
                 "    \"street_address\": \"Schulstr. 12\",\n" +
@@ -181,32 +187,63 @@ class SdJwtTests {
                 "    \"country\": \"DE\"\n" +
                 "  }\n" +
                 "}"
-        val claims : Value = Json.decodeFromString(jsonString)
+        val claims: Value = Json.decodeFromString(jsonString)
 
         // Flat SD-JWT https://www.ietf.org/archive/id/draft-ietf-oauth-selective-disclosure-jwt-14.html#name-example-flat-sd-jwt
-        val flatSdJwt = SdJwt.create(claims, listOf(listOf("address").toClaimsPointer()!!), "123", TestSigner(
-            SoftwareKeyPair()), kbValue)!!
+        val flatSdJwt =
+            SdJwt.create(
+                claims,
+                listOf(listOf("address").toClaimsPointer()!!),
+                "123",
+                TestSigner(SoftwareKeyPair()),
+                kbValue,
+            )!!
         assertEquals(1, flatSdJwt.get("_sd".asSelector())[0].asArray()!!.size)
         assertEquals(1, flatSdJwt.innerJwt.disclosuresMap.size)
         // Structured SD-JWT
-        val disclosuresStructured = listOf(listOf("address","street_address").toClaimsPointer()!!, listOf("address","locality").toClaimsPointer()!!, listOf("address","region").toClaimsPointer()!!)
-        val structuredSdJwt = SdJwt.create(claims, disclosuresStructured,  "123", TestSigner(
-            SoftwareKeyPair()), kbValue)!!
-        assertEquals(3, structuredSdJwt.get(listOf("address","_sd").toClaimsPointer()!!)[0].asArray()!!.size)
+        val disclosuresStructured =
+            listOf(
+                listOf("address", "street_address").toClaimsPointer()!!,
+                listOf("address", "locality").toClaimsPointer()!!,
+                listOf("address", "region").toClaimsPointer()!!,
+            )
+        val structuredSdJwt =
+            SdJwt.create(
+                claims,
+                disclosuresStructured,
+                "123",
+                TestSigner(SoftwareKeyPair()),
+                kbValue,
+            )!!
+        assertEquals(3, structuredSdJwt.get(listOf("address", "_sd").toClaimsPointer()!!)[0].asArray()!!.size)
         assertEquals(3, structuredSdJwt.innerJwt.disclosuresMap.size)
 
         // Recursive SD-JWT
-        val disclosuresRecursive = listOf(listOf("address").toClaimsPointer()!!,listOf("address","street_address").toClaimsPointer()!!, listOf("address","locality").toClaimsPointer()!!, listOf("address","region").toClaimsPointer()!!)
-        val recursiveSdJwt = SdJwt.create(claims, disclosuresRecursive,  "123", TestSigner(
-            SoftwareKeyPair()), kbValue)!!
+        val disclosuresRecursive =
+            listOf(
+                listOf("address").toClaimsPointer()!!,
+                listOf("address", "street_address").toClaimsPointer()!!,
+                listOf("address", "locality").toClaimsPointer()!!,
+                listOf("address", "region").toClaimsPointer()!!,
+            )
+        val recursiveSdJwt =
+            SdJwt.create(
+                claims,
+                disclosuresRecursive,
+                "123",
+                TestSigner(SoftwareKeyPair()),
+                kbValue,
+            )!!
         assertEquals(1, recursiveSdJwt.get("_sd".asSelector())[0].asArray()!!.size)
         assertEquals(4, recursiveSdJwt.innerJwt.disclosuresMap.size)
     }
+
     @Test
     fun testDeeplyNestedPresentation() {
         val kb = SoftwareKeyPair()
-        val kbValue : Value = Json.decodeFromString(kb.jwkString())
-        val deeplyNested = "{\n" +
+        val kbValue: Value = Json.decodeFromString(kb.jwkString())
+        val deeplyNested =
+            "{\n" +
                 "  \"object\" : {\n" +
                 "    \"array\" : [\n" +
                 "      {\n" +
@@ -229,18 +266,19 @@ class SdJwtTests {
                 "    }\n" +
                 "  ]\n" +
                 "}"
-        val claims : Value = Json.decodeFromString(deeplyNested)
-        val disclosurse = listOf(
-            listOf("object", "array", null, "key1").toClaimsPointer()!!,
-            listOf("object", "array", null).toClaimsPointer()!!,
-            listOf("object").toClaimsPointer()!!,
-            listOf("array", null).toClaimsPointer()!!,
-            listOf("other").toClaimsPointer()!!
-        )
-        val sdjwt = SdJwt.create(claims, disclosurse,"123", TestSigner(SoftwareKeyPair()),kbValue)!!
+        val claims: Value = Json.decodeFromString(deeplyNested)
+        val disclosurse =
+            listOf(
+                listOf("object", "array", null, "key1").toClaimsPointer()!!,
+                listOf("object", "array", null).toClaimsPointer()!!,
+                listOf("object").toClaimsPointer()!!,
+                listOf("array", null).toClaimsPointer()!!,
+                listOf("other").toClaimsPointer()!!,
+            )
+        val sdjwt = SdJwt.create(claims, disclosurse, "123", TestSigner(SoftwareKeyPair()), kbValue)!!
         assertEquals("object[0].key1", sdjwt[listOf("object", "array", 0, "key1").toClaimsPointer()!!][0].asString())
         assertEquals("object[0].key2", sdjwt[listOf("object", "array", 1, "key1").toClaimsPointer()!!][0].asString())
-        assertEquals(1L, sdjwt[listOf("other",  0, "test").toClaimsPointer()!!][0].asLong())
+        assertEquals(1L, sdjwt[listOf("other", 0, "test").toClaimsPointer()!!][0].asLong())
     }
 
     @Test
@@ -256,29 +294,39 @@ class SdJwtTests {
         val pubKeyJwt = Json.decodeFromString<Value>(keys.jwkString())
         val issuer = TestSigner(SoftwareKeyPair())
 
-        val claims = Value.Object(mapOf(
-            "place_of_birth" to Value.Object(mapOf(
-                "country" to Value.String("Switzerland"),
-                "locality" to Value.String("Zürich")
-            ))
-        ))
+        val claims =
+            Value.Object(
+                mapOf(
+                    "place_of_birth" to
+                        Value.Object(
+                            mapOf(
+                                "country" to Value.String("Switzerland"),
+                                "locality" to Value.String("Zürich"),
+                            ),
+                        ),
+                ),
+            )
 
-        val disclosures = listOf<ClaimsPointer>(
-            listOf("place_of_birth").toClaimsPointer()!!,
-            listOf("place_of_birth", "country").toClaimsPointer()!!,
-            listOf("place_of_birth", "locality").toClaimsPointer()!!
-        )
+        val disclosures =
+            listOf<ClaimsPointer>(
+                listOf("place_of_birth").toClaimsPointer()!!,
+                listOf("place_of_birth", "country").toClaimsPointer()!!,
+                listOf("place_of_birth", "locality").toClaimsPointer()!!,
+            )
 
-        val sdJwt = SdJwt.create(
-            claims = claims,
-            disclosures = disclosures,
-            keyId = "issuer-key-id",
-            key = issuer,
-            pubKeyJwk = pubKeyJwt)!!
+        val sdJwt =
+            SdJwt.create(
+                claims = claims,
+                disclosures = disclosures,
+                keyId = "issuer-key-id",
+                key = issuer,
+                pubKeyJwk = pubKeyJwt,
+            )!!
 
         val presentation = sdJwt.presentation()
-        presentation.addDisclosure(listOf(
-            PointerPart.String("place_of_birth")))
+        presentation.addDisclosure(
+            listOf(PointerPart.String("place_of_birth")),
+        )
         val vpToken = presentation.build(TestSigner(keys))
 
         val parsed = SdJwt.parse(vpToken)
@@ -425,18 +473,15 @@ class SdJwtTests {
 //        }
 //    }
 
-    private fun String.headerTyp(): String? {
-        return jwtHeader()["typ"]
+    private fun String.headerTyp(): String? =
+        jwtHeader()["typ"]
             ?.jsonPrimitive
             ?.content
-    }
 
-    private fun String.headerKid(): String? {
-        return jwtHeader()["kid"]
+    private fun String.headerKid(): String? =
+        jwtHeader()["kid"]
             ?.jsonPrimitive
             ?.content
-    }
 
-    private fun String.jwtHeader() =
-        Json.parseToJsonElement(base64UrlDecode(split(".").first()).decodeToString()).jsonObject
+    private fun String.jwtHeader() = Json.parseToJsonElement(base64UrlDecode(split(".").first()).decodeToString()).jsonObject
 }

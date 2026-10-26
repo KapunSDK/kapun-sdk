@@ -16,7 +16,6 @@ under the License.
 
 package org.kapunsdk.visualization.oca.serialization
 
-import org.kapunsdk.visualization.oca.model.content.EntryCodeValue
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
@@ -28,25 +27,36 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonDecoder
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonPrimitive
+import org.kapunsdk.visualization.oca.model.content.EntryCodeValue
 
 internal object EntryCodeValueSerializer : KSerializer<EntryCodeValue> {
+    override val descriptor = PrimitiveSerialDescriptor("EntryCodeValue", PrimitiveKind.STRING)
 
-	override val descriptor = PrimitiveSerialDescriptor("EntryCodeValue", PrimitiveKind.STRING)
+    override fun deserialize(decoder: Decoder): EntryCodeValue {
+        val jsonDecoder =
+            decoder as? JsonDecoder ?: throw IllegalArgumentException("This class can only be deserialized from JSON")
+        return when (val jsonElement = jsonDecoder.decodeJsonElement()) {
+            is JsonPrimitive -> EntryCodeValue.Reference(jsonElement.content)
+            is JsonArray -> EntryCodeValue.Predefined(jsonElement.map { it.jsonPrimitive.content })
+            else -> throw IllegalArgumentException("Excpected either JsonPrimitive or JsonArray but was $jsonElement")
+        }
+    }
 
-	override fun deserialize(decoder: Decoder): EntryCodeValue {
-		val jsonDecoder = decoder as? JsonDecoder ?: throw IllegalArgumentException("This class can only be deserialized from JSON")
-		return when (val jsonElement = jsonDecoder.decodeJsonElement()) {
-			is JsonPrimitive -> EntryCodeValue.Reference(jsonElement.content)
-			is JsonArray -> EntryCodeValue.Predefined(jsonElement.map { it.jsonPrimitive.content })
-			else -> throw IllegalArgumentException("Excpected either JsonPrimitive or JsonArray but was $jsonElement")
-		}
-	}
+    override fun serialize(
+        encoder: Encoder,
+        value: EntryCodeValue,
+    ) {
+        when (value) {
+            is EntryCodeValue.Predefined -> {
+                encoder.encodeSerializableValue<List<String>>(
+                    ListSerializer(String.serializer()),
+                    value.keys,
+                )
+            }
 
-	override fun serialize(encoder: Encoder, value: EntryCodeValue) {
-		when (value) {
-			is EntryCodeValue.Predefined -> encoder.encodeSerializableValue<List<String>>(ListSerializer(String.serializer()),value.keys)
-			is EntryCodeValue.Reference -> encoder.encodeString(value.reference)
-		}
-	}
-
+            is EntryCodeValue.Reference -> {
+                encoder.encodeString(value.reference)
+            }
+        }
+    }
 }

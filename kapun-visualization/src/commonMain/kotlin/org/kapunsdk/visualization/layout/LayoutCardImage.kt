@@ -19,9 +19,13 @@ package org.kapunsdk.visualization.layout
 import kotlinx.serialization.Serializable
 
 sealed interface LayoutCardImage {
-	@Serializable
-	data class Base64(val image: ByteArray) : LayoutCardImage
+    @Serializable
+    data class Base64(
+        val image: ByteArray,
+    ) : LayoutCardImage
 
-	@Serializable
-	data class Url(val url: String) : LayoutCardImage
+    @Serializable
+    data class Url(
+        val url: String,
+    ) : LayoutCardImage
 }

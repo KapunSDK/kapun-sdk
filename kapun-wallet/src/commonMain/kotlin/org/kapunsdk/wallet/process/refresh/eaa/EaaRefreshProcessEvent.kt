@@ -19,8 +19,8 @@ package org.kapunsdk.wallet.process.refresh.eaa
 import org.kapunsdk.wallet.credentials.identity.IdentityUiModel
 import org.kapunsdk.wallet.process.ProcessEvent
 
-sealed interface EaaRefreshProcessEvent: ProcessEvent {
-	data class RefreshRequests(
-		val identity: IdentityUiModel,
-	) : EaaRefreshProcessEvent
+sealed interface EaaRefreshProcessEvent : ProcessEvent {
+    data class RefreshRequests(
+        val identity: IdentityUiModel,
+    ) : EaaRefreshProcessEvent
 }

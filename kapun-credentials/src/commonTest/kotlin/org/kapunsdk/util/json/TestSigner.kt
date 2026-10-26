@@ -19,12 +19,10 @@ package org.kapunsdk.util.json
 import uniffi.kapun_credential_core_rust.SignatureCreator
 import uniffi.kapun_crypto_rust.SoftwareKeyPair
 
-class TestSigner(val issuerKey: SoftwareKeyPair) : SignatureCreator {
-	override fun alg(): String {
-		return "ES256"
-	}
+class TestSigner(
+    val issuerKey: SoftwareKeyPair,
+) : SignatureCreator {
+    override fun alg(): String = "ES256"
 
-	override fun sign(bytes: ByteArray): ByteArray {
-		return issuerKey.signWithKey(bytes)
-	}
+    override fun sign(bytes: ByteArray): ByteArray = issuerKey.signWithKey(bytes)
 }

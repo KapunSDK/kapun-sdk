@@ -19,13 +19,11 @@ package org.kapunsdk.wallet.process.vc2pdf
 import org.kapunsdk.wallet.process.ProcessEvent
 
 sealed interface Vc2PdfProcessEvent : ProcessEvent {
+    data class InitiateCredentialToPdf(
+        val flowId: String = "4",
+    ) : Vc2PdfProcessEvent
 
-	data class InitiateCredentialToPdf(
-		val flowId: String = "4",
-	) : Vc2PdfProcessEvent
-
-	data class PresentationCompleted(
-		val redirectUri: String,
-	) : Vc2PdfProcessEvent
-
+    data class PresentationCompleted(
+        val redirectUri: String,
+    ) : Vc2PdfProcessEvent
 }

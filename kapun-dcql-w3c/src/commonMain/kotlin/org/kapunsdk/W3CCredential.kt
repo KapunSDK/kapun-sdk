@@ -12,14 +12,14 @@ package org.kapunsdk
 import org.kapunsdk.credentials.get
 import org.kapunsdk.util.extensions.get
 import uniffi.kapun_credential_core_rust.Selector
-import uniffi.kapun_dcql_w3c_rust.W3cSdJwt
-import uniffi.kapun_dcql_w3c_rust.parseW3cSdJwt
 import uniffi.kapun_dcql_rust.Credential
 import uniffi.kapun_dcql_rust.CredentialLike
 import uniffi.kapun_dcql_rust.CredentialParser
 import uniffi.kapun_dcql_rust.Meta
 import uniffi.kapun_dcql_rust.MetaMismatch
 import uniffi.kapun_dcql_rust.registerParser
+import uniffi.kapun_dcql_w3c_rust.W3cSdJwt
+import uniffi.kapun_dcql_w3c_rust.parseW3cSdJwt
 import uniffi.kapun_util_rust.Value
 
 object W3CParser : CredentialParser {
@@ -38,7 +38,9 @@ object W3CParser : CredentialParser {
     }
 }
 
-class W3CCredential(private val w3c: W3cSdJwt) : CredentialLike {
+class W3CCredential(
+    private val w3c: W3cSdJwt,
+) : CredentialLike {
     override fun getBody(): Value = w3c.json
 
     override fun serialize(): String = w3c.originalSdjwt

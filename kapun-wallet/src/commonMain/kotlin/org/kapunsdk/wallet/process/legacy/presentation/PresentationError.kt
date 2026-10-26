@@ -17,6 +17,6 @@ under the License.
 package org.kapunsdk.wallet.process.legacy.presentation
 
 enum class PresentationError {
-	WRONG_PASSPHRASE_ENTERED,
-	WRONG_PIN_ENTERED;
+    WRONG_PASSPHRASE_ENTERED,
+    WRONG_PIN_ENTERED,
 }

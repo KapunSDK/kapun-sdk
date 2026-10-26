@@ -16,47 +16,50 @@ under the License.
 
 package org.kapunsdk.visualization.oca.serialization
 
-import org.kapunsdk.visualization.extensions.substringBetween
-import org.kapunsdk.visualization.oca.model.content.AttributeType
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
+import org.kapunsdk.visualization.extensions.substringBetween
+import org.kapunsdk.visualization.oca.model.content.AttributeType
 
 internal object AttributeTypeSerializer : KSerializer<AttributeType> {
+    override val descriptor = PrimitiveSerialDescriptor("AttributeType", PrimitiveKind.STRING)
 
-	override val descriptor = PrimitiveSerialDescriptor("AttributeType", PrimitiveKind.STRING)
+    override fun deserialize(decoder: Decoder): AttributeType {
+        val value = decoder.decodeString()
+        return value.toAttributeType()
+    }
 
-	override fun deserialize(decoder: Decoder): AttributeType {
-		val value = decoder.decodeString()
-		return value.toAttributeType()
-	}
+    override fun serialize(
+        encoder: Encoder,
+        value: AttributeType,
+    ) {
+        encoder.encodeString(value.toStringValue())
+    }
 
-	override fun serialize(encoder: Encoder, value: AttributeType) {
-		encoder.encodeString(value.toStringValue())
-	}
+    private fun AttributeType.toStringValue(): String =
+        when (this) {
+            is AttributeType.Array -> "Array[${contentType.toStringValue()}]"
+            AttributeType.Binary -> "Binary"
+            AttributeType.Boolean -> "Boolean"
+            AttributeType.DateTime -> "DateTime"
+            AttributeType.Numeric -> "Numeric"
+            AttributeType.Reference -> "Reference"
+            AttributeType.Text -> "Text"
+            AttributeType.Unknown -> "Unknown"
+        }
 
-	private fun AttributeType.toStringValue(): String = when (this) {
-		is AttributeType.Array -> "Array[${contentType.toStringValue()}]"
-		AttributeType.Binary -> "Binary"
-		AttributeType.Boolean -> "Boolean"
-		AttributeType.DateTime -> "DateTime"
-		AttributeType.Numeric -> "Numeric"
-		AttributeType.Reference -> "Reference"
-		AttributeType.Text -> "Text"
-		AttributeType.Unknown -> "Unknown"
-	}
-
-	private fun String.toAttributeType(): AttributeType = when (this.substringBefore("[")) {
-		"Array" -> AttributeType.Array(this.substringBetween("[", "]").toAttributeType())
-		"Binary" -> AttributeType.Binary
-		"Boolean" -> AttributeType.Boolean
-		"DateTime" -> AttributeType.DateTime
-		"Numeric" -> AttributeType.Numeric
-		"Reference" -> AttributeType.Reference
-		"Text" -> AttributeType.Text
-		else -> AttributeType.Unknown
-	}
-
+    private fun String.toAttributeType(): AttributeType =
+        when (this.substringBefore("[")) {
+            "Array" -> AttributeType.Array(this.substringBetween("[", "]").toAttributeType())
+            "Binary" -> AttributeType.Binary
+            "Boolean" -> AttributeType.Boolean
+            "DateTime" -> AttributeType.DateTime
+            "Numeric" -> AttributeType.Numeric
+            "Reference" -> AttributeType.Reference
+            "Text" -> AttributeType.Text
+            else -> AttributeType.Unknown
+        }
 }

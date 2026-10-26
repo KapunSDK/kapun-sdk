@@ -16,38 +16,38 @@ under the License.
 
 package org.kapunsdk.wallet.credentials.activity
 
-import org.kapunsdk.trust.framework.swiss.model.TrustData
-import org.kapunsdk.wallet.credentials.LocalizedKeyValue
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import org.kapunsdk.trust.framework.swiss.model.TrustData
+import org.kapunsdk.wallet.credentials.LocalizedKeyValue
 
 @Serializable
 sealed interface ActivityUiModel {
-	val id: Long
-	val type: ActivityType
-	val insertedAt: String
-	val frameworkId: String?
+    val id: Long
+    val type: ActivityType
+    val insertedAt: String
+    val frameworkId: String?
 
-	@Serializable
-	data class Issuance(
-		override val id: Long,
-		override val frameworkId: String?,
-		@SerialName("activityType") override val type: ActivityType,
-		override val insertedAt: String,
-		val issuanceTrustData: TrustData.Issuance,
-		val agentDisplayName: String? = null,
-		val agentLogoUri: String? = null,
-	) : ActivityUiModel
+    @Serializable
+    data class Issuance(
+        override val id: Long,
+        override val frameworkId: String?,
+        @SerialName("activityType") override val type: ActivityType,
+        override val insertedAt: String,
+        val issuanceTrustData: TrustData.Issuance,
+        val agentDisplayName: String? = null,
+        val agentLogoUri: String? = null,
+    ) : ActivityUiModel
 
-	@Serializable
-	data class Proof(
-		override val id: Long,
-		override val frameworkId: String?,
-		@SerialName("activityType") override val type: ActivityType,
-		override val insertedAt: String,
-		val values: List<LocalizedKeyValue>?,
-		val verificationTrustData: TrustData.Verification,
-		val agentDisplayName: String? = null,
-		val agentLogoUri: String? = null,
-	) : ActivityUiModel
+    @Serializable
+    data class Proof(
+        override val id: Long,
+        override val frameworkId: String?,
+        @SerialName("activityType") override val type: ActivityType,
+        override val insertedAt: String,
+        val values: List<LocalizedKeyValue>?,
+        val verificationTrustData: TrustData.Verification,
+        val agentDisplayName: String? = null,
+        val agentLogoUri: String? = null,
+    ) : ActivityUiModel
 }

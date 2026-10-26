@@ -13,7 +13,7 @@ sealed class CredentialIssuerMetadata {
 
     @Serializable
     class Unsigned(
-        override val claims: CredentialIssuerMetadataClaims
+        override val claims: CredentialIssuerMetadataClaims,
     ) : CredentialIssuerMetadata()
 
     abstract val claims: CredentialIssuerMetadataClaims

@@ -11,7 +11,7 @@ software distributed under the License is distributed on an
 "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
-under the License.   
+under the License.
  */
 package org.kapunsdk.sample.wallet.utils
 
@@ -24,24 +24,22 @@ import com.google.zxing.common.BitMatrix
 import com.google.zxing.qrcode.QRCodeWriter
 
 object QrCodeGenerator {
-
-	fun createQRCode(content: String): Bitmap? {
-		val writer = QRCodeWriter()
-		try {
-			val bitMatrix: BitMatrix = writer.encode(content, BarcodeFormat.QR_CODE, 512, 512)
-			val width: Int = bitMatrix.width
-			val height: Int = bitMatrix.height
-			val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565)
-			for (x in 0 until width) {
-				for (y in 0 until height) {
-					bmp.setPixel(x, y, if (bitMatrix.get(x, y)) Color.Black.toArgb() else Color.White.toArgb())
-				}
-			}
-			return bmp
-		} catch (e: WriterException) {
-			e.printStackTrace()
-		}
-		return null
-	}
-
+    fun createQRCode(content: String): Bitmap? {
+        val writer = QRCodeWriter()
+        try {
+            val bitMatrix: BitMatrix = writer.encode(content, BarcodeFormat.QR_CODE, 512, 512)
+            val width: Int = bitMatrix.width
+            val height: Int = bitMatrix.height
+            val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565)
+            for (x in 0 until width) {
+                for (y in 0 until height) {
+                    bmp.setPixel(x, y, if (bitMatrix.get(x, y)) Color.Black.toArgb() else Color.White.toArgb())
+                }
+            }
+            return bmp
+        } catch (e: WriterException) {
+            e.printStackTrace()
+        }
+        return null
+    }
 }

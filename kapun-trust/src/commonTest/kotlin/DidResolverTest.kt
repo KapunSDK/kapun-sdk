@@ -1,6 +1,6 @@
+import kotlinx.serialization.json.Json
 import org.kapunsdk.trust.did.DidResolver
 import org.kapunsdk.trust.did.models.WitnessProof
-import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -8,9 +8,10 @@ import kotlin.test.assertNotNull
 class DidResolverTest {
     @Test
     fun testSwiyu1() {
-        val jsonl = """
+        val jsonl =
+            """
             ["1-QmeoKrpAHbvnBGitDwdL2TFsjSmPdTcgwrvci65ejWZeE1","2025-02-03T13:46:46Z",{"method":"did:tdw:0.3","scid":"QmPEZPhDFR4nEYSFK5bMnvECqdpf1tPTPJuWs9QrMjCumw","updateKeys":["z6MkwGwfbexiUCGeyrdS2fsBCuTsm8b9JJyofvvphuJ5yq4f"]},{"value":{"@context":["https://www.w3.org/ns/did/v1","https://w3id.org/security/suites/jws-2020/v1"],"id":"did:tdw:QmPEZPhDFR4nEYSFK5bMnvECqdpf1tPTPJuWs9QrMjCumw:identifier-reg.trust-infra.swiyu-int.admin.ch:api:v1:did:9a5559f0-b81c-4368-a170-e7b4ae424527","authentication":["did:tdw:QmPEZPhDFR4nEYSFK5bMnvECqdpf1tPTPJuWs9QrMjCumw:identifier-reg.trust-infra.swiyu-int.admin.ch:api:v1:did:9a5559f0-b81c-4368-a170-e7b4ae424527#auth-key-857403c5-e637-48da-86e0-b5b46d995145"],"assertionMethod":["did:tdw:QmPEZPhDFR4nEYSFK5bMnvECqdpf1tPTPJuWs9QrMjCumw:identifier-reg.trust-infra.swiyu-int.admin.ch:api:v1:did:9a5559f0-b81c-4368-a170-e7b4ae424527#assert-key-f4bc032f-bfe0-4bab-acb3-bc3ef7fb3400","did:tdw:QmPEZPhDFR4nEYSFK5bMnvECqdpf1tPTPJuWs9QrMjCumw:identifier-reg.trust-infra.swiyu-int.admin.ch:api:v1:did:9a5559f0-b81c-4368-a170-e7b4ae424527#assert-key-b720c10d-34be-4e2e-9d87-cecdf8e6a00f","did:tdw:QmPEZPhDFR4nEYSFK5bMnvECqdpf1tPTPJuWs9QrMjCumw:identifier-reg.trust-infra.swiyu-int.admin.ch:api:v1:did:9a5559f0-b81c-4368-a170-e7b4ae424527#assert-key-c02a1676-ab19-491c-b0fa-3703ea269c07"],"verificationMethod":[{"id":"did:tdw:QmPEZPhDFR4nEYSFK5bMnvECqdpf1tPTPJuWs9QrMjCumw:identifier-reg.trust-infra.swiyu-int.admin.ch:api:v1:did:9a5559f0-b81c-4368-a170-e7b4ae424527#auth-key-857403c5-e637-48da-86e0-b5b46d995145","controller":"did:tdw:QmPEZPhDFR4nEYSFK5bMnvECqdpf1tPTPJuWs9QrMjCumw:identifier-reg.trust-infra.swiyu-int.admin.ch:api:v1:did:9a5559f0-b81c-4368-a170-e7b4ae424527","type":"JsonWebKey2020","publicKeyJwk":{"kty":"EC","crv":"P-256","x":"-vyk2CRIGhkVIHOs635MuecwGh0Up1vWrfXAcNYhLzE","y":"7N0RuWkLNjAzlrZjLcIYpiYJwd9Dbx8ihgSZQUWIBug"}},{"id":"did:tdw:QmPEZPhDFR4nEYSFK5bMnvECqdpf1tPTPJuWs9QrMjCumw:identifier-reg.trust-infra.swiyu-int.admin.ch:api:v1:did:9a5559f0-b81c-4368-a170-e7b4ae424527#assert-key-f4bc032f-bfe0-4bab-acb3-bc3ef7fb3400","controller":"did:tdw:QmPEZPhDFR4nEYSFK5bMnvECqdpf1tPTPJuWs9QrMjCumw:identifier-reg.trust-infra.swiyu-int.admin.ch:api:v1:did:9a5559f0-b81c-4368-a170-e7b4ae424527","type":"JsonWebKey2020","publicKeyJwk":{"kty":"EC","crv":"P-256","x":"zDTIeVtBZGBFH7l5k_soE79FEgeqtB9cJZc_jjwE1vc","y":"eTGNVxoW54gEHPrFTpOg2zNFLWcxLHs9vi85sXxMhXA"}},{"id":"did:tdw:QmPEZPhDFR4nEYSFK5bMnvECqdpf1tPTPJuWs9QrMjCumw:identifier-reg.trust-infra.swiyu-int.admin.ch:api:v1:did:9a5559f0-b81c-4368-a170-e7b4ae424527#assert-key-b720c10d-34be-4e2e-9d87-cecdf8e6a00f","controller":"did:tdw:QmPEZPhDFR4nEYSFK5bMnvECqdpf1tPTPJuWs9QrMjCumw:identifier-reg.trust-infra.swiyu-int.admin.ch:api:v1:did:9a5559f0-b81c-4368-a170-e7b4ae424527","type":"JsonWebKey2020","publicKeyJwk":{"kty":"EC","crv":"P-256","x":"_UOKP2X1Kft8njOmKUxh0UK7F0fVGM1kc78-YYXTpEw","y":"rYUhY-ntvpoArenVCFMI6Iw1D9sTsz6_NMT8CWiX7mw"}},{"id":"did:tdw:QmPEZPhDFR4nEYSFK5bMnvECqdpf1tPTPJuWs9QrMjCumw:identifier-reg.trust-infra.swiyu-int.admin.ch:api:v1:did:9a5559f0-b81c-4368-a170-e7b4ae424527#assert-key-c02a1676-ab19-491c-b0fa-3703ea269c07","controller":"did:tdw:QmPEZPhDFR4nEYSFK5bMnvECqdpf1tPTPJuWs9QrMjCumw:identifier-reg.trust-infra.swiyu-int.admin.ch:api:v1:did:9a5559f0-b81c-4368-a170-e7b4ae424527","type":"JsonWebKey2020","publicKeyJwk":{"kty":"EC","crv":"P-256","x":"A6uZ-HIqDWarkOHruGPaG6l2FRv9CSVCdQ96KV--zHI","y":"we1SEu2zQFi9yXH9JcnAEs64l1t4_Qv181fyvns-9wE"}}]}},[{"type":"DataIntegrityProof","cryptosuite":"eddsa-jcs-2022","created":"2025-02-03T13:46:46Z","verificationMethod":"did:key:z6MkwGwfbexiUCGeyrdS2fsBCuTsm8b9JJyofvvphuJ5yq4f#z6MkwGwfbexiUCGeyrdS2fsBCuTsm8b9JJyofvvphuJ5yq4f","proofPurpose":"authentication","challenge":"1-QmeoKrpAHbvnBGitDwdL2TFsjSmPdTcgwrvci65ejWZeE1","proofValue":"zX5HhpnVaLjEvgS3SKvPUxUZKYHQWbpVVaXcKRjfLZMkmyBBEgetr7XZiBGJ89t1UX8hx8G7MxVCbBg7xpMpeHBF"}]]
-        """.trimIndent()
+            """.trimIndent()
         val resolver = DidResolver.fromJsonL((jsonl + "\n").split('\n'))
 
         val entry = resolver.resolveLatest(verify = true)
@@ -19,10 +20,11 @@ class DidResolverTest {
 
     @Test
     fun testSwiyu2() {
-        val jsonl = """
+        val jsonl =
+            """
             ["1-QmdJiFHQ3gHMyRUnW6Rri6hHwKRrQUJadBRoirLZUJtsmC","2025-01-31T09:35:11Z",{"method":"did:tdw:0.3","scid":"QmWrXWFEDenvoYWFXxSQGFCa6Pi22Cdsg2r6weGhY2ChiQ","updateKeys":["z6MkrU7wPQwBXsnYzWVJMWbvq61ZeDib6v9aQ3DpXu7qWagv"]},{"value":{"@context":["https://www.w3.org/ns/did/v1","https://w3id.org/security/suites/jws-2020/v1"],"id":"did:tdw:QmWrXWFEDenvoYWFXxSQGFCa6Pi22Cdsg2r6weGhY2ChiQ:identifier-reg.trust-infra.swiyu-int.admin.ch:api:v1:did:2e246676-209a-4c21-aceb-721f8a90b212","authentication":["did:tdw:QmWrXWFEDenvoYWFXxSQGFCa6Pi22Cdsg2r6weGhY2ChiQ:identifier-reg.trust-infra.swiyu-int.admin.ch:api:v1:did:2e246676-209a-4c21-aceb-721f8a90b212#auth-key-01"],"assertionMethod":["did:tdw:QmWrXWFEDenvoYWFXxSQGFCa6Pi22Cdsg2r6weGhY2ChiQ:identifier-reg.trust-infra.swiyu-int.admin.ch:api:v1:did:2e246676-209a-4c21-aceb-721f8a90b212#assert-key-01"],"verificationMethod":[{"id":"did:tdw:QmWrXWFEDenvoYWFXxSQGFCa6Pi22Cdsg2r6weGhY2ChiQ:identifier-reg.trust-infra.swiyu-int.admin.ch:api:v1:did:2e246676-209a-4c21-aceb-721f8a90b212#auth-key-01","controller":"did:tdw:QmWrXWFEDenvoYWFXxSQGFCa6Pi22Cdsg2r6weGhY2ChiQ:identifier-reg.trust-infra.swiyu-int.admin.ch:api:v1:did:2e246676-209a-4c21-aceb-721f8a90b212","type":"JsonWebKey2020","publicKeyJwk":{"kty":"EC","crv":"P-256","x":"D3nYTvdvNL0wRvm4bu92CjntEpDfI8bfQdQhaaD6Qv8","y":"oLe56pmgQWmhAo5eviw2XFNHjmGhepy9RzQSseUXGIU","kid":"auth-key-01"}},{"id":"did:tdw:QmWrXWFEDenvoYWFXxSQGFCa6Pi22Cdsg2r6weGhY2ChiQ:identifier-reg.trust-infra.swiyu-int.admin.ch:api:v1:did:2e246676-209a-4c21-aceb-721f8a90b212#assert-key-01","controller":"did:tdw:QmWrXWFEDenvoYWFXxSQGFCa6Pi22Cdsg2r6weGhY2ChiQ:identifier-reg.trust-infra.swiyu-int.admin.ch:api:v1:did:2e246676-209a-4c21-aceb-721f8a90b212","type":"JsonWebKey2020","publicKeyJwk":{"kty":"EC","crv":"P-256","x":"1fwnwoN8zatr6kD_bvwY2zQDV4D6blE7mzTliQF11Jc","y":"9-cDZlPqXVlJnE0rcUUyy7P_15x7RLE-jiNGqHA9FP4","kid":"assert-key-01"}}]}},[{"type":"DataIntegrityProof","cryptosuite":"eddsa-jcs-2022","created":"2025-01-31T09:35:11Z","verificationMethod":"did:key:z6MkrU7wPQwBXsnYzWVJMWbvq61ZeDib6v9aQ3DpXu7qWagv#z6MkrU7wPQwBXsnYzWVJMWbvq61ZeDib6v9aQ3DpXu7qWagv","proofPurpose":"authentication","challenge":"1-QmdJiFHQ3gHMyRUnW6Rri6hHwKRrQUJadBRoirLZUJtsmC","proofValue":"z2HuP8d1Wk6mLZpp2QmxywGNSDAi2CxfgoE7FJoeB1DSfUfg2kUyokAaea1Bqz5Q6L5FaukkD1KdxUpU45z1TUB3R"}]]
             ["2-QmaZ4qosmE14mFfrZryRcbdF7xzcKtmsx63j8St8XcSXk9","2025-06-19T05:58:07Z",{"updateKeys":["z6MkqEoXQWnL8ecqWqLUDHgDhouF8Wb63juqG3uxBXg4iYZE"]},{"value":{"@context":["https://www.w3.org/ns/did/v1","https://w3id.org/security/suites/jws-2020/v1"],"id":"did:tdw:QmWrXWFEDenvoYWFXxSQGFCa6Pi22Cdsg2r6weGhY2ChiQ:identifier-reg.trust-infra.swiyu-int.admin.ch:api:v1:did:2e246676-209a-4c21-aceb-721f8a90b212","authentication":["did:tdw:QmWrXWFEDenvoYWFXxSQGFCa6Pi22Cdsg2r6weGhY2ChiQ:identifier-reg.trust-infra.swiyu-int.admin.ch:api:v1:did:2e246676-209a-4c21-aceb-721f8a90b212#auth-key-01","did:tdw:QmWrXWFEDenvoYWFXxSQGFCa6Pi22Cdsg2r6weGhY2ChiQ:identifier-reg.trust-infra.swiyu-int.admin.ch:api:v1:did:2e246676-209a-4c21-aceb-721f8a90b212#auth-key-02"],"assertionMethod":["did:tdw:QmWrXWFEDenvoYWFXxSQGFCa6Pi22Cdsg2r6weGhY2ChiQ:identifier-reg.trust-infra.swiyu-int.admin.ch:api:v1:did:2e246676-209a-4c21-aceb-721f8a90b212#assert-key-01","did:tdw:QmWrXWFEDenvoYWFXxSQGFCa6Pi22Cdsg2r6weGhY2ChiQ:identifier-reg.trust-infra.swiyu-int.admin.ch:api:v1:did:2e246676-209a-4c21-aceb-721f8a90b212#assert-key-02"],"verificationMethod":[{"id":"did:tdw:QmWrXWFEDenvoYWFXxSQGFCa6Pi22Cdsg2r6weGhY2ChiQ:identifier-reg.trust-infra.swiyu-int.admin.ch:api:v1:did:2e246676-209a-4c21-aceb-721f8a90b212#auth-key-01","controller":"did:tdw:QmWrXWFEDenvoYWFXxSQGFCa6Pi22Cdsg2r6weGhY2ChiQ:identifier-reg.trust-infra.swiyu-int.admin.ch:api:v1:did:2e246676-209a-4c21-aceb-721f8a90b212","type":"JsonWebKey2020","publicKeyJwk":{"kty":"EC","crv":"P-256","kid":"auth-key-01","x":"D3nYTvdvNL0wRvm4bu92CjntEpDfI8bfQdQhaaD6Qv8","y":"oLe56pmgQWmhAo5eviw2XFNHjmGhepy9RzQSseUXGIU"}},{"id":"did:tdw:QmWrXWFEDenvoYWFXxSQGFCa6Pi22Cdsg2r6weGhY2ChiQ:identifier-reg.trust-infra.swiyu-int.admin.ch:api:v1:did:2e246676-209a-4c21-aceb-721f8a90b212#auth-key-02","controller":"did:tdw:QmWrXWFEDenvoYWFXxSQGFCa6Pi22Cdsg2r6weGhY2ChiQ:identifier-reg.trust-infra.swiyu-int.admin.ch:api:v1:did:2e246676-209a-4c21-aceb-721f8a90b212","type":"JsonWebKey2020","publicKeyJwk":{"kty":"EC","crv":"P-256","kid":"auth-key-02","x":"hoFI0keVdxjBPlBy2XZFMmYOc77t1_-rLeqemDl9eE8","y":"1grlPKdSeO5larnfEBOMLOVlQsVy7EdOkCcDKtV8bSM"}},{"id":"did:tdw:QmWrXWFEDenvoYWFXxSQGFCa6Pi22Cdsg2r6weGhY2ChiQ:identifier-reg.trust-infra.swiyu-int.admin.ch:api:v1:did:2e246676-209a-4c21-aceb-721f8a90b212#assert-key-01","controller":"did:tdw:QmWrXWFEDenvoYWFXxSQGFCa6Pi22Cdsg2r6weGhY2ChiQ:identifier-reg.trust-infra.swiyu-int.admin.ch:api:v1:did:2e246676-209a-4c21-aceb-721f8a90b212","type":"JsonWebKey2020","publicKeyJwk":{"kty":"EC","crv":"P-256","kid":"assert-key-01","x":"1fwnwoN8zatr6kD_bvwY2zQDV4D6blE7mzTliQF11Jc","y":"9-cDZlPqXVlJnE0rcUUyy7P_15x7RLE-jiNGqHA9FP4"}},{"id":"did:tdw:QmWrXWFEDenvoYWFXxSQGFCa6Pi22Cdsg2r6weGhY2ChiQ:identifier-reg.trust-infra.swiyu-int.admin.ch:api:v1:did:2e246676-209a-4c21-aceb-721f8a90b212#assert-key-02","controller":"did:tdw:QmWrXWFEDenvoYWFXxSQGFCa6Pi22Cdsg2r6weGhY2ChiQ:identifier-reg.trust-infra.swiyu-int.admin.ch:api:v1:did:2e246676-209a-4c21-aceb-721f8a90b212","type":"JsonWebKey2020","publicKeyJwk":{"kty":"EC","crv":"P-256","kid":"assert-key-02","x":"epI4RIrbjW8IvQhzWkzX03gwWtlXsDExIcCaHiQNBSw","y":"gn-d4SuUtcuHmH8plz05vUflXhibaDBj9RFn7ocgozs"}}]}},[{"type":"DataIntegrityProof","cryptosuite":"eddsa-jcs-2022","created":"2025-06-19T05:58:07Z","verificationMethod":"did:key:z6MkrU7wPQwBXsnYzWVJMWbvq61ZeDib6v9aQ3DpXu7qWagv#z6MkrU7wPQwBXsnYzWVJMWbvq61ZeDib6v9aQ3DpXu7qWagv","proofPurpose":"authentication","challenge":"2-QmaZ4qosmE14mFfrZryRcbdF7xzcKtmsx63j8St8XcSXk9","proofValue":"z22FkwFQYinHLYauXnMp8rZhaAYxvAS3M25UXNG1XvBuQbP9m2DcBX1aaSvtjTsPxhDQAPtutC4TtE9EZZSCRcNmC"}]]
-        """.trimIndent()
+            """.trimIndent()
 
         val resolver = DidResolver.fromJsonL(jsonl.split('\n'))
 
@@ -32,9 +34,10 @@ class DidResolverTest {
 
     @Test
     fun testWebVHExample1() {
-        val log = """
+        val log =
+            """
             {"versionId":"1-QmWZWcvritBzgX3JiMz9dSjkTL2Pbw4HmBo4zC3eiNqLy8","versionTime":"2025-07-07T01:52:23Z","parameters":{"method":"did:webvh:1.0","scid":"QmQHjAiCq1N2dbTPKBkH7xpd93FQCgEPxmR2zTXqt4fndY","updateKeys":["z6MkqjRELM1dN43aw6QdkjG46k1fUTjdQJqx7g338djC3Bre"],"portable":true,"nextKeyHashes":["zQmTaTNScJGPSEiHWTxaEpdVExMYqn7DF2DFZ3VqoF9cawN"]},"state":{"@context":["https://www.w3.org/ns/did/v1","https://www.w3.org/ns/cid/v1"],"assertionMethod":["did:webvh:QmQHjAiCq1N2dbTPKBkH7xpd93FQCgEPxmR2zTXqt4fndY:localhost%3A8000#key-0"],"authentication":["did:webvh:QmQHjAiCq1N2dbTPKBkH7xpd93FQCgEPxmR2zTXqt4fndY:localhost%3A8000#key-0"],"capabilityDelegation":[],"capabilityInvocation":[],"id":"did:webvh:QmQHjAiCq1N2dbTPKBkH7xpd93FQCgEPxmR2zTXqt4fndY:localhost%3A8000","keyAgreement":["did:webvh:QmQHjAiCq1N2dbTPKBkH7xpd93FQCgEPxmR2zTXqt4fndY:localhost%3A8000#key-0"],"service":[],"verificationMethod":[{"controller":"did:webvh:QmQHjAiCq1N2dbTPKBkH7xpd93FQCgEPxmR2zTXqt4fndY:localhost%3A8000","id":"did:webvh:QmQHjAiCq1N2dbTPKBkH7xpd93FQCgEPxmR2zTXqt4fndY:localhost%3A8000#key-0","publicKeyMultibase":"z6Mkp6U8WcpWKFi6TFfUpzrtNN99a1aXpWARJEeXh8uFEn7H","type":"Multikey"}]},"proof":[{"type":"DataIntegrityProof","cryptosuite":"eddsa-jcs-2022","created":"2025-07-07T01:52:23Z","verificationMethod":"did:key:z6MkqjRELM1dN43aw6QdkjG46k1fUTjdQJqx7g338djC3Bre#z6MkqjRELM1dN43aw6QdkjG46k1fUTjdQJqx7g338djC3Bre","proofPurpose":"assertionMethod","proofValue":"z5VnQYT8GkJ2PQArqaqcFuNjpd8CcueLVT4JriXDYPfUBtS9LJBSMYpLQUAA1oUQQYhLuqemYE8H8Yv1J3i1DYbQj"}]}
-        """.trimIndent()
+            """.trimIndent()
 
         val resolver = DidResolver.fromJsonL(log.split('\n'))
 
@@ -44,7 +47,8 @@ class DidResolverTest {
 
     @Test
     fun testWebVHExample2() {
-        val log = """
+        val log =
+            """
             {"versionId":"1-QmY6g49yXLRWaxqN5XCZ6qLbLSa87VQjQQPVKMNQLpXog9","versionTime":"2025-08-21T23:55:51Z","parameters":{"method":"did:webvh:1.0","scid":"QmbHT3Eexjb4TFhjnHapNmFHxAVQZnDTrTCeYfHqvTArBz","updateKeys":["z6MkqsLddxXhAo5C8QPq8wQkxcFPMXkPkSRxGEbbBbfSdzsb"],"portable":true,"nextKeyHashes":["QmeyhAecbJHVLvqSQuU6gThTgZtMes1WBSPCe1ZC85Gwge","QmQ672odDuvZhZ4PiGy4wYDWmYri6g8Su6UtS9gNcqPqzh"],"witness":{"threshold":3,"witnesses":[{"id":"did:key:z6Mki8b2cYuFGiHGm6cqU4nUZ6Po7C55yU7erE5sbfh4bC3X"},{"id":"did:key:z6MkowcwWjwKFkr8sdSo2FmXEMPwPpbrYAWh1yDezNetdT48"},{"id":"did:key:z6Mkj3a3m86PqLVRDGxm6P937jes7wzBaTr3JhzxMQzE4evD"}]},"watchers":["https://watcher-1.affinidi.com/v1/webvh","https://watcher-2.affinidi.com/v1/webvh","https://watcher-3.affinidi.com/v1/webvh"],"ttl":3600},"state":{"@context":["https://www.w3.org/ns/did/v1"],"assertionMethod":["did:webvh:QmbHT3Eexjb4TFhjnHapNmFHxAVQZnDTrTCeYfHqvTArBz:test.affinidi.com#key-0"],"authentication":["did:webvh:QmbHT3Eexjb4TFhjnHapNmFHxAVQZnDTrTCeYfHqvTArBz:test.affinidi.com#key-0"],"id":"did:webvh:QmbHT3Eexjb4TFhjnHapNmFHxAVQZnDTrTCeYfHqvTArBz:test.affinidi.com","service":[{"id":"did:webvh:QmbHT3Eexjb4TFhjnHapNmFHxAVQZnDTrTCeYfHqvTArBz:test.affinidi.com#service-0","serviceEndpoint":[{"accept":["didcomm/v2"],"routingKeys":[],"uri":"http://mediator.affinidi.com:/api"}],"type":"DIDCommMessaging"}],"verificationMethod":[{"controller":"did:webvh:QmbHT3Eexjb4TFhjnHapNmFHxAVQZnDTrTCeYfHqvTArBz:test.affinidi.com","id":"did:webvh:QmbHT3Eexjb4TFhjnHapNmFHxAVQZnDTrTCeYfHqvTArBz:test.affinidi.com#key-0","publicKeyMultibase":"test1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ","type":"Multikey"}]},"proof":[{"type":"DataIntegrityProof","cryptosuite":"eddsa-jcs-2022","created":"2025-08-21T23:55:51Z","verificationMethod":"did:key:z6MkqsLddxXhAo5C8QPq8wQkxcFPMXkPkSRxGEbbBbfSdzsb#z6MkqsLddxXhAo5C8QPq8wQkxcFPMXkPkSRxGEbbBbfSdzsb","proofPurpose":"assertionMethod","proofValue":"z4VZjbMUbQawdSVsoJhZ1t8askUQv5CAjnigxC1qiihJ23HMTRigwXu3FH6PrGR8KnUDtRTyuCdXMttXg7KvEgw9T"}]}
             {"versionId":"2-QmcGMWiSvRufeWahE3VDnWpUDsKbnVZ1nXydiLtJp1ZpvE","versionTime":"2025-08-21T23:55:51Z","parameters":{"updateKeys":["z6MkpWv9fHBpRRWTp2h36vrTDi8U6aSZrfn8um2VyL8EphhT","z6MksinpEZnKN9ELLev3LgzyAr7DmEnDteFfJei8fJbAQY7P"],"nextKeyHashes":["QmRcUj4vto7BokB35C1xpRuDsmwBrkQqUMVcFscZZbWrD1","Qmdg3jVSWo48TRNQWVRx2GVB1L7a7SyLYSzCWt5vLb7NtP"]},"state":{"@context":["https://www.w3.org/ns/did/v1"],"assertionMethod":["did:webvh:QmbHT3Eexjb4TFhjnHapNmFHxAVQZnDTrTCeYfHqvTArBz:test.affinidi.com#key-0"],"authentication":["did:webvh:QmbHT3Eexjb4TFhjnHapNmFHxAVQZnDTrTCeYfHqvTArBz:test.affinidi.com#key-0"],"id":"did:webvh:QmbHT3Eexjb4TFhjnHapNmFHxAVQZnDTrTCeYfHqvTArBz:test.affinidi.com","service":[{"id":"did:webvh:QmbHT3Eexjb4TFhjnHapNmFHxAVQZnDTrTCeYfHqvTArBz:test.affinidi.com#service-0","serviceEndpoint":[{"accept":["didcomm/v2"],"routingKeys":[],"uri":"http://mediator.affinidi.com:/api"}],"type":"DIDCommMessaging"}],"verificationMethod":[{"controller":"did:webvh:QmbHT3Eexjb4TFhjnHapNmFHxAVQZnDTrTCeYfHqvTArBz:test.affinidi.com","id":"did:webvh:QmbHT3Eexjb4TFhjnHapNmFHxAVQZnDTrTCeYfHqvTArBz:test.affinidi.com#key-0","publicKeyMultibase":"test1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ","type":"Multikey"}]},"proof":[{"type":"DataIntegrityProof","cryptosuite":"eddsa-jcs-2022","created":"2025-08-21T23:55:51Z","verificationMethod":"did:key:z6MkpWv9fHBpRRWTp2h36vrTDi8U6aSZrfn8um2VyL8EphhT#z6MkpWv9fHBpRRWTp2h36vrTDi8U6aSZrfn8um2VyL8EphhT","proofPurpose":"assertionMethod","proofValue":"z2THgUxmkH4C2vBZZzjqQExsw6U7H429bcaRe2CyzuFLAjpTtJyuHHBYbCxc2K8x7YiuBWGrjskeYKrHYTZWBALV"}]}
             {"versionId":"3-QmU1Pi9q7XFhba7x9AzevXjtFTVk1Kd9HDdGrCKVaY5QRW","versionTime":"2025-08-21T23:55:51Z","parameters":{"updateKeys":["z6MkjG3zYHKRtXuKVC87zxEZyBV6xChugVsBwkYyL4n6qcak","z6MkjX5WzojReHr6AFFv8PJWpFjJU9VXbLfnCfgYHu2R5vNG"],"nextKeyHashes":["QmRqB7kAQPMmeuNPQdTdjiR8baHmQkK9Cg5a4QtkzHfxiF","QmRwSQPBuUvTFPL7Nwr4FnDTGW98jRzSxfvbi41TVFcLNX"],"witness":{"threshold":3,"witnesses":[{"id":"did:key:z6Mki8b2cYuFGiHGm6cqU4nUZ6Po7C55yU7erE5sbfh4bC3X"},{"id":"did:key:z6Mkj3a3m86PqLVRDGxm6P937jes7wzBaTr3JhzxMQzE4evD"},{"id":"did:key:z6Mkf3QYtxHxjHPF1q4ZvW2hK6WvofeZrXPaDeX1SKZRbN6M"}]}},"state":{"@context":["https://www.w3.org/ns/did/v1"],"assertionMethod":["did:webvh:QmbHT3Eexjb4TFhjnHapNmFHxAVQZnDTrTCeYfHqvTArBz:test.affinidi.com#key-0"],"authentication":["did:webvh:QmbHT3Eexjb4TFhjnHapNmFHxAVQZnDTrTCeYfHqvTArBz:test.affinidi.com#key-0"],"id":"did:webvh:QmbHT3Eexjb4TFhjnHapNmFHxAVQZnDTrTCeYfHqvTArBz:test.affinidi.com","service":[{"id":"did:webvh:QmbHT3Eexjb4TFhjnHapNmFHxAVQZnDTrTCeYfHqvTArBz:test.affinidi.com#service-0","serviceEndpoint":[{"accept":["didcomm/v2"],"routingKeys":[],"uri":"http://mediator.affinidi.com:/api"}],"type":"DIDCommMessaging"}],"verificationMethod":[{"controller":"did:webvh:QmbHT3Eexjb4TFhjnHapNmFHxAVQZnDTrTCeYfHqvTArBz:test.affinidi.com","id":"did:webvh:QmbHT3Eexjb4TFhjnHapNmFHxAVQZnDTrTCeYfHqvTArBz:test.affinidi.com#key-0","publicKeyMultibase":"test1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ","type":"Multikey"}]},"proof":[{"type":"DataIntegrityProof","cryptosuite":"eddsa-jcs-2022","created":"2025-08-21T23:55:51Z","verificationMethod":"did:key:z6MkjG3zYHKRtXuKVC87zxEZyBV6xChugVsBwkYyL4n6qcak#z6MkjG3zYHKRtXuKVC87zxEZyBV6xChugVsBwkYyL4n6qcak","proofPurpose":"assertionMethod","proofValue":"z35pfvms8TkUDXQuBzDot4Ab5ihrLnYAq9RS11WAebtmGjjfahJsAoaipWd7MKwW8HPVVuih3HT69HgV9HCSZu3dM"}]}
@@ -165,7 +169,7 @@ class DidResolverTest {
             {"versionId":"118-QmfCpzD8NDAtdPy6FCXWspwp8UdysHfQkhpsK5Ydq5YLvo","versionTime":"2025-08-21T23:55:52Z","parameters":{"updateKeys":["z6Mkjec3wsHM1hvJtFQ9UUJmMXKqk3XiGdHk3chdntheTk9u","z6MkseLgrvXSaERtxveNwqEWa5bQy5m4nL3YQMqZCvj7yzdp"],"nextKeyHashes":["QmP9WT9rz23DEuGTubZz97PYV3qJtiRSMgVPkKSa2YCwbH","QmZrGye98LvVkB6DinUTnQnxAYkMePLeKxrnmkKbXCFiDL"]},"state":{"@context":["https://www.w3.org/ns/did/v1"],"assertionMethod":["did:webvh:QmbHT3Eexjb4TFhjnHapNmFHxAVQZnDTrTCeYfHqvTArBz:test.affinidi.com#key-0"],"authentication":["did:webvh:QmbHT3Eexjb4TFhjnHapNmFHxAVQZnDTrTCeYfHqvTArBz:test.affinidi.com#key-0"],"id":"did:webvh:QmbHT3Eexjb4TFhjnHapNmFHxAVQZnDTrTCeYfHqvTArBz:test.affinidi.com","service":[{"id":"did:webvh:QmbHT3Eexjb4TFhjnHapNmFHxAVQZnDTrTCeYfHqvTArBz:test.affinidi.com#service-0","serviceEndpoint":[{"accept":["didcomm/v2"],"routingKeys":[],"uri":"http://mediator.affinidi.com:/api"}],"type":"DIDCommMessaging"}],"verificationMethod":[{"controller":"did:webvh:QmbHT3Eexjb4TFhjnHapNmFHxAVQZnDTrTCeYfHqvTArBz:test.affinidi.com","id":"did:webvh:QmbHT3Eexjb4TFhjnHapNmFHxAVQZnDTrTCeYfHqvTArBz:test.affinidi.com#key-0","publicKeyMultibase":"test1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ","type":"Multikey"}]},"proof":[{"type":"DataIntegrityProof","cryptosuite":"eddsa-jcs-2022","created":"2025-08-21T23:55:52Z","verificationMethod":"did:key:z6Mkjec3wsHM1hvJtFQ9UUJmMXKqk3XiGdHk3chdntheTk9u#z6Mkjec3wsHM1hvJtFQ9UUJmMXKqk3XiGdHk3chdntheTk9u","proofPurpose":"assertionMethod","proofValue":"z3dq82ye7YAaJDTV8iXLEJxcgu1V5YH2aR9vHMPFmnMKPjDBxTuhjKGmuPJXBMDkedpK4YSzFFKvv1X8b5xaiLDBq"}]}
             {"versionId":"119-QmUWMBx63pHjjYZgVGieSmByh7y3fTCRgmhbup8rUYZb29","versionTime":"2025-08-21T23:55:52Z","parameters":{"updateKeys":["z6MkocXJ1hQFcTsWbPQg16obG6hAVreQAFYRQUz3V2Tr7mhD","z6MkuujHF5VJ5bqwxpyph4K9p1rPoV3AYHXzkEiPEyWTCDQj"],"nextKeyHashes":["QmY94RcpLmfagKpfnXmruaKQY9Bf5GEZu4ydcovEVoNqcS","QmTyRYBRkF5qRsf656Cg4voZvEHSYuAbovsQTYb385ZzEp"]},"state":{"@context":["https://www.w3.org/ns/did/v1"],"assertionMethod":["did:webvh:QmbHT3Eexjb4TFhjnHapNmFHxAVQZnDTrTCeYfHqvTArBz:test.affinidi.com#key-0"],"authentication":["did:webvh:QmbHT3Eexjb4TFhjnHapNmFHxAVQZnDTrTCeYfHqvTArBz:test.affinidi.com#key-0"],"id":"did:webvh:QmbHT3Eexjb4TFhjnHapNmFHxAVQZnDTrTCeYfHqvTArBz:test.affinidi.com","service":[{"id":"did:webvh:QmbHT3Eexjb4TFhjnHapNmFHxAVQZnDTrTCeYfHqvTArBz:test.affinidi.com#service-0","serviceEndpoint":[{"accept":["didcomm/v2"],"routingKeys":[],"uri":"http://mediator.affinidi.com:/api"}],"type":"DIDCommMessaging"}],"verificationMethod":[{"controller":"did:webvh:QmbHT3Eexjb4TFhjnHapNmFHxAVQZnDTrTCeYfHqvTArBz:test.affinidi.com","id":"did:webvh:QmbHT3Eexjb4TFhjnHapNmFHxAVQZnDTrTCeYfHqvTArBz:test.affinidi.com#key-0","publicKeyMultibase":"test1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ","type":"Multikey"}]},"proof":[{"type":"DataIntegrityProof","cryptosuite":"eddsa-jcs-2022","created":"2025-08-21T23:55:52Z","verificationMethod":"did:key:z6MkocXJ1hQFcTsWbPQg16obG6hAVreQAFYRQUz3V2Tr7mhD#z6MkocXJ1hQFcTsWbPQg16obG6hAVreQAFYRQUz3V2Tr7mhD","proofPurpose":"assertionMethod","proofValue":"z5nfU3qzuVXFqZEUBfG8bRStxmXhPMLPYR8nErxvNEMvF4u2CF4bUMGEYZLUzmHzz1hwTwCLSiTJT1DcRa7sz7V2V"}]}
             {"versionId":"120-Qma84Xau5U21DbJ5tgt6BxZBYvYXqRbjMRKXJz4PdsKNp4","versionTime":"2025-08-21T23:55:52Z","parameters":{"updateKeys":["z6MktrksXjhFv1r5mHqC3RZ4NE5iY86kZNvSaa2znyB4TvfQ","z6MkewiGfmuSnWSkpAg2CjnwfVkEsxb28WGjZ4k3SxSADDB8"],"nextKeyHashes":["QmUnjbnfBSArJNdaPXrQvRgET83XEdBMPawU8qY3AiCPVY","QmWNLnWbHvBdNK7vnhjDKgKungpv85DnMf1aJ4g4QEyFj6"]},"state":{"@context":["https://www.w3.org/ns/did/v1"],"assertionMethod":["did:webvh:QmbHT3Eexjb4TFhjnHapNmFHxAVQZnDTrTCeYfHqvTArBz:test.affinidi.com#key-0"],"authentication":["did:webvh:QmbHT3Eexjb4TFhjnHapNmFHxAVQZnDTrTCeYfHqvTArBz:test.affinidi.com#key-0"],"id":"did:webvh:QmbHT3Eexjb4TFhjnHapNmFHxAVQZnDTrTCeYfHqvTArBz:test.affinidi.com","service":[{"id":"did:webvh:QmbHT3Eexjb4TFhjnHapNmFHxAVQZnDTrTCeYfHqvTArBz:test.affinidi.com#service-0","serviceEndpoint":[{"accept":["didcomm/v2"],"routingKeys":[],"uri":"http://mediator.affinidi.com:/api"}],"type":"DIDCommMessaging"}],"verificationMethod":[{"controller":"did:webvh:QmbHT3Eexjb4TFhjnHapNmFHxAVQZnDTrTCeYfHqvTArBz:test.affinidi.com","id":"did:webvh:QmbHT3Eexjb4TFhjnHapNmFHxAVQZnDTrTCeYfHqvTArBz:test.affinidi.com#key-0","publicKeyMultibase":"test1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ","type":"Multikey"}]},"proof":[{"type":"DataIntegrityProof","cryptosuite":"eddsa-jcs-2022","created":"2025-08-21T23:55:52Z","verificationMethod":"did:key:z6MktrksXjhFv1r5mHqC3RZ4NE5iY86kZNvSaa2znyB4TvfQ#z6MktrksXjhFv1r5mHqC3RZ4NE5iY86kZNvSaa2znyB4TvfQ","proofPurpose":"assertionMethod","proofValue":"zHHKbdu5wNXzifaf3ksEWyeBTAD8mzaGLW1Xgj3UXHMPgoiFjmfPY3obUQiLuggWaye22yZTtRpTUNeeqKF7UYph"}]}
-        """.trimIndent()
+            """.trimIndent()
 
         val resolver = DidResolver.fromJsonL(log.split('\n'))
 
@@ -176,57 +180,61 @@ class DidResolverTest {
 
     @Test
     fun testWebVHExampleWithWitnesses() {
-        var log = """
+        var log =
+            """
             {"versionId": "1-QmVCzWgVX2isJE6tsmUcHnNHQJ9WXZb9A26VpkxptB2fqb", "versionTime": "2025-05-09T22:33:41Z", "parameters": {"witness": {"threshold": 2, "witnesses": [{"id": "did:key:z6MkrMuMdd6hTJmwf8e6WZz643b7JxYiAnWAFsorDLkaZF5i"}, {"id": "did:key:z6MkgXvUbnhiVu1H6SmiPVzC9xpdnCFyE5X2AgxRY4PrbbWN"}, {"id": "did:key:z6MkvZ7MQfnCewK2qjqXpDAKBcExAPpLbpWv8khQxZS3RmTj"}]}, "updateKeys": ["z6Mkh8Pzehru4LVBRftuiLzpMchSzNWbEytus13N8fsfpobs"], "nextKeyHashes": ["QmRossAYEwzTgLNQx8zEzZPfxUU1WGSZpCFA6T8ZPku3V7"], "method": "did:webvh:1.0", "scid": "QmNdazvnrgei4agYFMVJjYduyZSYHcYWnHEgNW7A1sMUoU"}, "state": {"@context": ["https://www.w3.org/ns/did/v1"], "id": "did:webvh:QmNdazvnrgei4agYFMVJjYduyZSYHcYWnHEgNW7A1sMUoU:domain.example"}, "proof": [{"type": "DataIntegrityProof", "cryptosuite": "eddsa-jcs-2022", "verificationMethod": "did:key:z6Mkh8Pzehru4LVBRftuiLzpMchSzNWbEytus13N8fsfpobs#z6Mkh8Pzehru4LVBRftuiLzpMchSzNWbEytus13N8fsfpobs", "created": "2025-05-09T22:33:41Z", "proofPurpose": "assertionMethod", "proofValue": "z4rDHfJZ5hxVTu3TYnTLo2tTLyRFfBpzgkoWMnkLcg6tVXerkTXmXduHbM1oaMakhrc6sFt1A5Nj6AH5y63EFJysi"}]}
             {"versionId": "2-QmPFyXi2avxYnu1BwGbWdwph52Rjr5WZxKif7e6Vaf6DPr", "versionTime": "2025-05-09T22:33:42Z", "parameters": {"updateKeys": ["z6MkpqrwnQNMWxAqDfBfWpbU4vE7Wvzjwj1ErTpxCd9CDwdM"], "nextKeyHashes": ["QmeZZg9ikJWNvM827KZEp59QzvGmQNGNnVnT6EAQkFTAZd"]}, "state": {"@context": ["https://www.w3.org/ns/did/v1", "https://w3id.org/security/multikey/v1", "https://identity.foundation/.well-known/did-configuration/v1"], "id": "did:webvh:QmNdazvnrgei4agYFMVJjYduyZSYHcYWnHEgNW7A1sMUoU:domain.example", "authentication": ["did:webvh:QmNdazvnrgei4agYFMVJjYduyZSYHcYWnHEgNW7A1sMUoU:domain.example#z6MkkQ7ziv3QXSG2JKh1BvW9p31qaGieUJscDqz32osWrgbK"], "assertionMethod": ["did:webvh:QmNdazvnrgei4agYFMVJjYduyZSYHcYWnHEgNW7A1sMUoU:domain.example#z6MkkQ7ziv3QXSG2JKh1BvW9p31qaGieUJscDqz32osWrgbK"], "verificationMethod": [{"id": "did:webvh:QmNdazvnrgei4agYFMVJjYduyZSYHcYWnHEgNW7A1sMUoU:domain.example#z6MkkQ7ziv3QXSG2JKh1BvW9p31qaGieUJscDqz32osWrgbK", "controller": "did:webvh:QmNdazvnrgei4agYFMVJjYduyZSYHcYWnHEgNW7A1sMUoU:domain.example", "type": "Multikey", "publicKeyMultibase": "z6MkkQ7ziv3QXSG2JKh1BvW9p31qaGieUJscDqz32osWrgbK"}], "service": [{"id": "did:webvh:QmNdazvnrgei4agYFMVJjYduyZSYHcYWnHEgNW7A1sMUoU:domain.example#domain", "type": "LinkedDomains", "serviceEndpoint": "https://domain.example"}]}, "proof": [{"type": "DataIntegrityProof", "cryptosuite": "eddsa-jcs-2022", "verificationMethod": "did:key:z6MkpqrwnQNMWxAqDfBfWpbU4vE7Wvzjwj1ErTpxCd9CDwdM#z6MkpqrwnQNMWxAqDfBfWpbU4vE7Wvzjwj1ErTpxCd9CDwdM", "created": "2025-05-09T22:33:42Z", "proofPurpose": "assertionMethod", "proofValue": "zU2Xhy2Etfs7eZukbN3Cv7ityrv7XJ9ri7PWYbvaqgnmBJCeoLcFQZVUmb1JXW7WjgBPqprge5UGDuSgsWj5vzEH"}]}
-        """.trimIndent()
+            """.trimIndent()
 
-        var witnesses = Json { ignoreUnknownKeys = true }.decodeFromString<List<WitnessProof>>("""
-            [
-              {
-                "versionId": "1-QmVCzWgVX2isJE6tsmUcHnNHQJ9WXZb9A26VpkxptB2fqb",
-                "proof": [
+        var witnesses =
+            Json { ignoreUnknownKeys = true }.decodeFromString<List<WitnessProof>>(
+                """
+                [
                   {
-                    "type": "DataIntegrityProof",
-                    "cryptosuite": "eddsa-jcs-2022",
-                    "verificationMethod": "did:key:z6MkrMuMdd6hTJmwf8e6WZz643b7JxYiAnWAFsorDLkaZF5i#z6MkrMuMdd6hTJmwf8e6WZz643b7JxYiAnWAFsorDLkaZF5i",
-                    "created": "2025-05-09T22:33:42Z",
-                    "proofPurpose": "assertionMethod",
-                    "proofValue": "z5vGToJkpPcxV4qmoeRK8BDsYQDmTPaV3BjamEBjtDKXev7xCZhj48iLhNhCUNoFqgbcz4jPyfrvMCW2fF6QRWzZc"
+                    "versionId": "1-QmVCzWgVX2isJE6tsmUcHnNHQJ9WXZb9A26VpkxptB2fqb",
+                    "proof": [
+                      {
+                        "type": "DataIntegrityProof",
+                        "cryptosuite": "eddsa-jcs-2022",
+                        "verificationMethod": "did:key:z6MkrMuMdd6hTJmwf8e6WZz643b7JxYiAnWAFsorDLkaZF5i#z6MkrMuMdd6hTJmwf8e6WZz643b7JxYiAnWAFsorDLkaZF5i",
+                        "created": "2025-05-09T22:33:42Z",
+                        "proofPurpose": "assertionMethod",
+                        "proofValue": "z5vGToJkpPcxV4qmoeRK8BDsYQDmTPaV3BjamEBjtDKXev7xCZhj48iLhNhCUNoFqgbcz4jPyfrvMCW2fF6QRWzZc"
+                      },
+                      {
+                        "type": "DataIntegrityProof",
+                        "cryptosuite": "eddsa-jcs-2022",
+                        "verificationMethod": "did:key:z6MkgXvUbnhiVu1H6SmiPVzC9xpdnCFyE5X2AgxRY4PrbbWN#z6MkgXvUbnhiVu1H6SmiPVzC9xpdnCFyE5X2AgxRY4PrbbWN",
+                        "created": "2025-05-09T22:33:42Z",
+                        "proofPurpose": "assertionMethod",
+                        "proofValue": "z31tDEVbURZ4Qbv2m46eHH91prSt3LP5LvZEWCs7Wq3Uz1a3bpJepvd9eDa4rHdmnp9sPwHkXXhcr8tzMP43mJEWs"
+                      }
+                    ]
                   },
                   {
-                    "type": "DataIntegrityProof",
-                    "cryptosuite": "eddsa-jcs-2022",
-                    "verificationMethod": "did:key:z6MkgXvUbnhiVu1H6SmiPVzC9xpdnCFyE5X2AgxRY4PrbbWN#z6MkgXvUbnhiVu1H6SmiPVzC9xpdnCFyE5X2AgxRY4PrbbWN",
-                    "created": "2025-05-09T22:33:42Z",
-                    "proofPurpose": "assertionMethod",
-                    "proofValue": "z31tDEVbURZ4Qbv2m46eHH91prSt3LP5LvZEWCs7Wq3Uz1a3bpJepvd9eDa4rHdmnp9sPwHkXXhcr8tzMP43mJEWs"
+                    "versionId": "2-QmPFyXi2avxYnu1BwGbWdwph52Rjr5WZxKif7e6Vaf6DPr",
+                    "proof": [
+                      {
+                        "type": "DataIntegrityProof",
+                        "cryptosuite": "eddsa-jcs-2022",
+                        "verificationMethod": "did:key:z6MkrMuMdd6hTJmwf8e6WZz643b7JxYiAnWAFsorDLkaZF5i#z6MkrMuMdd6hTJmwf8e6WZz643b7JxYiAnWAFsorDLkaZF5i",
+                        "created": "2025-05-09T22:33:42Z",
+                        "proofPurpose": "assertionMethod",
+                        "proofValue": "z4LS4TW3T3SgCKANLX1nbcTAiR3YtVZf56cYASXH3NEZ3D2XNCZsPiBKG64wqVpky2sDmPv4BY9YLDJMjqZfY8b7Y"
+                      },
+                      {
+                        "type": "DataIntegrityProof",
+                        "cryptosuite": "eddsa-jcs-2022",
+                        "verificationMethod": "did:key:z6MkgXvUbnhiVu1H6SmiPVzC9xpdnCFyE5X2AgxRY4PrbbWN#z6MkgXvUbnhiVu1H6SmiPVzC9xpdnCFyE5X2AgxRY4PrbbWN",
+                        "created": "2025-05-09T22:33:42Z",
+                        "proofPurpose": "assertionMethod",
+                        "proofValue": "z3wwF7wWJVqjx6Cez16pYPa8KtqWpUddN3Rap2AqngACXyLSMy8S9n3aTFNMULZXFn1DgK1kiXb9y2B2XaLQrAxhX"
+                      }
+                    ]
                   }
                 ]
-              },
-              {
-                "versionId": "2-QmPFyXi2avxYnu1BwGbWdwph52Rjr5WZxKif7e6Vaf6DPr",
-                "proof": [
-                  {
-                    "type": "DataIntegrityProof",
-                    "cryptosuite": "eddsa-jcs-2022",
-                    "verificationMethod": "did:key:z6MkrMuMdd6hTJmwf8e6WZz643b7JxYiAnWAFsorDLkaZF5i#z6MkrMuMdd6hTJmwf8e6WZz643b7JxYiAnWAFsorDLkaZF5i",
-                    "created": "2025-05-09T22:33:42Z",
-                    "proofPurpose": "assertionMethod",
-                    "proofValue": "z4LS4TW3T3SgCKANLX1nbcTAiR3YtVZf56cYASXH3NEZ3D2XNCZsPiBKG64wqVpky2sDmPv4BY9YLDJMjqZfY8b7Y"
-                  },
-                  {
-                    "type": "DataIntegrityProof",
-                    "cryptosuite": "eddsa-jcs-2022",
-                    "verificationMethod": "did:key:z6MkgXvUbnhiVu1H6SmiPVzC9xpdnCFyE5X2AgxRY4PrbbWN#z6MkgXvUbnhiVu1H6SmiPVzC9xpdnCFyE5X2AgxRY4PrbbWN",
-                    "created": "2025-05-09T22:33:42Z",
-                    "proofPurpose": "assertionMethod",
-                    "proofValue": "z3wwF7wWJVqjx6Cez16pYPa8KtqWpUddN3Rap2AqngACXyLSMy8S9n3aTFNMULZXFn1DgK1kiXb9y2B2XaLQrAxhX"
-                  }
-                ]
-              }
-            ]
-        """.trimIndent())
+                """.trimIndent(),
+            )
 
         val resolver = DidResolver.fromJsonL(log.split('\n'))
 

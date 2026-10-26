@@ -17,9 +17,15 @@ under the License.
 package org.kapunsdk.visualization.oca.model.table
 
 sealed interface CodeTable {
-	data class Keys(val keys: List<String>) : CodeTable
+    data class Keys(
+        val keys: List<String>,
+    ) : CodeTable
 
-	data class KeyValues(val mappings: Map<String, String>): CodeTable
+    data class KeyValues(
+        val mappings: Map<String, String>,
+    ) : CodeTable
 
-	data class Unit(val entries: Map<String, Map<String, String>>) : CodeTable
+    data class Unit(
+        val entries: Map<String, Map<String, String>>,
+    ) : CodeTable
 }

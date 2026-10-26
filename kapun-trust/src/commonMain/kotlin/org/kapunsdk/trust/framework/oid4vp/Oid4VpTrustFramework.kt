@@ -16,6 +16,7 @@ under the License.
 
 package org.kapunsdk.trust.framework.oid4vp
 
+import io.ktor.http.Url
 import org.kapunsdk.credentials.SdJwt
 import org.kapunsdk.credentials.models.credential.CredentialModel
 import org.kapunsdk.issuance.metadata.data.CredentialIssuerMetadata
@@ -23,12 +24,11 @@ import org.kapunsdk.presentation.request.PresentationRequest
 import org.kapunsdk.trust.di.KapunTrustKoinComponent
 import org.kapunsdk.trust.framework.DidWebTrustAnchorProvider
 import org.kapunsdk.trust.framework.DocumentProvider
-import org.kapunsdk.trust.framework.X509TrustAnchorProvider
 import org.kapunsdk.trust.framework.TrustFramework
 import org.kapunsdk.trust.framework.ValidationInfo
+import org.kapunsdk.trust.framework.X509TrustAnchorProvider
 import org.kapunsdk.trust.model.AgentInformation
 import org.kapunsdk.trust.model.AgentType
-import io.ktor.http.Url
 import uniffi.kapun_credential_core_rust.SignatureCreator
 import uniffi.kapun_crypto_rust.SanType
 import uniffi.kapun_crypto_rust.base64UrlEncode
@@ -39,14 +39,9 @@ import uniffi.kapun_crypto_rust.validateJwtWithPubKey
 import uniffi.kapun_util_rust.Value
 
 class IdentitySigner : SignatureCreator {
-    override fun alg(): String {
-        return "none"
-    }
+    override fun alg(): String = "none"
 
-    override fun sign(bytes: ByteArray): ByteArray {
-        return ByteArray(0)
-    }
-
+    override fun sign(bytes: ByteArray): ByteArray = ByteArray(0)
 }
 
 data class X509TrustInfo(
@@ -61,45 +56,66 @@ data class DidWebTrustInfo(
     val isValid: Boolean,
 )
 
-const val OID4VP_BASIC_TRUST : String = "oid4vp_basic_trust"
+const val OID4VP_BASIC_TRUST: String = "oid4vp_basic_trust"
 const val EUDI_BASIC_TRUST: String = "eudi_basic_trust"
 
 class Oid4VpTrustFramework(
     val documentProvider: DocumentProvider,
     val x509TrustAnchorProvider: X509TrustAnchorProvider = StaticX509TrustAnchorProvider(),
     val didWebTrustAnchorProvider: DidWebTrustAnchorProvider = StaticDidWebTrustAnchorProvider(),
-    private val trustedDomains: List<String>
-) : TrustFramework, KapunTrustKoinComponent {
+    private val trustedDomains: List<String>,
+) : TrustFramework,
+    KapunTrustKoinComponent {
     override val frameworkId: String
         get() = OID4VP_BASIC_TRUST
+
     override suspend fun getIssuerInformation(
         baseUrl: String,
         credentialConfigurationIds: List<String>,
-        credentialIssuerMetadata: CredentialIssuerMetadata
+        credentialIssuerMetadata: CredentialIssuerMetadata,
     ): AgentInformation {
         val host = runCatching { Url(baseUrl).host }.getOrDefault(baseUrl)
         val isTrusted = trustedDomains.contains(host)
-        val displayName = credentialIssuerMetadata.claims.display?.firstOrNull()?.name ?: baseUrl
-        val displayLogo = credentialIssuerMetadata.claims.display?.firstOrNull()?.logo?.uri
+        val displayName =
+            credentialIssuerMetadata.claims.display
+                ?.firstOrNull()
+                ?.name ?: baseUrl
+        val displayLogo =
+            credentialIssuerMetadata.claims.display
+                ?.firstOrNull()
+                ?.logo
+                ?.uri
         val mutableMap = mutableMapOf<String, Value>()
         mutableMap.apply {
-            put("entityName", Value.Object(mapOf(
-                "de" to Value.String(displayName)
-            )))
+            put(
+                "entityName",
+                Value.Object(
+                    mapOf(
+                        "de" to Value.String(displayName),
+                    ),
+                ),
+            )
             displayLogo?.let {
-                put("logoUri", Value.Object(mapOf(
-                    "de" to Value.String(it)
-                )))
+                put(
+                    "logoUri",
+                    Value.Object(
+                        mapOf(
+                            "de" to Value.String(it),
+                        ),
+                    ),
+                )
             }
         }
-        val identityJwt = SdJwt.create(
-            Value.Object(
-                mutableMap
-            ),
-            listOf(), "<unsigned>",
-            key = IdentitySigner(),
-            pubKeyJwk = null,
-        )
+        val identityJwt =
+            SdJwt.create(
+                Value.Object(
+                    mutableMap,
+                ),
+                listOf(),
+                "<unsigned>",
+                key = IdentitySigner(),
+                pubKeyJwk = null,
+            )
         return AgentInformation(
             type = AgentType.ISSUER,
             domain = host,
@@ -108,146 +124,163 @@ class Oid4VpTrustFramework(
             isTrusted = isTrusted,
             isVerified = true,
             identityTrust = identityJwt?.innerJwt?.originalSdjwt,
-            trustFrameworkId = this.frameworkId,)
+            trustFrameworkId = this.frameworkId,
+        )
     }
 
     override suspend fun getVerifierInformation(
         requestUri: String,
         presentationRequest: PresentationRequest,
-        originalRequest: String?
+        originalRequest: String?,
     ): AgentInformation {
-        val x509Trust = originalRequest?.let {
-            getTrustInfoFromX509(presentationRequest, it)
-        }
-        val didWebTrust = originalRequest?.let {
-            getTrustInfoFromDidWeb(it)
-        }
+        val x509Trust =
+            originalRequest?.let {
+                getTrustInfoFromX509(presentationRequest, it)
+            }
+        val didWebTrust =
+            originalRequest?.let {
+                getTrustInfoFromDidWeb(it)
+            }
 
-        val baseUrl = x509Trust?.baseUrl
-            ?: requestUri
+        val baseUrl =
+            x509Trust?.baseUrl
+                ?: requestUri
 
-        val isTrusted = (x509Trust?.isTrusted == true)
-                || (didWebTrust?.isTrusted == true)
-        val isValid = (x509Trust?.isValid == true)
-                || (didWebTrust?.isValid == true)
+        val isTrusted =
+            (x509Trust?.isTrusted == true) ||
+                (didWebTrust?.isTrusted == true)
+        val isValid =
+            (x509Trust?.isValid == true) ||
+                (didWebTrust?.isValid == true)
 
         val mutableMap = mutableMapOf<String, Value>()
 
         mutableMap.apply {
             put(
-                "entityName", Value.Object(
+                "entityName",
+                Value.Object(
                     mapOf(
-                        "de" to Value.String(presentationRequest.clientMetadata?.clientName ?: x509Trust?.san ?: presentationRequest.clientId)
-                    )
+                        "de" to
+                            Value.String(
+                                presentationRequest.clientMetadata?.clientName ?: x509Trust?.san
+                                    ?: presentationRequest.clientId,
+                            ),
+                    ),
                 ),
             )
             presentationRequest.clientMetadata?.logoUri?.let {
                 put(
-                    "logoUri", Value.Object(
+                    "logoUri",
+                    Value.Object(
                         mapOf(
-                            "de" to Value.String(it)
-                    )
-                ),
+                            "de" to Value.String(it),
+                        ),
+                    ),
                 )
             }
         }
 
-        val identityJwt = SdJwt.create(
-            Value.Object(
-                mutableMap
-            ),
-            listOf(), "<unsigned>",
-            key = IdentitySigner(),
-            pubKeyJwk = null,
-        )
+        val identityJwt =
+            SdJwt.create(
+                Value.Object(
+                    mutableMap,
+                ),
+                listOf(),
+                "<unsigned>",
+                key = IdentitySigner(),
+                pubKeyJwk = null,
+            )
         return AgentInformation(
             type = AgentType.VERIFIER,
             domain = baseUrl,
-            displayName = presentationRequest.clientMetadata?.clientName ?: x509Trust?.san ?: presentationRequest.clientId,
+            displayName =
+                presentationRequest.clientMetadata?.clientName ?: x509Trust?.san ?: presentationRequest.clientId,
             logoUri = presentationRequest.clientMetadata?.logoUri,
             isTrusted = isTrusted,
             isVerified = isValid,
             identityTrust = identityJwt?.innerJwt?.originalSdjwt,
             trustFrameworkId = this.frameworkId,
-            )
+        )
     }
 
     private fun getTrustInfoFromX509(
         presentationRequest: PresentationRequest,
-        jwt: String
+        jwt: String,
     ): X509TrustInfo {
-        //TODO: we still should check the trust anchor
-        //TODO: we should check some of the properties like response_uri and such
+        // TODO: we still should check the trust anchor
+        // TODO: we should check some of the properties like response_uri and such
         val certs = getX509FromJwt(jwt)
-        val isChainValid = certs?.let { x509TrustAnchorProvider.verifyChain(it)  } ?: false
-        val isSigned = certs?.getOrNull(0)?.publicKey?.let {
-            validateJwtWithPubKey(jwt, it)
-        } ?: false
+        val isChainValid = certs?.let { x509TrustAnchorProvider.verifyChain(it) } ?: false
+        val isSigned =
+            certs?.getOrNull(0)?.publicKey?.let {
+                validateJwtWithPubKey(jwt, it)
+            } ?: false
         val isTrusted = isSigned and isChainValid
-        val san = if (presentationRequest.clientId.startsWith("x509_san_uri")){
-            SanType.Uri(presentationRequest.clientId.replace("x509_san_uri:", ""))
-        } else if (presentationRequest.clientId.startsWith("x509_san_dns"))  {
-            SanType.Dns(presentationRequest.clientId.replace("x509_san_dns:", ""))
-        } else {
-            null
-        }
-        val isValid = if (san == null) {
-            // check if we have x509_hash
-            if(presentationRequest.clientId.startsWith("x509_hash")) {
-                val clientIdHash = presentationRequest.clientId
-                    .replace("x509_hash:", "")
-                    // remove potential padding characters
-                    .trim { it == '='}
-                certs?.getOrNull(0)?.let {
-                    base64UrlEncode(sha256Rs(it.originalCert)) == clientIdHash
-                } ?: false
+        val san =
+            if (presentationRequest.clientId.startsWith("x509_san_uri")) {
+                SanType.Uri(presentationRequest.clientId.replace("x509_san_uri:", ""))
+            } else if (presentationRequest.clientId.startsWith("x509_san_dns")) {
+                SanType.Dns(presentationRequest.clientId.replace("x509_san_dns:", ""))
             } else {
-                false
+                null
             }
-        } else {
-            certs?.getOrNull(0)?.san?.contains(san)?:false
-        }
+        val isValid =
+            if (san == null) {
+                // check if we have x509_hash
+                if (presentationRequest.clientId.startsWith("x509_hash")) {
+                    val clientIdHash =
+                        presentationRequest.clientId
+                            .replace("x509_hash:", "")
+                            // remove potential padding characters
+                            .trim { it == '=' }
+                    certs?.getOrNull(0)?.let {
+                        base64UrlEncode(sha256Rs(it.originalCert)) == clientIdHash
+                    } ?: false
+                } else {
+                    false
+                }
+            } else {
+                certs?.getOrNull(0)?.san?.contains(san) ?: false
+            }
 
         return X509TrustInfo(
             isTrusted = isTrusted,
             isValid = isValid,
             baseUrl = certs?.getOrNull(0)?.subject,
-            san = san?.getString() ?: presentationRequest.clientId
+            san = san?.getString() ?: presentationRequest.clientId,
         )
     }
 
     private suspend fun getTrustInfoFromDidWeb(jwt: String): DidWebTrustInfo {
         val kid = getKidFromJwt(jwt)
 
-        val isTrusted = kid?.let { didWebTrustAnchorProvider.isTrusted(it) }
-            ?: false
+        val isTrusted =
+            kid?.let { didWebTrustAnchorProvider.isTrusted(it) }
+                ?: false
         val isValid = didWebTrustAnchorProvider.verifyJwt(jwt)
 
         return DidWebTrustInfo(
             isTrusted = isTrusted,
-            isValid = isValid
+            isValid = isValid,
         )
     }
 
-    override suspend fun validatePresentationRequest(presentationRequest: PresentationRequest): ValidationInfo {
-        return ValidationInfo(isValid = true)
-    }
+    override suspend fun validatePresentationRequest(presentationRequest: PresentationRequest): ValidationInfo =
+        ValidationInfo(isValid = true)
 
     override suspend fun getAllowedDocuments(
         presentationRequest: PresentationRequest,
-        includeUsedCredentials: Boolean
+        includeUsedCredentials: Boolean,
     ): List<CredentialModel> {
         // Filter credentials by their used-state according to includeUsedCredentials
         return documentProvider
             .getAllCredentials()
             .filter { includeUsedCredentials || !it.isUsed }
     }
-
 }
 
-fun SanType.getString() : String {
-    return when(this) {
+fun SanType.getString(): String =
+    when (this) {
         is SanType.Dns -> this.v1
         is SanType.Uri -> this.v1
     }
-}

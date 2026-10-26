@@ -16,7 +16,6 @@ under the License.
 
 package org.kapunsdk.issuance.metadata.data
 
-import org.kapunsdk.issuance.metadata.data.CredentialConfigurationSerializer
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -30,347 +29,289 @@ import kotlinx.serialization.json.JsonDecoder
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.longOrNull
+import org.kapunsdk.issuance.metadata.data.CredentialConfigurationSerializer
 
 /**
  * Credential Issuer Metadata as described in https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#name-credential-issuer-metadata-p
  */
 @Serializable
 data class CredentialIssuerMetadataClaims(
-	@SerialName("credential_issuer")
-	val credentialIssuer: String,
-
-	@SerialName("authorization_servers")
-	val authorizationServers: List<String>? = null,
-
-	@SerialName("credential_endpoint")
-	val credentialEndpoint: String,
-
-	@SerialName("nonce_endpoint")
-	val nonceEndpoint: String? = null,
-
-	@SerialName("deferred_credential_endpoint")
-	val deferredCredentialEndpoint: String? = null,
-
-	@SerialName("notification_endpoint")
-	val notificationEndpoint: String? = null,
-
-	@SerialName("credential_response_encryption")
-	val credentialResponseEncryption: CredentialResponseEncryption? = null,
-
-	@SerialName("batch_credential_issuance")
-	val batchCredentialIssuance: BatchCredentialIssuance? = null,
-
-	@SerialName("signed_metadata")
-	val signedMetadata: String? = null,
-
-	@SerialName("credential_issuer_identity_trust_statement")
-	val credentialIssuerIdentityTrustStatement: String? = null,
-
-	@SerialName("display")
-	val display: List<Display>? = null,
-
-	@SerialName("credential_configurations_supported")
-	val credentialConfigurationsSupported: Map<String, CredentialConfiguration>,
-
-	@SerialName("vct")
-	val vct: String? = null,
-
-	@SerialName("credential_metadata")
-	val credentialMetadata: CredentialMetadata? = null,
+    @SerialName("credential_issuer")
+    val credentialIssuer: String,
+    @SerialName("authorization_servers")
+    val authorizationServers: List<String>? = null,
+    @SerialName("credential_endpoint")
+    val credentialEndpoint: String,
+    @SerialName("nonce_endpoint")
+    val nonceEndpoint: String? = null,
+    @SerialName("deferred_credential_endpoint")
+    val deferredCredentialEndpoint: String? = null,
+    @SerialName("notification_endpoint")
+    val notificationEndpoint: String? = null,
+    @SerialName("credential_response_encryption")
+    val credentialResponseEncryption: CredentialResponseEncryption? = null,
+    @SerialName("batch_credential_issuance")
+    val batchCredentialIssuance: BatchCredentialIssuance? = null,
+    @SerialName("signed_metadata")
+    val signedMetadata: String? = null,
+    @SerialName("credential_issuer_identity_trust_statement")
+    val credentialIssuerIdentityTrustStatement: String? = null,
+    @SerialName("display")
+    val display: List<Display>? = null,
+    @SerialName("credential_configurations_supported")
+    val credentialConfigurationsSupported: Map<String, CredentialConfiguration>,
+    @SerialName("vct")
+    val vct: String? = null,
+    @SerialName("credential_metadata")
+    val credentialMetadata: CredentialMetadata? = null,
 )
 
 @Serializable
 data class CredentialMetadata(
-	@SerialName("display")
-	val display: List<Display>? = null,
-
-	@SerialName("claims")
-	val claims: List<CredentialMetadataClaim>? = null,
+    @SerialName("display")
+    val display: List<Display>? = null,
+    @SerialName("claims")
+    val claims: List<CredentialMetadataClaim>? = null,
 )
 
 @Serializable
 data class CredentialMetadataClaim(
-	@SerialName("path")
-	val path: List<JsonElement>,
-
-	@SerialName("display")
-	val display: List<Display>? = null,
-
-	@SerialName("mandatory")
-	val isMandatory: Boolean? = null,
+    @SerialName("path")
+    val path: List<JsonElement>,
+    @SerialName("display")
+    val display: List<Display>? = null,
+    @SerialName("mandatory")
+    val isMandatory: Boolean? = null,
 )
 
 @Serializable
 data class CredentialResponseEncryption(
-	@SerialName("alg_values_supported")
-	val algValuesSupported: List<String>,
-
-	@SerialName("enc_values_supported")
-	val encValuesSupported: List<String>,
-
-	@SerialName("zip_values_supported")
-	val zipValuesSupported: List<String>? = null,
-
-	@SerialName("encryption_required")
-	val encryptionRequired: Boolean
+    @SerialName("alg_values_supported")
+    val algValuesSupported: List<String>,
+    @SerialName("enc_values_supported")
+    val encValuesSupported: List<String>,
+    @SerialName("zip_values_supported")
+    val zipValuesSupported: List<String>? = null,
+    @SerialName("encryption_required")
+    val encryptionRequired: Boolean,
 )
 
 @Serializable
 data class BatchCredentialIssuance(
-	@SerialName("batch_size")
-	val batchSize: Int,
+    @SerialName("batch_size")
+    val batchSize: Int,
 )
 
 @Serializable
 data class Display(
-	@SerialName("name")
-	val name: String? = null,
-
-	@SerialName("locale")
-	val locale: String? = null,
-
-	@SerialName("logo")
-	val logo: Logo? = null,
-
-	@SerialName("description")
-	val description: String? = null,
-
-	@SerialName("background_color")
-	val backgroundColor: String? = null,
-
-	@SerialName("background_image")
-	val backgroundImage: BackgroundImage? = null,
-
-	@SerialName("text_color")
-	val textColor: String? = null,
+    @SerialName("name")
+    val name: String? = null,
+    @SerialName("locale")
+    val locale: String? = null,
+    @SerialName("logo")
+    val logo: Logo? = null,
+    @SerialName("description")
+    val description: String? = null,
+    @SerialName("background_color")
+    val backgroundColor: String? = null,
+    @SerialName("background_image")
+    val backgroundImage: BackgroundImage? = null,
+    @SerialName("text_color")
+    val textColor: String? = null,
 )
 
 @Serializable
 data class Logo(
-	@SerialName("uri")
-	// Is required, but we don't need it, so don't fail if metadata is wrong
-	val uri: String? = null,
-
-	@SerialName("alt_text")
-	val altText: String? = null,
+    // Is required, but we don't need it, so don't fail if metadata is wrong
+    @SerialName("uri")
+    val uri: String? = null,
+    @SerialName("alt_text")
+    val altText: String? = null,
 )
 
 @Serializable
 data class BackgroundImage(
-	@SerialName("uri")
-	val uri: String,
+    @SerialName("uri")
+    val uri: String,
 )
 
 @Serializable(with = CredentialConfigurationSerializer::class)
 sealed interface CredentialConfiguration {
-	val format: String
-	val scope: String?
-	val cryptographicBindingMethodsSupported: List<String>?
-	val credentialSigningAlgValuesSupported: List<StringOrLong>?
-	val proofTypesSupported: Map<String, ProofType>?
-	val display: List<Display>?
-	val credentialMetadata: CredentialMetadata?
+    val format: String
+    val scope: String?
+    val cryptographicBindingMethodsSupported: List<String>?
+    val credentialSigningAlgValuesSupported: List<StringOrLong>?
+    val proofTypesSupported: Map<String, ProofType>?
+    val display: List<Display>?
+    val credentialMetadata: CredentialMetadata?
 
-	fun getDisplayMetadata(): List<Display>? =
-		credentialMetadata?.display ?: display
+    fun getDisplayMetadata(): List<Display>? = credentialMetadata?.display ?: display
 
-	/**
-	 * ISO mDL credential format as described in https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#name-iso-mdl
-	 */
-	@Serializable
-	data class Mdoc(
-		@SerialName("format")
-		override val format: String,
+    /**
+     * ISO mDL credential format as described in https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#name-iso-mdl
+     */
+    @Serializable
+    data class Mdoc(
+        @SerialName("format")
+        override val format: String,
+        @SerialName("scope")
+        override val scope: String? = null,
+        @SerialName("cryptographic_binding_methods_supported")
+        override val cryptographicBindingMethodsSupported: List<String>? = null,
+        @SerialName("credential_signing_alg_values_supported")
+        override val credentialSigningAlgValuesSupported: List<StringOrLong>? = null,
+        @SerialName("proof_types_supported")
+        override val proofTypesSupported: Map<String, ProofType>? = null,
+        @SerialName("display")
+        override val display: List<Display>? = null,
+        @SerialName("credential_metadata")
+        override val credentialMetadata: CredentialMetadata? = null,
+        @SerialName("doctype")
+        val doctype: String,
+        @SerialName("claims")
+        val claims: JsonElement? = null,
+    ) : CredentialConfiguration
 
-		@SerialName("scope")
-		override val scope: String? = null,
+    /**
+     * SD-JWT VC credential format as described in https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#name-ietf-sd-jwt-vc
+     */
+    @Serializable
+    data class SdJwt(
+        @SerialName("format")
+        override val format: String,
+        @SerialName("scope")
+        override val scope: String? = null,
+        @SerialName("cryptographic_binding_methods_supported")
+        override val cryptographicBindingMethodsSupported: List<String>? = null,
+        @SerialName("credential_signing_alg_values_supported")
+        override val credentialSigningAlgValuesSupported: List<StringOrLong>? = null,
+        @SerialName("proof_types_supported")
+        override val proofTypesSupported: Map<String, ProofType>? = null,
+        @SerialName("display")
+        override val display: List<Display>? = null,
+        @SerialName("credential_metadata")
+        override val credentialMetadata: CredentialMetadata? = null,
+        @SerialName("vct")
+        val vct: String,
+        @SerialName("claims")
+        val claims: JsonElement? = null,
+    ) : CredentialConfiguration
 
-		@SerialName("cryptographic_binding_methods_supported")
-		override val cryptographicBindingMethodsSupported: List<String>? = null,
+    @Serializable
+    data class Bbs(
+        @SerialName("format")
+        override val format: String,
+        @SerialName("scope")
+        override val scope: String? = null,
+        @SerialName("cryptographic_binding_methods_supported")
+        override val cryptographicBindingMethodsSupported: List<String>? = null,
+        @SerialName("credential_signing_alg_values_supported")
+        override val credentialSigningAlgValuesSupported: List<StringOrLong>? = null,
+        @SerialName("proof_types_supported")
+        override val proofTypesSupported: Map<String, ProofType>? = null,
+        @SerialName("display")
+        override val display: List<Display>? = null,
+        @SerialName("credential_metadata")
+        override val credentialMetadata: CredentialMetadata? = null,
+        @SerialName("vct")
+        val vct: String? = null,
+        @SerialName("claims")
+        val claims: JsonElement? = null,
+    ) : CredentialConfiguration
 
-		@SerialName("credential_signing_alg_values_supported")
-		override val credentialSigningAlgValuesSupported: List<StringOrLong>? = null,
+    @Serializable
+    data class SdJwtVcdm(
+        @SerialName("format")
+        override val format: String,
+        @SerialName("scope")
+        override val scope: String? = null,
+        @SerialName("cryptographic_binding_methods_supported")
+        override val cryptographicBindingMethodsSupported: List<String>? = null,
+        @SerialName("credential_signing_alg_values_supported")
+        override val credentialSigningAlgValuesSupported: List<StringOrLong>? = null,
+        @SerialName("proof_types_supported")
+        override val proofTypesSupported: Map<String, ProofType>? = null,
+        @SerialName("display")
+        override val display: List<Display>? = null,
+        @SerialName("credential_metadata")
+        override val credentialMetadata: CredentialMetadata? = null,
+        @SerialName("claims")
+        val claims: JsonElement? = null,
+        @SerialName("credential_definition")
+        val credentialDefinition: VcdmCredentialDefinition? = null,
+    ) : CredentialConfiguration
 
-		@SerialName("proof_types_supported")
-		override val proofTypesSupported: Map<String, ProofType>? = null,
-
-		@SerialName("display")
-		override val display: List<Display>? = null,
-
-		@SerialName("credential_metadata")
-		override val credentialMetadata: CredentialMetadata? = null,
-
-		@SerialName("doctype")
-		val doctype: String,
-
-		@SerialName("claims")
-		val claims: JsonElement? = null,
-	) : CredentialConfiguration
-
-	/**
-	 * SD-JWT VC credential format as described in https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#name-ietf-sd-jwt-vc
-	 */
-	@Serializable
-	data class SdJwt(
-		@SerialName("format")
-		override val format: String,
-
-		@SerialName("scope")
-		override val scope: String? = null,
-
-		@SerialName("cryptographic_binding_methods_supported")
-		override val cryptographicBindingMethodsSupported: List<String>? = null,
-
-		@SerialName("credential_signing_alg_values_supported")
-		override val credentialSigningAlgValuesSupported: List<StringOrLong>? = null,
-
-		@SerialName("proof_types_supported")
-		override val proofTypesSupported: Map<String, ProofType>? = null,
-
-		@SerialName("display")
-		override val display: List<Display>? = null,
-
-		@SerialName("credential_metadata")
-		override val credentialMetadata: CredentialMetadata? = null,
-
-		@SerialName("vct")
-		val vct: String,
-
-		@SerialName("claims")
-		val claims: JsonElement? = null,
-	) : CredentialConfiguration
-
-	@Serializable
-	data class Bbs(
-		@SerialName("format")
-		override val format: String,
-
-		@SerialName("scope")
-		override val scope: String? = null,
-
-		@SerialName("cryptographic_binding_methods_supported")
-		override val cryptographicBindingMethodsSupported: List<String>? = null,
-
-		@SerialName("credential_signing_alg_values_supported")
-		override val credentialSigningAlgValuesSupported: List<StringOrLong>? = null,
-
-		@SerialName("proof_types_supported")
-		override val proofTypesSupported: Map<String, ProofType>? = null,
-
-		@SerialName("display")
-		override val display: List<Display>? = null,
-
-		@SerialName("credential_metadata")
-		override val credentialMetadata: CredentialMetadata? = null,
-
-		@SerialName("vct")
-		val vct: String? = null,
-
-		@SerialName("claims")
-		val claims: JsonElement? = null,
-	) : CredentialConfiguration
-
-	@Serializable
-	data class SdJwtVcdm(
-		@SerialName("format")
-		override val format: String,
-
-		@SerialName("scope")
-		override val scope: String? = null,
-
-		@SerialName("cryptographic_binding_methods_supported")
-		override val cryptographicBindingMethodsSupported: List<String>? = null,
-
-		@SerialName("credential_signing_alg_values_supported")
-		override val credentialSigningAlgValuesSupported: List<StringOrLong>? = null,
-
-		@SerialName("proof_types_supported")
-		override val proofTypesSupported: Map<String, ProofType>? = null,
-
-		@SerialName("display")
-		override val display: List<Display>? = null,
-
-		@SerialName("credential_metadata")
-		override val credentialMetadata: CredentialMetadata? = null,
-
-		@SerialName("claims")
-		val claims: JsonElement? = null,
-
-		@SerialName("credential_definition")
-		val credentialDefinition: VcdmCredentialDefinition? = null
-	) : CredentialConfiguration
-
-	/**
-	 * Fallback for unknown credential formats
-	 */
-	@Serializable
-	data class Unknown(
-		@SerialName("format")
-		override val format: String,
-
-		@SerialName("scope")
-		override val scope: String? = null,
-
-		@SerialName("cryptographic_binding_methods_supported")
-		override val cryptographicBindingMethodsSupported: List<String>? = null,
-
-		@SerialName("credential_signing_alg_values_supported")
-		override val credentialSigningAlgValuesSupported: List<StringOrLong>? = null,
-
-		@SerialName("proof_types_supported")
-		override val proofTypesSupported: Map<String, ProofType>? = null,
-
-		@SerialName("display")
-		override val display: List<Display>? = null,
-
-		@SerialName("credential_metadata")
-		override val credentialMetadata: CredentialMetadata? = null,
-	) : CredentialConfiguration
+    /**
+     * Fallback for unknown credential formats
+     */
+    @Serializable
+    data class Unknown(
+        @SerialName("format")
+        override val format: String,
+        @SerialName("scope")
+        override val scope: String? = null,
+        @SerialName("cryptographic_binding_methods_supported")
+        override val cryptographicBindingMethodsSupported: List<String>? = null,
+        @SerialName("credential_signing_alg_values_supported")
+        override val credentialSigningAlgValuesSupported: List<StringOrLong>? = null,
+        @SerialName("proof_types_supported")
+        override val proofTypesSupported: Map<String, ProofType>? = null,
+        @SerialName("display")
+        override val display: List<Display>? = null,
+        @SerialName("credential_metadata")
+        override val credentialMetadata: CredentialMetadata? = null,
+    ) : CredentialConfiguration
 }
 
 @Serializable
 data class ProofType(
-	@SerialName("proof_signing_alg_values_supported")
-	val proofSigningAlgValuesSupported: List<String>,
-
-	@SerialName("key_attestations_required")
-	val keyAttestationsRequired: KeyAttestationsRequired? = null,
+    @SerialName("proof_signing_alg_values_supported")
+    val proofSigningAlgValuesSupported: List<String>,
+    @SerialName("key_attestations_required")
+    val keyAttestationsRequired: KeyAttestationsRequired? = null,
 )
 
 @Serializable
 data class KeyAttestationsRequired(
-	@SerialName("key_storage")
-	val keyStorage: List<String>? = null,
-
-	@SerialName("user_authentication")
-	val userAuthentication: List<String>? = null,
+    @SerialName("key_storage")
+    val keyStorage: List<String>? = null,
+    @SerialName("user_authentication")
+    val userAuthentication: List<String>? = null,
 )
 
 @Serializable
 data class VcdmCredentialDefinition(
-	@SerialName("type")
-	val type: List<String>? = null
+    @SerialName("type")
+    val type: List<String>? = null,
 )
 
 @Serializable(with = StringOrLongSerializer::class)
 sealed class StringOrLong {
-    data class StrValue(val value: String) : StringOrLong()
-    data class LongValue(val value: Long) : StringOrLong()
+    data class StrValue(
+        val value: String,
+    ) : StringOrLong()
 
-    fun asString(): String? = when(this) {
-        is StrValue -> value
-        else -> null
-    }
+    data class LongValue(
+        val value: Long,
+    ) : StringOrLong()
 
-    fun asLong(): Long? = when(this) {
-        is LongValue -> value
-        else -> null
-    }
+    fun asString(): String? =
+        when (this) {
+            is StrValue -> value
+            else -> null
+        }
 
-    override fun toString(): String = when(this) {
-        is StrValue -> value
-        is LongValue -> value.toString()
-    }
+    fun asLong(): Long? =
+        when (this) {
+            is LongValue -> value
+            else -> null
+        }
+
+    override fun toString(): String =
+        when (this) {
+            is StrValue -> value
+            is LongValue -> value.toString()
+        }
 }
 
 object StringOrLongSerializer : KSerializer<StringOrLong> {
@@ -378,8 +319,9 @@ object StringOrLongSerializer : KSerializer<StringOrLong> {
         PrimitiveSerialDescriptor("StringOrLong", PrimitiveKind.STRING)
 
     override fun deserialize(decoder: Decoder): StringOrLong {
-        val input = decoder as? JsonDecoder
-            ?: throw SerializationException("This class can be loaded only by Json")
+        val input =
+            decoder as? JsonDecoder
+                ?: throw SerializationException("This class can be loaded only by Json")
 
         val element = input.decodeJsonElement()
 
@@ -396,7 +338,10 @@ object StringOrLongSerializer : KSerializer<StringOrLong> {
         throw SerializationException("Expected String or Long, but got $element")
     }
 
-    override fun serialize(encoder: Encoder, value: StringOrLong) {
+    override fun serialize(
+        encoder: Encoder,
+        value: StringOrLong,
+    ) {
         when (value) {
             is StringOrLong.LongValue -> encoder.encodeLong(value.value)
             is StringOrLong.StrValue -> encoder.encodeString(value.value)

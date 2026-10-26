@@ -19,8 +19,9 @@ package org.kapunsdk.issuance.metadata.di
 import org.kapunsdk.issuance.metadata.MetadataService
 import org.koin.dsl.module
 
-internal fun metadataModule() = module {
-	includes(
-		MetadataService.koinModule,
-	)
-}
+internal fun metadataModule() =
+    module {
+        includes(
+            MetadataService.koinModule,
+        )
+    }

@@ -17,23 +17,26 @@ interface DidResolver {
             // caller that obtains the lines with split('\n') therefore gets
             // one final empty element; it is not a log entry and must be
             // ignored.
-            val entries = lines
-                .filter { it.isNotBlank() }
-                .map { DidLogEntry.parse(it) }
+            val entries =
+                lines
+                    .filter { it.isNotBlank() }
+                    .map { DidLogEntry.parse(it) }
 
             // Check if all entries are of type did:tdw:0.3 and
             // the first entry specifies the did:tdw:0.3 method
             // and no other entry specifies a different method.
             if (entries.all { it is DidLogEntry.Tdw03 } &&
                 entries.firstOrNull()?.parameters?.method == DID_TDW_03_METHOD &&
-                entries.none { it.parameters.method?.equals(DID_TDW_03_METHOD) == false}) {
+                entries.none { it.parameters.method?.equals(DID_TDW_03_METHOD) == false }
+            ) {
                 return DidTdwResolver(entries)
             }
 
             // Same check, but now for did:webvh:1.0
             if (entries.all { it is DidLogEntry.WebVH10 } &&
                 entries.firstOrNull()?.parameters?.method == DID_WEB_VH_10_METHOD &&
-                entries.none { it.parameters.method?.equals(DID_WEB_VH_10_METHOD) == false}) {
+                entries.none { it.parameters.method?.equals(DID_WEB_VH_10_METHOD) == false }
+            ) {
                 return DidWebVHResolver(entries)
             }
 
@@ -43,5 +46,6 @@ interface DidResolver {
 
     fun resolveLatest(
         verify: Boolean = true,
-        witnesses: List<WitnessProof>? = null): DidLogEntry
+        witnesses: List<WitnessProof>? = null,
+    ): DidLogEntry
 }

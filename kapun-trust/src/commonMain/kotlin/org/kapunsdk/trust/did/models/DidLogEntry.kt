@@ -2,14 +2,14 @@
 
 package org.kapunsdk.trust.did.models
 
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import org.kapunsdk.util.extensions.asArray
 import org.kapunsdk.util.extensions.asObject
 import org.kapunsdk.util.extensions.asString
 import org.kapunsdk.util.extensions.fromJsonElement
 import org.kapunsdk.util.extensions.get
 import org.kapunsdk.util.extensions.transform
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
 import uniffi.kapun_crypto_rust.DidVerificationDocument
 import uniffi.kapun_crypto_rust.parseDidVerificationDocument
 import uniffi.kapun_util_rust.Value
@@ -23,7 +23,6 @@ sealed interface DidLogEntry {
         override val parameters: Parameters,
         override val state: Value,
         override val proofs: List<Pair<DataIntegrityProof, Value>>,
-
         internal val rawValue: Value.Array,
     ) : DidLogEntry
 
@@ -33,7 +32,6 @@ sealed interface DidLogEntry {
         override val parameters: Parameters,
         override val state: Value,
         override val proofs: List<Pair<DataIntegrityProof, Value>>,
-
         internal val rawValue: Value.Object,
     ) : DidLogEntry
 
@@ -49,8 +47,9 @@ sealed interface DidLogEntry {
         }
 
         private fun parseArray(array: List<Value>): DidLogEntry {
-            if (array.size != 5)
+            if (array.size != 5) {
                 throw ResolveException("Invalid Log Entry: array of size ${array.size} found")
+            }
 
             val versionId = array[0]
             val versionTime = array[1]
@@ -59,43 +58,54 @@ sealed interface DidLogEntry {
             val proof = array[4]
 
             return Tdw03(
-                versionId = versionId.asString()?.let {
-                    val split = it.split('-')
-                    VersionId(version = split[0].toInt(), entryHash = split[1])
-                } ?: throw ResolveException("VersionId is not a String"),
-                versionTime = versionTime.asString()?.let {
-                    Instant.parse(it)
-                } ?: throw ResolveException("VersionTime is not a String"),
-                parameters = parameters.transform<Parameters>()
-                    ?: throw ResolveException("Couldn't parse parameters"),
+                versionId =
+                    versionId.asString()?.let {
+                        val split = it.split('-')
+                        VersionId(version = split[0].toInt(), entryHash = split[1])
+                    } ?: throw ResolveException("VersionId is not a String"),
+                versionTime =
+                    versionTime.asString()?.let {
+                        Instant.parse(it)
+                    } ?: throw ResolveException("VersionTime is not a String"),
+                parameters =
+                    parameters.transform<Parameters>()
+                        ?: throw ResolveException("Couldn't parse parameters"),
                 state = state,
-                proofs = proof.transform<List<Value>>()?.map { Pair(
-                    it.transform() ?: throw ResolveException("Couldn't parse DataIntegrityProof"),
-                    it)
-                } ?: throw ResolveException("Couldn't parse Data Integrity Proof"),
-                rawValue = Value.Array(array)
+                proofs =
+                    proof.transform<List<Value>>()?.map {
+                        Pair(
+                            it.transform() ?: throw ResolveException("Couldn't parse DataIntegrityProof"),
+                            it,
+                        )
+                    } ?: throw ResolveException("Couldn't parse Data Integrity Proof"),
+                rawValue = Value.Array(array),
             )
         }
 
-        private fun parseObject(obj: Map<String, Value>): DidLogEntry {
-            return WebVH10(
-                versionId = obj["versionId"]?.asString()?.let {
-                    val split = it.split('-')
-                    VersionId(version = split[0].toInt(), entryHash = split[1])
-                } ?: throw ResolveException("VersionId is not a String"),
-                versionTime = obj["versionTime"]?.asString()?.let {
-                    Instant.parse(it)
-                } ?: throw ResolveException("VersionTime is not a String"),
-                parameters = obj["parameters"]?.transform<Parameters>()
-                    ?: throw ResolveException("Couldn't parse parameters"),
+        private fun parseObject(obj: Map<String, Value>): DidLogEntry =
+            WebVH10(
+                versionId =
+                    obj["versionId"]?.asString()?.let {
+                        val split = it.split('-')
+                        VersionId(version = split[0].toInt(), entryHash = split[1])
+                    } ?: throw ResolveException("VersionId is not a String"),
+                versionTime =
+                    obj["versionTime"]?.asString()?.let {
+                        Instant.parse(it)
+                    } ?: throw ResolveException("VersionTime is not a String"),
+                parameters =
+                    obj["parameters"]?.transform<Parameters>()
+                        ?: throw ResolveException("Couldn't parse parameters"),
                 state = obj["state"] ?: throw ResolveException("Did Log entry doesn't have a state"),
-                proofs = obj["proof"]?.transform<List<Value>>()?.map { Pair(
-                    it.transform() ?: throw ResolveException("Couldn't parse DataIntegrityProof"),
-                    it)
-                } ?: throw ResolveException("Couldn't parse Data Integrity Proof"),
-                rawValue = Value.Object(obj)
+                proofs =
+                    obj["proof"]?.transform<List<Value>>()?.map {
+                        Pair(
+                            it.transform() ?: throw ResolveException("Couldn't parse DataIntegrityProof"),
+                            it,
+                        )
+                    } ?: throw ResolveException("Couldn't parse Data Integrity Proof"),
+                rawValue = Value.Object(obj),
             )
-        }
     }
 
     val versionId: VersionId
@@ -104,13 +114,14 @@ sealed interface DidLogEntry {
     val state: Value
     val proofs: List<Pair<DataIntegrityProof, Value>>
 
+    fun doc(): DidVerificationDocument? =
+        when (this) {
+            is Tdw03 -> {
+                parseDidVerificationDocument(this.state["value"])
+            }
 
-    fun doc(): DidVerificationDocument? = when (this) {
-		is Tdw03 -> {
-			parseDidVerificationDocument(this.state["value"])
-		}
-		is WebVH10 -> {
-			parseDidVerificationDocument(this.state)
-		}
-	}
+            is WebVH10 -> {
+                parseDidVerificationDocument(this.state)
+            }
+        }
 }

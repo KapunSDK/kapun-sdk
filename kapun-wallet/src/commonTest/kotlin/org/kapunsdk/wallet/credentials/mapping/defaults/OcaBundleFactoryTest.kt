@@ -26,41 +26,45 @@ import kotlin.test.assertNotNull
 class OcaBundleFactoryTest {
     @Test
     fun testBbsMetadataDisplayIsUsedForOca() {
-        val metadata = Json { ignoreUnknownKeys = true }.decodeFromString<CredentialIssuerMetadataClaims>(
-            """
-            {
-              "credential_issuer": "https://issuer.example",
-              "credential_endpoint": "https://issuer.example/credential",
-              "credential_configurations_supported": {
-                "bbs": {
-                  "format": "zkp_vc",
-                  "vct": "urn:example:bbs",
-                  "credential_metadata": {
-                    "display": [
-                      { "name": "BBS credential", "locale": "en-US" }
-                    ]
+        val metadata =
+            Json { ignoreUnknownKeys = true }.decodeFromString<CredentialIssuerMetadataClaims>(
+                """
+                {
+                  "credential_issuer": "https://issuer.example",
+                  "credential_endpoint": "https://issuer.example/credential",
+                  "credential_configurations_supported": {
+                    "bbs": {
+                      "format": "zkp_vc",
+                      "vct": "urn:example:bbs",
+                      "credential_metadata": {
+                        "display": [
+                          { "name": "BBS credential", "locale": "en-US" }
+                        ]
+                      }
+                    }
                   }
                 }
-              }
-            }
-            """.trimIndent()
-        )
+                """.trimIndent(),
+            )
 
-        val bundle = OcaBundleFactory.createOcaFromDisplayMetadata(
-            locale = "en-US",
-            stringResourceProvider = object : StringResourceProvider {
-                override fun getString(stringName: String) = stringName
-            },
-            backgroundImage = null,
-            metadata = metadata,
-            vct = "urn:example:bbs",
-            jsonContent = "{\"name\":\"Alice\"}",
-        )
+        val bundle =
+            OcaBundleFactory.createOcaFromDisplayMetadata(
+                locale = "en-US",
+                stringResourceProvider =
+                    object : StringResourceProvider {
+                        override fun getString(stringName: String) = stringName
+                    },
+                backgroundImage = null,
+                metadata = metadata,
+                vct = "urn:example:bbs",
+                jsonContent = "{\"name\":\"Alice\"}",
+            )
 
-        val style = assertNotNull(bundle)
-            .overlays
-            .filterIsInstance<UbiqueStyleJsonOverlay>()
-            .single()
+        val style =
+            assertNotNull(bundle)
+                .overlays
+                .filterIsInstance<UbiqueStyleJsonOverlay>()
+                .single()
         assertEquals("BBS credential", style.title)
     }
 }

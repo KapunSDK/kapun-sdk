@@ -19,42 +19,43 @@ package org.kapunsdk.trust.revocation
 import uniffi.kapun_issuance_rust.StatusList
 import uniffi.kapun_util_rust.deflateString
 
-
 const val VALID = 0
 const val REVOKED = 1
 const val SUSPENDED = 2
 
-fun StatusList.isRevoked(index: Int) : Boolean {
-        return runCatching {
-                val status = this.getStatus(index) ?: return false
-                status == REVOKED.toByte()
-        }.getOrNull() ?: true
+fun StatusList.isRevoked(index: Int): Boolean {
+    return runCatching {
+        val status = this.getStatus(index) ?: return false
+        status == REVOKED.toByte()
+    }.getOrNull() ?: true
 }
 
-fun StatusList.getStatus(index: Int) : Byte? {
-        return runCatching {
-                if (index < 0) {
-                        return null
-                }
-                val decompressed = deflateString(lst)
-                val entrySize = (8U / this.bits).toByte()
-                if(index/entrySize >= decompressed.size) {
-                        return null
-                }
-                val byteNumber = index / entrySize
-                val bitIndex = index % entrySize
-                val statusByte = decompressed[byteNumber].toUByte()
-                val statusMask = 255.shr(8 - this.bits.toByte())
-                val statusBits = statusByte.and(
-                        statusMask.shl(bitIndex * this.bits.toInt()).toUByte())
-                        .toInt().shr(bitIndex * this.bits.toInt())
-                statusBits.toByte()
-        }.getOrNull()
+fun StatusList.getStatus(index: Int): Byte? {
+    return runCatching {
+        if (index < 0) {
+            return null
+        }
+        val decompressed = deflateString(lst)
+        val entrySize = (8U / this.bits).toByte()
+        if (index / entrySize >= decompressed.size) {
+            return null
+        }
+        val byteNumber = index / entrySize
+        val bitIndex = index % entrySize
+        val statusByte = decompressed[byteNumber].toUByte()
+        val statusMask = 255.shr(8 - this.bits.toByte())
+        val statusBits =
+            statusByte
+                .and(statusMask.shl(bitIndex * this.bits.toInt()).toUByte())
+                .toInt()
+                .shr(bitIndex * this.bits.toInt())
+        statusBits.toByte()
+    }.getOrNull()
 }
 
-fun StatusList.isSuspended(index: Int) : Boolean {
-        return runCatching {
-                val status = this.getStatus(index) ?: return false
-                status == SUSPENDED.toByte()
-        }.getOrNull() ?: true
+fun StatusList.isSuspended(index: Int): Boolean {
+    return runCatching {
+        val status = this.getStatus(index) ?: return false
+        status == SUSPENDED.toByte()
+    }.getOrNull() ?: true
 }

@@ -24,6 +24,5 @@ import kotlin.time.Instant
  * In some cases around the year 2001, this function might not work correctly.
  */
 @OptIn(ExperimentalTime::class)
-fun Instant.Companion.fromSecondsOrMillis(epoch: Long): Instant {
-	return if (epoch > 1_000_000_000_000L) fromEpochMilliseconds(epoch) else fromEpochSeconds(epoch)
-}
+fun Instant.Companion.fromSecondsOrMillis(epoch: Long): Instant =
+    if (epoch > 1_000_000_000_000L) fromEpochMilliseconds(epoch) else fromEpochSeconds(epoch)

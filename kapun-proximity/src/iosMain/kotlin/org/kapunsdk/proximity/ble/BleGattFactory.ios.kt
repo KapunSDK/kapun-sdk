@@ -11,31 +11,23 @@ software distributed under the License is distributed on an
 "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
-under the License.   
+under the License.
  */
 package org.kapunsdk.proximity.ble
 
 import org.kapunsdk.proximity.ble.client.BleGattClient
 import org.kapunsdk.proximity.ble.client.GattClient
-import org.kapunsdk.proximity.ble.server.GattServer
 import org.kapunsdk.proximity.ble.server.BleGattServer
+import org.kapunsdk.proximity.ble.server.GattServer
 import kotlin.uuid.Uuid
 
-internal actual class BleGattFactory() {
+internal actual class BleGattFactory {
+    internal actual fun createServer(serviceUuid: Uuid): BleGattServer = GattServer(serviceUuid)
 
-	internal actual fun createServer(
-		serviceUuid: Uuid,
-	): BleGattServer {
-		return GattServer(serviceUuid)
-	}
+    internal actual fun createClient(
+        serviceUuid: Uuid,
+        options: ProximityBleOptions,
+    ): BleGattClient = GattClient(serviceUuid)
 
-	internal actual fun createClient(
-		serviceUuid: Uuid,
-		options: ProximityBleOptions,
-	): BleGattClient {
-		return GattClient(serviceUuid)
-	}
-	internal actual fun isBleAdvSupported() : Boolean {
-		return true
-	}
+    internal actual fun isBleAdvSupported(): Boolean = true
 }

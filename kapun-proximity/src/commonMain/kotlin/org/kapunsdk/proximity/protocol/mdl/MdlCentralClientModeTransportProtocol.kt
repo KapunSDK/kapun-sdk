@@ -11,7 +11,7 @@ software distributed under the License is distributed on an
 "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
-under the License.   
+under the License.
  */
 package org.kapunsdk.proximity.protocol.mdl
 
@@ -46,325 +46,356 @@ import uniffi.kapun_util_rust.encodeCbor
 import kotlin.uuid.Uuid
 
 internal class MdlCentralClientModeTransportProtocol(
-	role: Role,
-	private val serviceUuid: Uuid,
-	private val ephemeralKey: EphemeralKey,
-	private val deviceMacAddress: String? = null,
-	private val options: ProximityBleOptions = ProximityBleOptions.Default,
-) : BleTransportProtocol(role), KapunProximityKoinComponent, MdlTransportProtocolExtensions {
-	companion object {
-		private const val TAG = "MdlCentralClientMode"
+    role: Role,
+    private val serviceUuid: Uuid,
+    private val ephemeralKey: EphemeralKey,
+    private val deviceMacAddress: String? = null,
+    private val options: ProximityBleOptions = ProximityBleOptions.Default,
+) : BleTransportProtocol(role),
+    KapunProximityKoinComponent,
+    MdlTransportProtocolExtensions {
+    companion object {
+        private const val TAG = "MdlCentralClientMode"
 
-		// ISO-18013-5 Table 12
-		val characteristicStateUuid = Uuid.parse("00000005-A123-48CE-896B-4C76973373E6")
-		val characteristicClient2ServerUuid = Uuid.parse("00000006-A123-48CE-896B-4C76973373E6")
-		val characteristicServer2ClientUuid = Uuid.parse("00000007-A123-48CE-896B-4C76973373E6")
-		val characteristicIdentUuid = Uuid.parse("00000008-A123-48CE-896B-4C76973373E6")
-	}
+        // ISO-18013-5 Table 12
+        val characteristicStateUuid = Uuid.parse("00000005-A123-48CE-896B-4C76973373E6")
+        val characteristicClient2ServerUuid = Uuid.parse("00000006-A123-48CE-896B-4C76973373E6")
+        val characteristicServer2ClientUuid = Uuid.parse("00000007-A123-48CE-896B-4C76973373E6")
+        val characteristicIdentUuid = Uuid.parse("00000008-A123-48CE-896B-4C76973373E6")
+    }
 
-	private val gattFactory by inject<BleGattFactory>()
-	private val characteristicsFactory by inject<MdlCharacteristicsFactory>()
+    private val gattFactory by inject<BleGattFactory>()
+    private val characteristicsFactory by inject<MdlCharacteristicsFactory>()
 
-	private var gattServer: BleGattServer? = null
-	private var gattClient: BleGattClient? = null
-	override var sessionTranscript: Value? = null
+    private var gattServer: BleGattServer? = null
+    private var gattClient: BleGattClient? = null
+    override var sessionTranscript: Value? = null
 
-	fun isSupported(): Boolean {
-		if (this.role == Role.VERIFIER) {
-			return gattFactory.isBleAdvSupported()
-		}
-		return true
-	}
+    fun isSupported(): Boolean {
+        if (this.role == Role.VERIFIER) {
+            return gattFactory.isBleAdvSupported()
+        }
+        return true
+    }
 
 	/*
-	* Get the session cipher struct, for session encryption. In the case of the mDl (wallet) we only use eReaderKeyBytes
-	* as they are part of the session transcript and also the peer public key.
-	* For the mDl reader we need the public key, which was presented in the QR-Code.
-	* */
-	override fun getSessionCipher(engagementBytes: ByteArray, eReaderKeyBytes: ByteArray, peerCoseKey: ByteArray?): SessionCipher? {
-		sessionTranscript = listOf(24 to engagementBytes, 24 to eReaderKeyBytes, Value.Null).toCbor()
-		val sessionTranscriptBs = encodeCbor(sessionTranscript!!)
-		val sessionTranscriptBytes = encodeCbor(
-			(24 to sessionTranscriptBs).toCbor()
-		)
-		// Use the peerKey if we are the mdl reader
-		val coseKey = decodeCbor(peerCoseKey ?: eReaderKeyBytes)
-		val kty = coseKey.asOrderedObject()?.get(Value.Number(JsonNumber.Integer(1)))!!.asLong() ?: return null
-		val publicKey = when(kty) {
-			// OKP, only x coordinate
-			1L -> {
-				coseKey.asOrderedObject()?.get(Value.Number(JsonNumber.Integer(-2)))!!.asBytes() ?: return null
-			}
-			// EC key sec1 bytes
-			2L -> {
-				val x = coseKey.asOrderedObject()?.get(Value.Number(JsonNumber.Integer(-2)))!!.asBytes() ?: return null
-				val y = coseKey.asOrderedObject()?.get(Value.Number(JsonNumber.Integer(-3)))!!.asBytes() ?: return null
-				byteArrayOf(0x04) + x + y
-			}
-			else -> return null
-		}
-		return this.ephemeralKey.getSessionCipher(sessionTranscriptBytes, publicKey)
-	}
+	 * Get the session cipher struct, for session encryption. In the case of the mDl (wallet) we only use eReaderKeyBytes
+	 * as they are part of the session transcript and also the peer public key.
+	 * For the mDl reader we need the public key, which was presented in the QR-Code.
+	 * */
+    override fun getSessionCipher(
+        engagementBytes: ByteArray,
+        eReaderKeyBytes: ByteArray,
+        peerCoseKey: ByteArray?,
+    ): SessionCipher? {
+        sessionTranscript = listOf(24 to engagementBytes, 24 to eReaderKeyBytes, Value.Null).toCbor()
+        val sessionTranscriptBs = encodeCbor(sessionTranscript!!)
+        val sessionTranscriptBytes =
+            encodeCbor(
+                (24 to sessionTranscriptBs).toCbor(),
+            )
+        // Use the peerKey if we are the mdl reader
+        val coseKey = decodeCbor(peerCoseKey ?: eReaderKeyBytes)
+        val kty = coseKey.asOrderedObject()?.get(Value.Number(JsonNumber.Integer(1)))!!.asLong() ?: return null
+        val publicKey =
+            when (kty) {
+                // OKP, only x coordinate
+                1L -> {
+                    coseKey.asOrderedObject()?.get(Value.Number(JsonNumber.Integer(-2)))!!.asBytes() ?: return null
+                }
 
-	override suspend fun connect() {
-		// In central client mode, the wallet (or mDL) acts as the client (scanning) and the verifier (or mDL reader) acts as the server (advertising)
-		when (role) {
-			Role.WALLET -> connectAsClient()
-			Role.VERIFIER -> connectAsServer()
-		}
-	}
+                // EC key sec1 bytes
+                2L -> {
+                    val x =
+                        coseKey.asOrderedObject()?.get(Value.Number(JsonNumber.Integer(-2)))!!.asBytes() ?: return null
+                    val y =
+                        coseKey.asOrderedObject()?.get(Value.Number(JsonNumber.Integer(-3)))!!.asBytes() ?: return null
+                    byteArrayOf(0x04) + x + y
+                }
 
-	override fun disconnect() {
-		reportDisconnected()
-		inhibitCallbacks()
+                else -> {
+                    return null
+                }
+            }
+        return this.ephemeralKey.getSessionCipher(sessionTranscriptBytes, publicKey)
+    }
 
-		gattServer?.apply {
-			stopAdvertising()
-			setListener(null)
-			stop()
-			gattServer = null
-		}
+    override suspend fun connect() {
+        // In central client mode, the wallet (or mDL) acts as the client (scanning) and the verifier (or mDL reader) acts as the server (advertising)
+        when (role) {
+            Role.WALLET -> connectAsClient()
+            Role.VERIFIER -> connectAsServer()
+        }
+    }
 
-		gattClient?.apply {
-			stopScanning()
-			setListener(null)
-			disconnect()
-			gattClient = null
-		}
-	}
+    override fun disconnect() {
+        reportDisconnected()
+        inhibitCallbacks()
 
-	override fun sendMessage(data: ByteArray, onProgress: ((sent: Int, total: Int) -> Unit)?) {
-		val charUuid = when (role) {
-			Role.WALLET -> characteristicClient2ServerUuid
-			Role.VERIFIER -> characteristicServer2ClientUuid
-		}
+        gattServer?.apply {
+            stopAdvertising()
+            setListener(null)
+            stop()
+            gattServer = null
+        }
 
-		when {
-			gattServer != null -> gattServer?.writeCharacteristic(charUuid, data, onProgress)
-			gattClient != null -> gattClient?.writeCharacteristic(charUuid, data, onProgress)
-			else -> throw IllegalStateException("No Gatt Server or Gatt Client available")
-		}
-	}
+        gattClient?.apply {
+            stopScanning()
+            setListener(null)
+            disconnect()
+            gattClient = null
+        }
+    }
 
-	override fun sendTransportSpecificTerminationMessage() {
-		val terminationCode = byteArrayOf(0x02.toByte())
-		when {
-			gattServer != null -> gattServer?.writeCharacteristic(characteristicStateUuid, terminationCode)
-			gattClient != null -> gattClient?.writeCharacteristic(characteristicStateUuid, terminationCode)
-			else -> throw IllegalStateException("No Gatt Server or Gatt Client available")
-		}
-	}
+    override fun sendMessage(
+        data: ByteArray,
+        onProgress: ((sent: Int, total: Int) -> Unit)?,
+    ) {
+        val charUuid =
+            when (role) {
+                Role.WALLET -> characteristicClient2ServerUuid
+                Role.VERIFIER -> characteristicServer2ClientUuid
+            }
 
-	override fun supportsTransportSpecificTerminationMessage(): Boolean {
-		return when {
-			gattServer != null -> gattServer?.supportsSessionTermination() ?: false
-			gattClient != null -> gattClient?.supportsSessionTermination() ?: false
-			else -> false
-		}
-	}
+        when {
+            gattServer != null -> gattServer?.writeCharacteristic(charUuid, data, onProgress)
+            gattClient != null -> gattClient?.writeCharacteristic(charUuid, data, onProgress)
+            else -> throw IllegalStateException("No Gatt Server or Gatt Client available")
+        }
+    }
 
-	private fun connectAsServer() {
-		gattServer = gattFactory.createServer(serviceUuid).apply {
-			setListener(serverListener)
-			val characteristics = characteristicsFactory.createServerVerifierCharacteristics()
-			if (!start(characteristics)) {
-				reportError(ProximityError.Unknown("Error starting Gatt Server"))
-				stop()
-				gattServer = null
-				return
-			}
+    override fun sendTransportSpecificTerminationMessage() {
+        val terminationCode = byteArrayOf(0x02.toByte())
+        when {
+            gattServer != null -> gattServer?.writeCharacteristic(characteristicStateUuid, terminationCode)
+            gattClient != null -> gattClient?.writeCharacteristic(characteristicStateUuid, terminationCode)
+            else -> throw IllegalStateException("No Gatt Server or Gatt Client available")
+        }
+    }
 
-			startAdvertising(
-				object : BleAdvertiserListener {
-					override fun onError(msg: String) {
-						reportError(ProximityError.Unknown(msg))
-					}
-				}
-			)
-		}
-	}
+    override fun supportsTransportSpecificTerminationMessage(): Boolean =
+        when {
+            gattServer != null -> gattServer?.supportsSessionTermination() ?: false
+            gattClient != null -> gattClient?.supportsSessionTermination() ?: false
+            else -> false
+        }
 
-	private fun connectAsClient() {
-		gattClient = gattFactory.createClient(serviceUuid, options).apply {
-			setListener(clientListener)
+    private fun connectAsServer() {
+        gattServer =
+            gattFactory.createServer(serviceUuid).apply {
+                setListener(serverListener)
+                val characteristics = characteristicsFactory.createServerVerifierCharacteristics()
+                if (!start(characteristics)) {
+                    reportError(ProximityError.Unknown("Error starting Gatt Server"))
+                    stop()
+                    gattServer = null
+                    return
+                }
 
-			if (!deviceMacAddress.isNullOrEmpty()) {
-				connect(deviceMacAddress)
-			} else {
-				startScanning(
-					object : BleScannerListener {
-						override fun onError(msg: String) {
-							reportError(ProximityError.Unknown(msg))
-						}
-					}
-				)
-			}
-		}
-	}
+                startAdvertising(
+                    object : BleAdvertiserListener {
+                        override fun onError(msg: String) {
+                            reportError(ProximityError.Unknown(msg))
+                        }
+                    },
+                )
+            }
+    }
 
-	private val serverListener = object : BleGattServerListener {
-		override fun onPeerConnecting() {
-			reportConnecting()
-		}
+    private fun connectAsClient() {
+        gattClient =
+            gattFactory.createClient(serviceUuid, options).apply {
+                setListener(clientListener)
 
-		override fun onPeerConnected() {
-			gattServer?.stopAdvertising()
-		}
+                if (!deviceMacAddress.isNullOrEmpty()) {
+                    connect(deviceMacAddress)
+                } else {
+                    startScanning(
+                        object : BleScannerListener {
+                            override fun onError(msg: String) {
+                                reportError(ProximityError.Unknown(msg))
+                            }
+                        },
+                    )
+                }
+            }
+    }
 
-		override fun onPeerDisconnected() {
-			reportDisconnected()
-		}
+    private val serverListener =
+        object : BleGattServerListener {
+            override fun onPeerConnecting() {
+                reportConnecting()
+            }
 
-		override fun onError(error: ProximityError) {
-			reportError(error)
-		}
+            override fun onPeerConnected() {
+                gattServer?.stopAdvertising()
+            }
 
-		override fun onDescriptorWriteRequest(descriptor: BleGattCharacteristicDescriptor): GattRequestResult {
-			Logger(TAG).debug("descriptor write request")
-			return super.onDescriptorWriteRequest(descriptor)
-		}
+            override fun onPeerDisconnected() {
+                reportDisconnected()
+            }
 
-		override fun onCharacteristicReadRequest(characteristic: BleGattCharacteristic): GattRequestResult {
-			return super.onCharacteristicReadRequest(characteristic)
-		}
+            override fun onError(error: ProximityError) {
+                reportError(error)
+            }
 
-		override fun onMtuChanged(mtu: Int) {
-			super.onMtuChanged(mtu)
-			// after the mtu was negotiated we can start sending data.
-//			reportConnected()
-		}
+            override fun onDescriptorWriteRequest(descriptor: BleGattCharacteristicDescriptor): GattRequestResult {
+                Logger(TAG).debug("descriptor write request")
+                return super.onDescriptorWriteRequest(descriptor)
+            }
 
-		override fun onCharacteristicWriteRequest(characteristic: BleGattCharacteristic): GattRequestResult {
-			if (characteristic.uuid == characteristicStateUuid) {
-				val value = characteristic.value
-				return when {
-					value == null -> {
-						reportError(ProximityError.Unknown("Value is null"))
-						GattRequestResult(isSuccessful = false)
-					}
-					value.size != 1 -> {
-						reportError(ProximityError.Unknown("Value has invalid size (${value.size})"))
-						GattRequestResult(isSuccessful = false)
-					}
-					value[0] == 0x02.toByte() -> {
-						reportTransportSpecificSessionTermination()
-						GattRequestResult(isSuccessful = true)
-					}
-					value[0] == 0x01.toByte() -> {
-						reportConnected()
-						GattRequestResult(isSuccessful = true)
-					}
-					else -> {
-						reportError(ProximityError.Unknown("Invalid value for state characteristic ${value.toHexString()}"))
-						GattRequestResult(isSuccessful = false)
-					}
-				}
-			} else {
-				characteristic.value?.let { reportMessageReceived(it) }
-				return GattRequestResult(isSuccessful = true)
-			}
-		}
+            override fun onCharacteristicReadRequest(characteristic: BleGattCharacteristic): GattRequestResult =
+                super.onCharacteristicReadRequest(characteristic)
 
-	}
+            override fun onMtuChanged(mtu: Int) {
+                super.onMtuChanged(mtu)
+                // after the mtu was negotiated we can start sending data.
+// 			reportConnected()
+            }
 
-	private val clientListener = object : BleGattClientListener {
-		override fun onPeerConnecting() {
-			reportConnecting()
-		}
+            override fun onCharacteristicWriteRequest(characteristic: BleGattCharacteristic): GattRequestResult {
+                if (characteristic.uuid == characteristicStateUuid) {
+                    val value = characteristic.value
+                    return when {
+                        value == null -> {
+                            reportError(ProximityError.Unknown("Value is null"))
+                            GattRequestResult(isSuccessful = false)
+                        }
 
-		override fun onPeerConnected() {
-			// We report connected as soon as we start writing
-			// the on the state characteristic (or rather when we receive the callback)
-			gattClient?.writeCharacteristicNonChunked(characteristicStateUuid, byteArrayOf(0x01));
-		}
+                        value.size != 1 -> {
+                            reportError(ProximityError.Unknown("Value has invalid size (${value.size})"))
+                            GattRequestResult(isSuccessful = false)
+                        }
 
-		override fun onPeerDisconnected() {
-			gattClient?.apply {
-				setListener(null)
-				disconnect()
-				gattClient = null
-			}
-			reportDisconnected()
-		}
+                        value[0] == 0x02.toByte() -> {
+                            reportTransportSpecificSessionTermination()
+                            GattRequestResult(isSuccessful = true)
+                        }
 
-		override fun onMtuChanged(mtu: Int) {
-			Logger(TAG).debug("MTU changed: mtu=$mtu")
-			// TODO Read Ident characteristic
-		}
+                        value[0] == 0x01.toByte() -> {
+                            reportConnected()
+                            GattRequestResult(isSuccessful = true)
+                        }
 
-		override fun onError(error: ProximityError) {
-			reportError(error)
-		}
+                        else -> {
+                            reportError(
+                                ProximityError.Unknown("Invalid value for state characteristic ${value.toHexString()}"),
+                            )
+                            GattRequestResult(isSuccessful = false)
+                        }
+                    }
+                } else {
+                    characteristic.value?.let { reportMessageReceived(it) }
+                    return GattRequestResult(isSuccessful = true)
+                }
+            }
+        }
 
-		override fun onServicesDiscovered(services: List<BleGattService>): List<BleGattCharacteristic> {
-			val service = services.singleOrNull { it.uuid == serviceUuid }
-			Logger(TAG).debug("services discovered")
-			if (service != null) {
-				val stateCharacteristic = service.characteristics.singleOrNull { it.uuid == characteristicStateUuid }
-				if (stateCharacteristic == null) {
-					reportError(ProximityError.Unknown("State characteristic not found"))
-					return emptyList()
-				}
+    private val clientListener =
+        object : BleGattClientListener {
+            override fun onPeerConnecting() {
+                reportConnecting()
+            }
 
-				val client2ServerCharacteristic =
-					service.characteristics.singleOrNull { it.uuid == characteristicClient2ServerUuid }
-				if (client2ServerCharacteristic == null) {
-					reportError(ProximityError.Unknown("Client2Server characteristic not found"))
-					return emptyList()
-				}
+            override fun onPeerConnected() {
+                // We report connected as soon as we start writing
+                // the on the state characteristic (or rather when we receive the callback)
+                gattClient?.writeCharacteristicNonChunked(characteristicStateUuid, byteArrayOf(0x01))
+            }
 
-				val server2ClientCharacteristic =
-					service.characteristics.singleOrNull { it.uuid == characteristicServer2ClientUuid }
-				if (server2ClientCharacteristic == null) {
-					reportError(ProximityError.Unknown("Server2Client characteristic not found"))
-					return emptyList()
-				}
+            override fun onPeerDisconnected() {
+                gattClient?.apply {
+                    setListener(null)
+                    disconnect()
+                    gattClient = null
+                }
+                reportDisconnected()
+            }
 
-				val identCharacteristic = service.characteristics.singleOrNull { it.uuid == characteristicIdentUuid }
-				if (identCharacteristic == null) {
-					reportError(ProximityError.Unknown("Ident characteristic not found"))
-					return emptyList()
-				}
-				Logger(TAG).debug("all ISO-18013-5 characteristics resolved")
-				return listOf(
-					stateCharacteristic,
-					client2ServerCharacteristic,
-					server2ClientCharacteristic,
-					identCharacteristic
-				)
-			} else {
-				reportError(ProximityError.Unknown("Service not found"))
-				return emptyList()
-			}
-		}
+            override fun onMtuChanged(mtu: Int) {
+                Logger(TAG).debug("MTU changed: mtu=$mtu")
+                // TODO Read Ident characteristic
+            }
 
-		override fun onCharacteristicRead(characteristic: BleGattCharacteristic) {
-			// TODO Protocol specific stuff (handle Ident)
-			characteristic.value?.let { reportMessageReceived(it) }
-		}
+            override fun onError(error: ProximityError) {
+                reportError(error)
+            }
 
-		override fun onCharacteristicWrite(characteristic: BleGattCharacteristic) {
-			if (characteristic.uuid == characteristicStateUuid) {
-				reportConnected()
-			}
-		}
+            override fun onServicesDiscovered(services: List<BleGattService>): List<BleGattCharacteristic> {
+                val service = services.singleOrNull { it.uuid == serviceUuid }
+                Logger(TAG).debug("services discovered")
+                if (service != null) {
+                    val stateCharacteristic =
+                        service.characteristics.singleOrNull {
+                            it.uuid == characteristicStateUuid
+                        }
+                    if (stateCharacteristic == null) {
+                        reportError(ProximityError.Unknown("State characteristic not found"))
+                        return emptyList()
+                    }
 
-		override fun onCharacteristicChanged(characteristic: BleGattCharacteristic) {
-			if (characteristic.uuid == characteristicStateUuid) {
-				val value = characteristic.value
-				when {
-					value == null -> reportError(ProximityError.Unknown("Value is null"))
-					value.size != 1 -> reportError(ProximityError.Unknown("Value has invalid size (${value.size})"))
-					value[0] == 0x02.toByte() -> reportTransportSpecificSessionTermination()
-					else -> reportError(ProximityError.Unknown("Invalid value for state characteristic"))
-				}
-			} else {
-				characteristic.value?.let { reportMessageReceived(it) }
-			}
-		}
+                    val client2ServerCharacteristic =
+                        service.characteristics.singleOrNull { it.uuid == characteristicClient2ServerUuid }
+                    if (client2ServerCharacteristic == null) {
+                        reportError(ProximityError.Unknown("Client2Server characteristic not found"))
+                        return emptyList()
+                    }
 
-		override fun onDescriptorWrite(descriptor: BleGattCharacteristicDescriptor) {
-			Logger(TAG).debug("descriptor write complete")
-		}
-	}
+                    val server2ClientCharacteristic =
+                        service.characteristics.singleOrNull { it.uuid == characteristicServer2ClientUuid }
+                    if (server2ClientCharacteristic == null) {
+                        reportError(ProximityError.Unknown("Server2Client characteristic not found"))
+                        return emptyList()
+                    }
+
+                    val identCharacteristic =
+                        service.characteristics.singleOrNull {
+                            it.uuid == characteristicIdentUuid
+                        }
+                    if (identCharacteristic == null) {
+                        reportError(ProximityError.Unknown("Ident characteristic not found"))
+                        return emptyList()
+                    }
+                    Logger(TAG).debug("all ISO-18013-5 characteristics resolved")
+                    return listOf(
+                        stateCharacteristic,
+                        client2ServerCharacteristic,
+                        server2ClientCharacteristic,
+                        identCharacteristic,
+                    )
+                } else {
+                    reportError(ProximityError.Unknown("Service not found"))
+                    return emptyList()
+                }
+            }
+
+            override fun onCharacteristicRead(characteristic: BleGattCharacteristic) {
+                // TODO Protocol specific stuff (handle Ident)
+                characteristic.value?.let { reportMessageReceived(it) }
+            }
+
+            override fun onCharacteristicWrite(characteristic: BleGattCharacteristic) {
+                if (characteristic.uuid == characteristicStateUuid) {
+                    reportConnected()
+                }
+            }
+
+            override fun onCharacteristicChanged(characteristic: BleGattCharacteristic) {
+                if (characteristic.uuid == characteristicStateUuid) {
+                    val value = characteristic.value
+                    when {
+                        value == null -> reportError(ProximityError.Unknown("Value is null"))
+                        value.size != 1 -> reportError(ProximityError.Unknown("Value has invalid size (${value.size})"))
+                        value[0] == 0x02.toByte() -> reportTransportSpecificSessionTermination()
+                        else -> reportError(ProximityError.Unknown("Invalid value for state characteristic"))
+                    }
+                } else {
+                    characteristic.value?.let { reportMessageReceived(it) }
+                }
+            }
+
+            override fun onDescriptorWrite(descriptor: BleGattCharacteristicDescriptor) {
+                Logger(TAG).debug("descriptor write complete")
+            }
+        }
 }

@@ -21,155 +21,161 @@ import kotlin.io.encoding.Base64
 const val OIDC_FEDERATION_TRUST_FRAMEWORK_ID: String = "oidc_federation_framework"
 
 class OidcFederationTrustFramerwork(
-	val documentProvider: DocumentProvider? = null,
-	val oidfTrustAnchorProvider: OidfTrustAnchorProvider = StaticOidfTrustAnchorProvider(),
-	private val lenientTrustChainVerification: () -> Boolean = { false },
-	private val httpClient: HttpClient? = null,
+    val documentProvider: DocumentProvider? = null,
+    val oidfTrustAnchorProvider: OidfTrustAnchorProvider = StaticOidfTrustAnchorProvider(),
+    private val lenientTrustChainVerification: () -> Boolean = { false },
+    private val httpClient: HttpClient? = null,
 ) : TrustFramework {
-	override val frameworkId: String
-		get() = OIDC_FEDERATION_TRUST_FRAMEWORK_ID
+    override val frameworkId: String
+        get() = OIDC_FEDERATION_TRUST_FRAMEWORK_ID
 
+    override suspend fun getIssuerInformation(
+        baseUrl: String,
+        credentialConfigurationIds: List<String>,
+        credentialIssuerMetadata: CredentialIssuerMetadata,
+    ): AgentInformation? {
+        // TODO: get credentialIssuerMetadata from here instead of fetching it earlier.
+        val trustInfo =
+            runCatching {
+                oidcfTrustChainFromUrl(
+                    credentialIssuerMetadata.claims.credentialIssuer,
+                    lenientTrustChainVerification(),
+                )
+            }.onFailure { Logger("Federation").error("Federation failed, skipping it", it) }
+                .getOrNull() ?: return null
 
-	override suspend fun getIssuerInformation(
-		baseUrl: String,
-		credentialConfigurationIds: List<String>,
-		credentialIssuerMetadata: CredentialIssuerMetadata
-	): AgentInformation? {
-		// TODO: get credentialIssuerMetadata from here instead of fetching it earlier.
-		val trustInfo = runCatching {
-			oidcfTrustChainFromUrl(
-				credentialIssuerMetadata.claims.credentialIssuer,
-				lenientTrustChainVerification(),
-			)
-		}.onFailure { Logger("Federation").error("Federation failed, skipping it", it) }
-			.getOrNull() ?: return null
+        val invalidTrustAnchors =
+            trustInfo.trustAnchorKeys.filterNot {
+                val isTrusted = oidfTrustAnchorProvider.isTrusted(it)
+                if (!isTrusted) {
+                    oidfTrustAnchorProvider.onInvalidTrustAnchor(it)
+                }
+                isTrusted
+            }
+        val isTrusted = invalidTrustAnchors.size < trustInfo.trustAnchorKeys.size
+        val isVerified =
+            credentialConfigurationIds.all {
+                trustInfo.leaf.credentialConfigurationsSupported?.contains(it) ?: false
+            }
 
-		val invalidTrustAnchors = trustInfo.trustAnchorKeys.filterNot {
-			val isTrusted = oidfTrustAnchorProvider.isTrusted(it)
-			if (!isTrusted) {
-				oidfTrustAnchorProvider.onInvalidTrustAnchor(it)
-			}
-			isTrusted
-		}
-		val isTrusted = invalidTrustAnchors.size < trustInfo.trustAnchorKeys.size
-		val isVerified = credentialConfigurationIds.all {
-			trustInfo.leaf.credentialConfigurationsSupported?.contains(it) ?: false
-		};
+        return AgentInformation(
+            type = AgentType.ISSUER,
+            domain = trustInfo.leaf.domain,
+            displayName = trustInfo.leaf.displayName,
+            trustFrameworkId = OIDC_FEDERATION_TRUST_FRAMEWORK_ID,
+            logoUri = downloadLogo(trustInfo.leaf.logoUri),
+            isTrusted = isTrusted,
+            isVerified = isVerified,
+            identityTrust = null,
+            issuanceTrust = trustInfo.subordinateStatements.joinToString(separator = "\n"),
+            verificationTrust = null,
+            untrustedTrustAnchor = invalidTrustAnchors.firstOrNull()?.toTrustAnchorInfo(),
+        )
+    }
 
-		return AgentInformation(
-			type = AgentType.ISSUER,
-			domain = trustInfo.leaf.domain,
-			displayName = trustInfo.leaf.displayName,
-			trustFrameworkId = OIDC_FEDERATION_TRUST_FRAMEWORK_ID,
-			logoUri = downloadLogo(trustInfo.leaf.logoUri),
-			isTrusted = isTrusted,
-			isVerified = isVerified,
-			identityTrust = null,
-			issuanceTrust = trustInfo.subordinateStatements.joinToString(separator = "\n"),
-			verificationTrust = null,
-			untrustedTrustAnchor = invalidTrustAnchors.firstOrNull()?.toTrustAnchorInfo(),
-		)
-	}
+    override suspend fun getVerifierInformation(
+        requestUri: String,
+        presentationRequest: PresentationRequest,
+        originalRequest: String?,
+    ): AgentInformation? {
+        val request = originalRequest ?: return null
+        val trustInfo =
+            runCatching {
+                oidcfTrustChainFromPresentationRequest(
+                    request,
+                    lenientTrustChainVerification(),
+                )
+            }.onFailure { Logger("Federation").error("Federation failed, skipping it", it) }
+                .getOrNull() ?: return null
 
-	override suspend fun getVerifierInformation(
-		requestUri: String, presentationRequest: PresentationRequest, originalRequest: String?
-	): AgentInformation? {
-		val request = originalRequest ?: return null
-		val trustInfo = runCatching {
-			oidcfTrustChainFromPresentationRequest(
-				request,
-				lenientTrustChainVerification(),
-			)
-		}.onFailure { Logger("Federation").error("Federation failed, skipping it", it) }
-			.getOrNull() ?: return null
+        val invalidTrustAnchors =
+            trustInfo.trustAnchorKeys.filterNot {
+                val isTrusted = oidfTrustAnchorProvider.isTrusted(it)
+                if (!isTrusted) {
+                    oidfTrustAnchorProvider.onInvalidTrustAnchor(it)
+                }
+                isTrusted
+            }
+        val isTrusted = invalidTrustAnchors.size < trustInfo.trustAnchorKeys.size
+        val isVerified = true
 
-		val invalidTrustAnchors = trustInfo.trustAnchorKeys.filterNot {
-			val isTrusted = oidfTrustAnchorProvider.isTrusted(it)
-			if (!isTrusted) {
-				oidfTrustAnchorProvider.onInvalidTrustAnchor(it)
-			}
-			isTrusted
-		}
-		val isTrusted = invalidTrustAnchors.size < trustInfo.trustAnchorKeys.size
-		val isVerified = true;
+        return AgentInformation(
+            type = AgentType.VERIFIER,
+            domain = trustInfo.leaf.domain,
+            displayName = trustInfo.leaf.displayName,
+            trustFrameworkId = OIDC_FEDERATION_TRUST_FRAMEWORK_ID,
+            logoUri = downloadLogo(trustInfo.leaf.logoUri),
+            isTrusted = isTrusted,
+            isVerified = isVerified,
+            identityTrust = null,
+            issuanceTrust = null,
+            verificationTrust = trustInfo.subordinateStatements.joinToString(separator = "\n"),
+            untrustedTrustAnchor = invalidTrustAnchors.firstOrNull()?.toTrustAnchorInfo(),
+        )
+    }
 
-		return AgentInformation(
-			type = AgentType.VERIFIER,
-			domain = trustInfo.leaf.domain,
-			displayName = trustInfo.leaf.displayName,
-			trustFrameworkId = OIDC_FEDERATION_TRUST_FRAMEWORK_ID,
-			logoUri = downloadLogo(trustInfo.leaf.logoUri),
-			isTrusted = isTrusted,
-			isVerified = isVerified,
-			identityTrust = null,
-			issuanceTrust = null,
-			verificationTrust = trustInfo.subordinateStatements.joinToString(separator = "\n"),
-			untrustedTrustAnchor = invalidTrustAnchors.firstOrNull()?.toTrustAnchorInfo(),
-		);
-	}
+    override fun saveTrustAnchor(trustAnchor: TrustAnchorInfo) {
+        if (trustAnchor.trustFrameworkId != frameworkId) {
+            return
+        }
+        oidfTrustAnchorProvider.addTrustAnchor(
+            uniffi.kapun_trust_rust.TrustAnchor(trustAnchor.key, trustAnchor.subject),
+        )
+    }
 
-	override fun saveTrustAnchor(trustAnchor: TrustAnchorInfo) {
-		if (trustAnchor.trustFrameworkId != frameworkId) {
-			return
-		}
-		oidfTrustAnchorProvider.addTrustAnchor(
-			uniffi.kapun_trust_rust.TrustAnchor(trustAnchor.key, trustAnchor.subject)
-		)
-	}
+    override fun getTrustAnchors(): List<TrustAnchorInfo> {
+        val userTrustAnchors = oidfTrustAnchorProvider.getUserTrustAnchors().toSet()
+        return oidfTrustAnchorProvider
+            .getTrustAnchors()
+            .distinct()
+            .map { it.toTrustAnchorInfo(isRemovable = it in userTrustAnchors) }
+    }
 
-	override fun getTrustAnchors(): List<TrustAnchorInfo> {
-		val userTrustAnchors = oidfTrustAnchorProvider.getUserTrustAnchors().toSet()
-		return oidfTrustAnchorProvider.getTrustAnchors()
-			.distinct()
-			.map { it.toTrustAnchorInfo(isRemovable = it in userTrustAnchors) }
-	}
+    override fun removeTrustAnchor(trustAnchor: TrustAnchorInfo) {
+        if (trustAnchor.trustFrameworkId != frameworkId || !trustAnchor.isRemovable) {
+            return
+        }
+        oidfTrustAnchorProvider.removeTrustAnchor(
+            uniffi.kapun_trust_rust.TrustAnchor(trustAnchor.key, trustAnchor.subject),
+        )
+    }
 
-	override fun removeTrustAnchor(trustAnchor: TrustAnchorInfo) {
-		if (trustAnchor.trustFrameworkId != frameworkId || !trustAnchor.isRemovable) {
-			return
-		}
-		oidfTrustAnchorProvider.removeTrustAnchor(
-			uniffi.kapun_trust_rust.TrustAnchor(trustAnchor.key, trustAnchor.subject)
-		)
-	}
+    private fun uniffi.kapun_trust_rust.TrustAnchor.toTrustAnchorInfo(isRemovable: Boolean = true) =
+        TrustAnchorInfo(
+            key = key,
+            subject = sub,
+            trustFrameworkId = OIDC_FEDERATION_TRUST_FRAMEWORK_ID,
+            isRemovable = isRemovable,
+        )
 
-	private fun uniffi.kapun_trust_rust.TrustAnchor.toTrustAnchorInfo(
-		isRemovable: Boolean = true,
-	) = TrustAnchorInfo(
-		key = key,
-		subject = sub,
-		trustFrameworkId = OIDC_FEDERATION_TRUST_FRAMEWORK_ID,
-		isRemovable = isRemovable,
-	)
+    private suspend fun downloadLogo(logoUri: String?): String? {
+        if (logoUri == null || logoUri.startsWith("data:")) {
+            return logoUri
+        }
+        val client = httpClient ?: return logoUri
 
-	private suspend fun downloadLogo(logoUri: String?): String? {
-		if (logoUri == null || logoUri.startsWith("data:")) {
-			return logoUri
-		}
-		val client = httpClient ?: return logoUri
+        return runCatching {
+            val response = client.get(logoUri)
+            val contentType =
+                response.headers[io.ktor.http.HttpHeaders.ContentType]
+                    ?.substringBefore(';')
+                    ?.takeIf { it.startsWith("image/") }
+                    ?: return@runCatching logoUri
+            val data = response.body<ByteArray>()
+            "data:$contentType;base64,${Base64.encode(data)}"
+        }.getOrDefault(logoUri)
+    }
 
-		return runCatching {
-			val response = client.get(logoUri)
-			val contentType = response.headers[io.ktor.http.HttpHeaders.ContentType]
-				?.substringBefore(';')
-				?.takeIf { it.startsWith("image/") }
-				?: return@runCatching logoUri
-			val data = response.body<ByteArray>()
-			"data:$contentType;base64,${Base64.encode(data)}"
-		}.getOrDefault(logoUri)
-	}
+    override suspend fun validatePresentationRequest(presentationRequest: PresentationRequest): ValidationInfo {
+        // No concept of semantic correctness of a presentation request in this trust framework.
+        return ValidationInfo(isValid = true)
+    }
 
-
-	override suspend fun validatePresentationRequest(presentationRequest: PresentationRequest): ValidationInfo {
-		// No concept of semantic correctness of a presentation request in this trust framework.
-		return ValidationInfo(isValid = true)
-	}
-
-	override suspend fun getAllowedDocuments(
-		presentationRequest: PresentationRequest,
-		includeUsedCredentials: Boolean,
-	): List<CredentialModel> {
-		// No concept of filtering credentials based on presentation request in this trust framework.
-		return documentProvider?.getAllCredentials().orEmpty();
-	}
+    override suspend fun getAllowedDocuments(
+        presentationRequest: PresentationRequest,
+        includeUsedCredentials: Boolean,
+    ): List<CredentialModel> {
+        // No concept of filtering credentials based on presentation request in this trust framework.
+        return documentProvider?.getAllCredentials().orEmpty()
+    }
 }
