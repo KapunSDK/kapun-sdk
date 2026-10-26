@@ -234,7 +234,9 @@ impl FrostSigner {
     pub fn get_public_key(&self) -> Result<Vec<u8>, FrostError> {
         let pkg = PublicKeyPackage::deserialize(&self.pub_key_package)
             .map_err(|_| FrostError::InvalidPublicKey)?;
-        Ok(pkg.verifying_key().serialize().to_vec())
+        pkg.verifying_key()
+            .serialize()
+            .map_err(|e| FrostError::FrostSigningFailed(anyhow!(e)))
     }
     /// Algorithm for JWK header
     pub fn get_alg(&self) -> String {
@@ -314,14 +316,16 @@ impl FrostSigner {
             .map_err(|e| FrostError::FrostSigningFailed(anyhow!(e)))?;
         let group_signature = frost::aggregate(&signing_package, &round2_split, &pubkeys)
             .map_err(|e| FrostError::FrostSigningFailed(anyhow!(e)))?;
-        Ok(group_signature.serialize().to_vec())
+        group_signature
+            .serialize()
+            .map_err(|e| FrostError::FrostSigningFailed(anyhow!(e)))
     }
 
     /// Convenience function to allow certain integrity checks
     pub fn verify(&self, msg: Vec<u8>, gs: Vec<u8>) -> Result<(), FrostError> {
         let mut group_signature: [u8; 64] = [0; 64];
         group_signature.copy_from_slice(gs.as_slice());
-        let group_signature: Signature = Signature::deserialize(group_signature)
+        let group_signature: Signature = Signature::deserialize(&group_signature)
             .map_err(|e| FrostError::FrostSigningFailed(anyhow!(e)))?;
         let pubkeys = PublicKeyPackage::deserialize(self.pub_key_package.as_slice())
             .map_err(|e| FrostError::FrostSigningFailed(anyhow!(e)))?;
