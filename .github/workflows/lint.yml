@@ -12,8 +12,7 @@ permissions:
 jobs:
   ktlint:
     name: Kotlin lint
-    runs-on: ["k8s-runner-kapunsdk"]
-    container: "cimg/android:2026.08-ndk"
+    runs-on: ["macOS"]
     steps:
       - uses: actions/checkout@v7.0.1
 
