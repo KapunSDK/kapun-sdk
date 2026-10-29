@@ -12292,6 +12292,7 @@ dependencies = [
  "legogroth16",
  "multibase",
  "num-bigint 0.4.8",
+ "pedersen",
  "proof_system",
  "rand_core 0.6.4",
  "rdf-proofs",
@@ -12299,6 +12300,7 @@ dependencies = [
  "rok",
  "serde",
  "serde_json",
+ "t256",
 ]
 
 [[package]]

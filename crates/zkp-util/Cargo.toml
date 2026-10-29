@@ -27,6 +27,8 @@ serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 ecdsa_pops = { git = "https://github.com/hpicrypto/ecdsa_pops.git", rev = "5cf1c72db8b182be7aac879cfea7105ce1b93ee6", default-features = false }
 rok = { git = "https://github.com/hpicrypto/ecdsa_pops.git", rev = "5cf1c72db8b182be7aac879cfea7105ce1b93ee6", default-features = false }
+pedersen = { git = "https://github.com/hpicrypto/ecdsa_pops.git", rev = "5cf1c72db8b182be7aac879cfea7105ce1b93ee6", default-features = false }
+t256 = { git = "https://github.com/hpicrypto/ecdsa_pops.git", rev = "5cf1c72db8b182be7aac879cfea7105ce1b93ee6", default-features = false }
 
 [features]
 default = []
