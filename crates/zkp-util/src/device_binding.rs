@@ -19,6 +19,7 @@ use std::time::Instant;
 
 use anyhow::{anyhow, Context};
 use ark_bls12_381::G1Affine as BlsG1Affine;
+use ark_ec::short_weierstrass::SWCurveConfig;
 use ark_ff::{BigInteger, PrimeField as ArkPrimeField};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use base64::Engine;
@@ -36,6 +37,7 @@ use ecdsa_pops::{
 use ecdsa_pops::halo2curves::ff::{Field, PrimeField};
 use kvac::bbs_sharp::ecdsa;
 use num_bigint::BigUint;
+use pedersen::pedersen_config::PedersenConfig;
 use rand_core::{OsRng, RngCore};
 use rok::{Nizk, Relation, RoK};
 
@@ -116,6 +118,19 @@ fn sigma_setup_label(label: &[u8]) -> String {
     format!(
         "zkp-util device binding sigma:{}",
         base64::prelude::BASE64_STANDARD.encode(label)
+    )
+}
+
+fn sigma_nizk(label: &[u8]) -> PoPSigmaNizk {
+    // CDLS's scalar multiplication proof uses these fixed T256 generators. Keep
+    // the BLS commitment generators label-derived, but use the matching T256
+    // generators for both proof creation and verification.
+    let cdls_g = <t256::Config as SWCurveConfig>::GENERATOR;
+    let cdls_h = <t256::Config as PedersenConfig>::GENERATOR2;
+    PoPSigmaNizk::new_with_t256_key(
+        &sigma_setup_label(label),
+        ecdsa_pops::utils::cdls_t256_to_t256(&cdls_g),
+        ecdsa_pops::utils::cdls_t256_to_t256(&cdls_h),
     )
 }
 
@@ -491,7 +506,7 @@ impl DeviceBindingSigma {
         _merlin_transcript_label: &'static [u8],
         _challenge_label: &'static [u8],
     ) -> anyhow::Result<Self> {
-        let nizk = PoPSigmaNizk::new(&sigma_setup_label(comm_key_bls_label));
+        let nizk = sigma_nizk(comm_key_bls_label);
         let ecdsa = ECDSA {
             pp: Secp256r1Affine::generator(),
         };
@@ -582,7 +597,7 @@ impl DeviceBindingSigma {
 
 impl DeviceBindingPresentationSigma {
     pub fn verify(&self, message: SecpFr, comm_key_bls_label: &[u8]) -> anyhow::Result<()> {
-        let nizk = PoPSigmaNizk::new(&sigma_setup_label(comm_key_bls_label));
+        let nizk = sigma_nizk(comm_key_bls_label);
         let ecdsa = ECDSA {
             pp: Secp256r1Affine::generator(),
         };
