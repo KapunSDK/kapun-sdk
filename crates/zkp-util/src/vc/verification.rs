@@ -23,7 +23,7 @@ use proof_system::prelude::{
 use rand_core::RngCore;
 use rdf_proofs::{multibase_to_ark, KeyGraph};
 use rdf_util::{
-    oxrdf::{GraphName, NamedNode, Subject},
+    oxrdf::{Dataset, GraphName, NamedNode, Subject},
     Value as RdfValue,
 };
 use serde_json::Value as JsonValue;
@@ -41,6 +41,17 @@ use super::{
     presentation::VerifiablePresentationSigma,
     requirements::{DeviceBindingVerificationParams, ProofRequirement},
 };
+
+fn find_vc_with_predicate(
+    vp_dataset: &Dataset,
+    predicate: &str,
+    num_vcs: usize,
+) -> Option<(usize, usize)> {
+    (0..num_vcs).find_map(|vc_idx| {
+        index_of_vp(vp_dataset, &NamedNode::new_unchecked(predicate), vc_idx)
+            .map(|message_idx| (vc_idx, message_idx))
+    })
+}
 
 #[allow(clippy::too_many_arguments)]
 pub fn verify<R: RngCore>(
@@ -75,6 +86,7 @@ pub fn verify<R: RngCore>(
     // Verify the device binding
     let mut statements = Statements::new();
     let mut meta_statements = MetaStatements::new();
+    let mut vc1_graph_idx = None;
 
     if let Some(db) = presentation.device_binding {
         let Some(params) = device_binding else {
@@ -101,26 +113,16 @@ pub fn verify<R: RngCore>(
         ));
 
         // TODO: This is a biiiiig hack
-        let (x1_index, graph_idx) = {
-            if let Some(idx) = index_of_vp(
-                &presentation.proof.dataset(),
-                &NamedNode::new_unchecked(DEVICE_BINDING_KEY_X_1),
-                0,
-            ) {
-                (idx + 1, 0)
-            } else {
-                (
-                    index_of_vp(
-                        &presentation.proof.dataset(),
-                        &NamedNode::new_unchecked(DEVICE_BINDING_KEY_X_1),
-                        1,
-                    )
-                    .unwrap()
-                        + 1,
-                    1,
-                )
-            }
-        };
+        // `present_two` treats vc1 as the identity credential. Its device-binding
+        // predicate gives us its position in the canonicalized VP graph order.
+        let (graph_idx, x1_index) = find_vc_with_predicate(
+            &presentation.proof.dataset(),
+            DEVICE_BINDING_KEY_X_1,
+            num_vcs,
+        )
+        .context("Could not find the device-bound credential in the VP")?;
+        let x1_index = x1_index + 1;
+        vc1_graph_idx = Some(graph_idx);
         let x2_index = index_of_vp(
             &presentation.proof.dataset(),
             &NamedNode::new_unchecked(DEVICE_BINDING_KEY_X_2),
@@ -174,23 +176,35 @@ pub fn verify<R: RngCore>(
 
     for req in requirements {
         if let ProofRequirement::EqualClaims(eq) = req {
+            let (vc1_idx, vc2_idx) = if let Some(vc1_idx) = vc1_graph_idx {
+                let vc2_idx = (0..num_vcs)
+                    .find(|vc_idx| *vc_idx != vc1_idx)
+                    .context("Equality proof requires two credentials")?;
+                (vc1_idx, vc2_idx)
+            } else {
+                // Preserve the existing convention when no device-binding marker
+                // is present to identify vc1 in the canonical graph order.
+                (0, 1)
+            };
             let idx1 = index_of_vp(
                 &presentation.proof.dataset(),
                 &NamedNode::new_unchecked(&eq.key1),
-                0,
+                vc1_idx,
             )
             .unwrap()
                 + 1;
             let idx2 = index_of_vp(
                 &presentation.proof.dataset(),
                 &NamedNode::new_unchecked(&eq.key2),
-                1,
+                vc2_idx,
             )
             .unwrap()
                 + 1;
 
-            meta_statements
-                .add_witness_equality(EqualWitnesses(BTreeSet::from([(0, idx1), (1, idx2)])));
+            meta_statements.add_witness_equality(EqualWitnesses(BTreeSet::from([
+                (vc1_idx, idx1),
+                (vc2_idx, idx2),
+            ])));
         }
     }
 
@@ -320,6 +334,7 @@ pub fn verify_native<R: RngCore>(
     // Verify the device binding
     let mut statements = Statements::new();
     let mut meta_statements = MetaStatements::new();
+    let mut vc1_graph_idx = None;
 
     if let Some(db) = presentation.device_binding {
         let Some(params) = device_binding else {
@@ -349,26 +364,16 @@ pub fn verify_native<R: RngCore>(
         ));
 
         // TODO: This is a biiiiig hack
-        let (x_index, graph_idx) = {
-            if let Some(idx) = index_of_vp(
-                &presentation.proof.dataset(),
-                &NamedNode::new_unchecked(DEVICE_BINDING_KEY_X_1),
-                0,
-            ) {
-                (idx + 1, 0)
-            } else {
-                (
-                    index_of_vp(
-                        &presentation.proof.dataset(),
-                        &NamedNode::new_unchecked(DEVICE_BINDING_KEY_X_1),
-                        1,
-                    )
-                    .unwrap()
-                        + 1,
-                    1,
-                )
-            }
-        };
+        // `present_two_native` treats vc1 as the identity credential. Its
+        // device-binding predicate identifies vc1 after canonical graph sorting.
+        let (graph_idx, x_index) = find_vc_with_predicate(
+            &presentation.proof.dataset(),
+            DEVICE_BINDING_KEY_X_1,
+            num_vcs,
+        )
+        .context("Could not find the device-bound credential in the VP")?;
+        let x_index = x_index + 1;
+        vc1_graph_idx = Some(graph_idx);
         let x2_index = index_of_vp(
             &presentation.proof.dataset(),
             &NamedNode::new_unchecked(DEVICE_BINDING_KEY_X_2),
@@ -422,23 +427,35 @@ pub fn verify_native<R: RngCore>(
 
     for req in requirements {
         if let ProofRequirement::EqualClaims(eq) = req {
+            let (vc1_idx, vc2_idx) = if let Some(vc1_idx) = vc1_graph_idx {
+                let vc2_idx = (0..num_vcs)
+                    .find(|vc_idx| *vc_idx != vc1_idx)
+                    .context("Equality proof requires two credentials")?;
+                (vc1_idx, vc2_idx)
+            } else {
+                // Preserve the existing convention when no device-binding marker
+                // is present to identify vc1 in the canonical graph order.
+                (0, 1)
+            };
             let idx1 = index_of_vp(
                 &presentation.proof.dataset(),
                 &NamedNode::new_unchecked(&eq.key1),
-                0,
+                vc1_idx,
             )
             .unwrap()
                 + 1;
             let idx2 = index_of_vp(
                 &presentation.proof.dataset(),
                 &NamedNode::new_unchecked(&eq.key2),
-                1,
+                vc2_idx,
             )
             .unwrap()
                 + 1;
 
-            meta_statements
-                .add_witness_equality(EqualWitnesses(BTreeSet::from([(0, idx1), (1, idx2)])));
+            meta_statements.add_witness_equality(EqualWitnesses(BTreeSet::from([
+                (vc1_idx, idx1),
+                (vc2_idx, idx2),
+            ])));
         }
     }
 
