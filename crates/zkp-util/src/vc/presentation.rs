@@ -42,7 +42,7 @@ use crate::{
         DEVICE_BINDING_KEY_Y_2,
     },
     vc::{
-        index::index_of_vc,
+        index::{index_of_vc, index_of_vc_claim},
         requirements::{DiscloseRequirement, EqualClaimsRequirement},
     },
 };
@@ -734,7 +734,10 @@ pub fn present_two<R: RngCore>(
 
             let term = v.to_term_value().unwrap();
 
-            eq_idx_1.push(index_of_vc(&vc1, &term, &terms));
+            eq_idx_1.push(
+                index_of_vc_claim(&eq.key1, &term, &terms)
+                    .context("Couldn't find equality claim in vc1")?,
+            );
             deanon_map.insert(
                 NamedOrBlankNode::BlankNode(BlankNode::new_unchecked(blank_id.clone())),
                 term,
@@ -907,7 +910,10 @@ pub fn present_two<R: RngCore>(
 
             let term = v.to_term_value().unwrap();
 
-            eq_idx_2.push(index_of_vc(&vc2, &term, &terms));
+            eq_idx_2.push(
+                index_of_vc_claim(&eq.key2, &term, &terms)
+                    .context("Couldn't find equality claim in vc2")?,
+            );
             deanon_map.insert(
                 NamedOrBlankNode::BlankNode(BlankNode::new_unchecked(blank_id.clone())),
                 term,
@@ -1029,7 +1035,10 @@ pub fn present_two_native<R: RngCore>(
 
             let term = v.to_term_value().unwrap();
 
-            eq_idx_1.push(index_of_vc(&vc1, &term, &terms));
+            eq_idx_1.push(
+                index_of_vc_claim(&eq.key1, &term, &terms)
+                    .context("Couldn't find equality claim in vc1")?,
+            );
             deanon_map.insert(
                 NamedOrBlankNode::BlankNode(BlankNode::new_unchecked(blank_id.clone())),
                 term,
@@ -1219,7 +1228,10 @@ pub fn present_two_native<R: RngCore>(
 
             let term = v.to_term_value().unwrap();
 
-            eq_idx_2.push(index_of_vc(&vc2, &term, &terms));
+            eq_idx_2.push(
+                index_of_vc_claim(&eq.key2, &term, &terms)
+                    .context("Couldn't find equality claim in vc2")?,
+            );
             deanon_map.insert(
                 NamedOrBlankNode::BlankNode(BlankNode::new_unchecked(blank_id.clone())),
                 term,

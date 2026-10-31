@@ -40,6 +40,13 @@ use zkp_util::{
     SECP_GEN,
 };
 
+// Wasmer's Linux VM object references this symbol. The SDK provides this
+// compatibility stub in kapun-credential-core, but this standalone integration
+// test does not link that crate.
+#[cfg(target_arch = "x86_64")]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __rust_probestack() {}
+
 #[test]
 fn device_binding_with_both_and_special() {
     const STACK_SIZE: usize = 50 * 1024 * 1024;
