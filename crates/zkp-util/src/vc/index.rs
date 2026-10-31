@@ -24,6 +24,25 @@ pub fn index_of_vc(_vc: &VerifiableCredential, value: &Term, terms: &Vec<Term>) 
     terms.iter().position(|t| t == value).unwrap() + 1
 }
 
+pub fn index_of_vc_claim(predicate: &str, value: &Term, terms: &[Term]) -> Option<usize> {
+    let predicate = Term::NamedNode(NamedNode::new_unchecked(predicate));
+    let credential_subject = Term::NamedNode(NamedNode::new_unchecked(
+        "https://www.w3.org/2018/credentials#credentialSubject",
+    ));
+    let subject = terms
+        .chunks_exact(3)
+        .find(|triple| triple[1] == credential_subject)?[2]
+        .clone();
+
+    // BBS messages start with a secret; each RDF triple contributes its object at 3n + 2.
+    terms
+        .chunks_exact(3)
+        .position(|triple| {
+            triple[0] == subject && triple[1] == predicate && triple[2] == *value
+        })
+        .map(|triple_idx| 3 * triple_idx + 2 + 1)
+}
+
 pub fn index_of_vp(vp_dataset: &Dataset, predicate: &NamedNode, vc_idx: usize) -> Option<usize> {
     let vp: VerifiablePresentation = vp_dataset.try_into().unwrap();
 
