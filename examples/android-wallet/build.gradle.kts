@@ -49,6 +49,7 @@ android {
 
 dependencies {
 	implementation(project(":kapun-wallet"))
+	implementation(project(":kapun-nfc"))
 	implementation(project(":kapun-proximity"))
 	implementation(project(":kapun-crypto"))
 
