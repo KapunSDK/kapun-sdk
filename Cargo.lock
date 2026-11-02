@@ -4798,6 +4798,7 @@ version = "0.3.0"
 source = "git+https://github.com/heidiverse/possum.git#0909892e9448e0500475d8c5827745c9697a2a5b"
 dependencies = [
  "chrono",
+ "jsonlogic",
  "peg",
  "serde_json",
 ]
@@ -5048,6 +5049,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "jsonlogic"
+version = "0.5.4"
+source = "git+https://github.com/ubamrein/jsonlogic_rs.git#671eb2ec84259dba92e26a71f52d0f9959465cc6"
+dependencies = [
+ "chrono",
+ "serde_json",
+]
+
+[[package]]
 name = "jsonpath_lib"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5226,7 +5236,6 @@ name = "kapun-dcql-rust"
 version = "0.1.0"
 dependencies = [
  "chrono",
- "jlc",
  "kapun-credential-core-rust",
  "kapun-util-rust",
  "serde",
@@ -5306,6 +5315,17 @@ dependencies = [
  "uniffi",
  "ureq 3.4.2",
  "zune-inflate",
+]
+
+[[package]]
+name = "kapun-possum-rust"
+version = "0.1.0"
+dependencies = [
+ "jlc",
+ "jsonlogic",
+ "kapun-util-rust",
+ "serde_json",
+ "uniffi",
 ]
 
 [[package]]
