@@ -36,6 +36,11 @@ subprojects {
 			// Keep Cargo's shared compilation cache in a visible, dedicated directory.
 			// It is intentionally outside Gradle's build directories so `clean` does not remove it.
 			targetDirectory.set(rootProject.layout.projectDirectory.dir("cargo-target"))
+
+			// The workspace crates depend on each other with different features. Building them all
+			// in every Cargo invocation resolves the same features each time, so unchanged crates
+			// stay fresh instead of being rebuilt once per module on every build.
+			buildWorkspaceLibraries.set(true)
 		}
 
 		// gradle.properties defines this as a Gradle project property, but Cargo/clang only read it
