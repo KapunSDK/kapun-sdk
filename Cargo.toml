@@ -9,6 +9,7 @@ members = [
     "kapun-dcql-openbadges/rust",
     "kapun-crypto/rust",
     "kapun-dcql/rust",
+    "kapun-possum/rust",
     "kapun-issuance/rust",
     "kapun-presentation/rust",
     "kapun-trust/rust",
