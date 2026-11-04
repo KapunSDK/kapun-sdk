@@ -1,0 +1,235 @@
+{
+  "profile_version": "swiss-profile-vc:1.0.0",
+  "capture_bases": [
+    {
+      "type": "spec/capture_base/1.0",
+      "digest": "IGYIaBR88bya5R1nX2lLFWI4GRDP1CENEGpstlZVTCnE",
+      "attributes": {
+        "person": "refs:IBvsL_HyHdrLV0U3_sbJVm3lDtE5pNyI6ziGwwUHisHd",
+        "courses": "Array[refs:IO0jbaq2s-oak9u1LRl9rEsow2ik8yFbzdL090iQd7mL]",
+        "note": "Text"
+      }
+    },
+    {
+      "type": "spec/capture_base/1.0",
+      "digest": "IBvsL_HyHdrLV0U3_sbJVm3lDtE5pNyI6ziGwwUHisHd",
+      "attributes": {
+        "familyName": "Text",
+        "givenName": "Text",
+        "birthDate": "DateTime",
+        "photo": "Binary",
+        "memberId": "Text"
+      }
+    },
+    {
+      "type": "spec/capture_base/1.0",
+      "digest": "IO0jbaq2s-oak9u1LRl9rEsow2ik8yFbzdL090iQd7mL",
+      "attributes": {
+        "name": "Text",
+        "completedOn": "DateTime",
+        "validUntil": "Text"
+      }
+    }
+  ],
+  "overlays": [
+    {
+      "capture_base": "IBvsL_HyHdrLV0U3_sbJVm3lDtE5pNyI6ziGwwUHisHd",
+      "type": "spec/overlays/format/1.0",
+      "attribute_formats": {
+        "birthDate": "YYYY-MM-DD",
+        "photo": "image/png"
+      }
+    },
+    {
+      "capture_base": "IO0jbaq2s-oak9u1LRl9rEsow2ik8yFbzdL090iQd7mL",
+      "type": "spec/overlays/format/1.0",
+      "attribute_formats": {
+        "completedOn": "YYYY-MM-DD"
+      }
+    },
+    {
+      "type": "extend/overlays/data_source/2.0",
+      "capture_base": "IGYIaBR88bya5R1nX2lLFWI4GRDP1CENEGpstlZVTCnE",
+      "format": "dc+sd-jwt",
+      "attribute_sources": {
+        "courses": [
+          "courses"
+        ],
+        "note": [
+          "note"
+        ]
+      }
+    },
+    {
+      "type": "extend/overlays/data_source/2.0",
+      "capture_base": "IBvsL_HyHdrLV0U3_sbJVm3lDtE5pNyI6ziGwwUHisHd",
+      "format": "dc+sd-jwt",
+      "attribute_sources": {
+        "familyName": [
+          "familyName"
+        ],
+        "givenName": [
+          "givenName"
+        ],
+        "birthDate": [
+          "birthDate"
+        ],
+        "photo": [
+          "photo"
+        ],
+        "memberId": [
+          "member",
+          "id"
+        ]
+      }
+    },
+    {
+      "type": "extend/overlays/data_source/2.0",
+      "capture_base": "IO0jbaq2s-oak9u1LRl9rEsow2ik8yFbzdL090iQd7mL",
+      "format": "dc+sd-jwt",
+      "attribute_sources": {
+        "name": [
+          "courses",
+          null,
+          "name"
+        ],
+        "completedOn": [
+          "courses",
+          null,
+          "completedOn"
+        ],
+        "validUntil": [
+          "courses",
+          null,
+          "validUntil"
+        ]
+      }
+    },
+    {
+      "type": "spec/overlays/meta/1.0",
+      "capture_base": "IGYIaBR88bya5R1nX2lLFWI4GRDP1CENEGpstlZVTCnE",
+      "language": "de",
+      "name": "Ausbildungsnachweis",
+      "description": "Kurse und Person"
+    },
+    {
+      "type": "spec/overlays/meta/1.0",
+      "capture_base": "IGYIaBR88bya5R1nX2lLFWI4GRDP1CENEGpstlZVTCnE",
+      "language": "fr",
+      "name": "Attestation de formation",
+      "description": "Cours et personne"
+    },
+    {
+      "type": "aries/overlays/branding/1.1",
+      "capture_base": "IGYIaBR88bya5R1nX2lLFWI4GRDP1CENEGpstlZVTCnE",
+      "language": "de",
+      "primary_background_color": "#2f4f4f",
+      "primary_field": "Kurse: {{refs:IO0jbaq2s-oak9u1LRl9rEsow2ik8yFbzdL090iQd7mL:name.join(', ')}}"
+    },
+    {
+      "type": "aries/overlays/branding/1.1",
+      "capture_base": "IGYIaBR88bya5R1nX2lLFWI4GRDP1CENEGpstlZVTCnE",
+      "language": "fr",
+      "primary_background_color": "#2f4f4f",
+      "primary_field": "Cours : {{refs:IO0jbaq2s-oak9u1LRl9rEsow2ik8yFbzdL090iQd7mL:name.join(', ')}}"
+    },
+    {
+      "type": "spec/overlays/label/1.1",
+      "capture_base": "IGYIaBR88bya5R1nX2lLFWI4GRDP1CENEGpstlZVTCnE",
+      "language": "de",
+      "attribute_labels": {
+        "person": "Person",
+        "courses": "Kurs {{refs:IO0jbaq2s-oak9u1LRl9rEsow2ik8yFbzdL090iQd7mL:name}}",
+        "note": "Bemerkung"
+      }
+    },
+    {
+      "type": "spec/overlays/label/1.1",
+      "capture_base": "IGYIaBR88bya5R1nX2lLFWI4GRDP1CENEGpstlZVTCnE",
+      "language": "fr",
+      "attribute_labels": {
+        "person": "Personne",
+        "courses": "Cours {{refs:IO0jbaq2s-oak9u1LRl9rEsow2ik8yFbzdL090iQd7mL:name}}",
+        "note": "Remarque"
+      }
+    },
+    {
+      "type": "spec/overlays/label/1.1",
+      "capture_base": "IBvsL_HyHdrLV0U3_sbJVm3lDtE5pNyI6ziGwwUHisHd",
+      "language": "de",
+      "attribute_labels": {
+        "familyName": "Name",
+        "givenName": "Vorname",
+        "birthDate": "Geburtsdatum",
+        "photo": "Foto",
+        "memberId": "Mitgliedernummer"
+      }
+    },
+    {
+      "type": "spec/overlays/label/1.1",
+      "capture_base": "IBvsL_HyHdrLV0U3_sbJVm3lDtE5pNyI6ziGwwUHisHd",
+      "language": "fr",
+      "attribute_labels": {
+        "familyName": "Nom",
+        "givenName": "Prénom",
+        "birthDate": "Date de naissance",
+        "photo": "Photo",
+        "memberId": "Numéro de membre"
+      }
+    },
+    {
+      "type": "spec/overlays/label/1.1",
+      "capture_base": "IO0jbaq2s-oak9u1LRl9rEsow2ik8yFbzdL090iQd7mL",
+      "language": "de",
+      "attribute_labels": {
+        "name": "Kurs",
+        "completedOn": "Abgeschlossen am",
+        "validUntil": "Gültig bis"
+      }
+    },
+    {
+      "type": "spec/overlays/label/1.1",
+      "capture_base": "IO0jbaq2s-oak9u1LRl9rEsow2ik8yFbzdL090iQd7mL",
+      "language": "fr",
+      "attribute_labels": {
+        "name": "Cours",
+        "completedOn": "Terminé le",
+        "validUntil": "Valable jusqu'au"
+      }
+    },
+    {
+      "type": "extend/overlays/order/1.0",
+      "capture_base": "IGYIaBR88bya5R1nX2lLFWI4GRDP1CENEGpstlZVTCnE",
+      "attribute_orders": {
+        "person": 1,
+        "courses": 2,
+        "note": 3
+      }
+    },
+    {
+      "type": "extend/overlays/order/1.0",
+      "capture_base": "IBvsL_HyHdrLV0U3_sbJVm3lDtE5pNyI6ziGwwUHisHd",
+      "attribute_orders": {
+        "photo": 1,
+        "familyName": 2,
+        "givenName": 3,
+        "birthDate": 4,
+        "memberId": 5
+      }
+    },
+    {
+      "type": "extend/overlays/order/1.0",
+      "capture_base": "IO0jbaq2s-oak9u1LRl9rEsow2ik8yFbzdL090iQd7mL",
+      "attribute_orders": {
+        "name": 1,
+        "completedOn": 2,
+        "validUntil": 3
+      }
+    },
+    {
+      "type": "example/overlays/unknown_extension/1.0",
+      "capture_base": "IGYIaBR88bya5R1nX2lLFWI4GRDP1CENEGpstlZVTCnE",
+      "anything": true
+    }
+  ]
+}
