@@ -46,6 +46,8 @@ sealed interface MdocErrors {
 
 class Mdoc(val mdoc: MdocRust) {
     companion object {
+        private const val DEFAULT_VALIDITY_DAYS: ULong = 14UL
+
         val MDOC_FORMATS: Array<String> = arrayOf("mso_mdoc")
         fun mdlPresentation(documentRequest: DocumentRequest, sessionTranscript: Value, signers: List<SignatureCreator>, mdocs: List<Mdoc>): ByteArray? {
             if(documentRequest !is DocumentRequest.Mdl) {
@@ -75,7 +77,27 @@ class Mdoc(val mdoc: MdocRust) {
             docType: String,
             certificateChain: List<ByteArray>,
             deviceKey: Value
+        ): Result<Mdoc> = create(
+            properties,
+            signer,
+            docType,
+            certificateChain,
+            deviceKey,
+            DEFAULT_VALIDITY_DAYS
+        )
+
+        fun create(
+            properties: Value,
+            signer: SignatureCreator,
+            docType: String,
+            certificateChain: List<ByteArray>,
+            deviceKey: Value,
+            validityDays: ULong
         ): Result<Mdoc> {
+            if (validityDays == 0UL) {
+                return Result.failure(MdocErrors.InvalidFormat("Validity must be at least one day"))
+            }
+
             val valueDigests = mutableMapOf<String, MutableMap<Int, Value>>()
             val namespaces = mutableMapOf<String, MutableList<Value>>()
             for (entry in properties.asOrderedObject()?.entries!!) {
@@ -112,7 +134,7 @@ class Mdoc(val mdoc: MdocRust) {
                 -3 to base64UrlDecode(deviceKey["y"].asString()!!),
             )
             val now = currentDateTimeString()
-            val exp = dateTimeStringInDays(14UL)
+            val exp = dateTimeStringInDays(validityDays)
             val mso = mapOf(
                 "version" to "1.0",
                 "digestAlgorithm" to "SHA-256",
