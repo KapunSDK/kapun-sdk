@@ -14,3 +14,7 @@ serde_json.workspace = true
 jlc = { git = "https://github.com/heidiverse/possum.git" }
 jsonlogic = { git = "https://github.com/ubamrein/jsonlogic_rs.git" }
 kapun-util-rust = { path = "../../kapun-util/rust" }
+
+[features]
+default = ["uniffi"]
+uniffi = []
