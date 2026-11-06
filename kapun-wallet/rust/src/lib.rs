@@ -67,6 +67,21 @@ pub fn set_user_agent(user_agent: Option<String>) {
     kapun_util_rust::network::set_user_agent(user_agent);
 }
 
+/// Registers invalid and undisclosable SD-JWT claims in this native component's parser copy.
+#[cfg_attr(
+    feature = "uniffi",
+    uniffi::export(default(illegal_claims), default(undisclosable_claims))
+)]
+pub fn register_invalid_and_undisclosable_claims(
+    illegal_claims: Vec<String>,
+    undisclosable_claims: Vec<String>,
+) {
+    kapun_dcql_sdjwt_rust::sdjwt::register_invalid_and_undisclosable_claims(
+        illegal_claims,
+        undisclosable_claims,
+    );
+}
+
 #[cfg(all(feature = "reqwest", feature = "uniffi"))]
 lazy_static! {
     pub static ref PROXY: Mutex<Arc<Option<Proxy>>> = Mutex::new(Arc::new(None));
