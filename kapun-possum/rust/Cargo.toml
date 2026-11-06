@@ -1,0 +1,20 @@
+[package]
+name = "kapun-possum-rust"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "staticlib", "lib"]
+name = "kapun_possum_rust"
+
+[dependencies]
+uniffi.workspace = true
+serde_json.workspace = true
+# Possum, with its JsonLogic engine: it evaluates CertLogic operations such as date comparisons.
+jlc = { git = "https://github.com/heidiverse/possum.git" }
+jsonlogic = { git = "https://github.com/ubamrein/jsonlogic_rs.git" }
+kapun-util-rust = { path = "../../kapun-util/rust" }
+
+[features]
+default = ["uniffi"]
+uniffi = []
