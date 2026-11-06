@@ -33,6 +33,8 @@ import kotlinx.serialization.json.JsonContentPolymorphicSerializer
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import org.kapunsdk.visualization.oca.model.overlay.presentation.OrderOverlay
+import org.kapunsdk.visualization.oca.model.overlay.transformation.DataSourceOverlay
 
 internal object OverlaySerializer : JsonContentPolymorphicSerializer<Overlay>(Overlay::class) {
 
@@ -54,6 +56,7 @@ internal object OverlaySerializer : JsonContentPolymorphicSerializer<Overlay>(Ov
 			"cluster_ordering" -> ClusterOrderingOverlay.serializer()
 			"conditional" -> ConditionalOverlay.serializer()
 			"conformance" -> ConformanceOverlay.serializer()
+			"data_source" -> DataSourceOverlay.serializer()
 			"entry" -> EntryOverlay.serializer()
 			"entry_code" -> EntryCodeOverlay.serializer()
 			"entry_code_mapping" -> EntryCodeMappingOverlay.serializer()
@@ -62,6 +65,7 @@ internal object OverlaySerializer : JsonContentPolymorphicSerializer<Overlay>(Ov
 			"label" -> LabelOverlay.serializer()
 			"mapping" -> AttributeMappingOverlay.serializer()
 			"meta" -> MetaOverlay.serializer()
+			"order" -> OrderOverlay.serializer()
 			"sensitive" -> SensitiveOverlay.serializer()
 			"standard" -> StandardOverlay.serializer()
 			"style_json" -> UbiqueStyleJsonOverlay.serializer()
