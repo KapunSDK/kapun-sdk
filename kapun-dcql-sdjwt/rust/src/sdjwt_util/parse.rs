@@ -18,6 +18,7 @@ use std::{
     collections::{HashMap, HashSet},
     fmt::{Display, Formatter},
     hash::RandomState,
+    sync::{LazyLock, Mutex},
 };
 
 use base64::{Engine, prelude::BASE64_URL_SAFE_NO_PAD};
@@ -27,15 +28,18 @@ use serde_json::Value as JsonValue;
 
 use crate::sdjwt_util::hash_algs::SdJwtHasher;
 
-const UNDISCLOSABLE_CLAIMS: [&str; 10] = [
+const UNDISCLOSABLE_CLAIMS: [&str; 13] = [
     // Regular JWT claims
     "iss",
     "iat",
     "exp",
     "nbf",
-    "vct",
     // SD-JWT claims
     "cnf",
+    "status",
+    "vct",
+    "vct#integrity",
+    "aka_vcts",
     // JSON-LD JWT claims
     "@context",
     "issuer",
@@ -43,7 +47,15 @@ const UNDISCLOSABLE_CLAIMS: [&str; 10] = [
     "validUntil",
 ];
 
+/// Additional illegal claims registered with the sdjwt parser.
+pub(crate) static REGISTERED_UNDISCLOSABLE_CLAIMS: LazyLock<Mutex<Vec<String>>> =
+    LazyLock::new(|| Mutex::new(Vec::new()));
+
 const ILLEGAL_CLAIM_NAMES: [&str; 2] = ["_sd", "..."];
+
+/// Additional illegal claims registered with the sdjwt parser.
+pub(crate) static REGISTERED_ILLEGAL_CLAIM_NAMES: LazyLock<Mutex<Vec<String>>> =
+    LazyLock::new(|| Mutex::new(Vec::new()));
 
 #[derive(Debug, uniffi::Error, Clone, Copy)]
 pub enum SdJwtDecodeError {
@@ -326,6 +338,16 @@ fn reconstruct(
 }
 
 pub fn decode_sdjwt(payload: &str) -> Result<ParsedSdJwt, SdJwtDecodeError> {
+    let Ok(additional_illegal_claims_lock) = REGISTERED_ILLEGAL_CLAIM_NAMES.lock() else {
+        return Err(SdJwtDecodeError::InvalidDisclosure);
+    };
+    let Ok(additional_undisclosable_claims_lock) = REGISTERED_UNDISCLOSABLE_CLAIMS.lock() else {
+        return Err(SdJwtDecodeError::InvalidDisclosure);
+    };
+    let additional_illegal_claims = additional_illegal_claims_lock.clone();
+    let additional_undisclosable_claims = additional_undisclosable_claims_lock.clone();
+    drop(additional_illegal_claims_lock);
+    drop(additional_undisclosable_claims_lock);
     // Remove whitespace from the payload
     let payload = {
         let mut tmp = payload.to_string();
@@ -360,11 +382,15 @@ pub fn decode_sdjwt(payload: &str) -> Result<ParsedSdJwt, SdJwtDecodeError> {
             // if we have an object disclosure...
             if let Some(key) = parsed_disclosure.key.as_ref() {
                 // ... check if the claimed disclosure is allowed to be disclosed
-                if UNDISCLOSABLE_CLAIMS.contains(&key.as_str()) {
+                if UNDISCLOSABLE_CLAIMS.contains(&key.as_str())
+                    || additional_undisclosable_claims.contains(&key)
+                {
                     return Err(SdJwtDecodeError::InvalidDisclosure);
                 }
                 // ... and is not a illegal claim name (which would overwrite sdjwt claim names)
-                if ILLEGAL_CLAIM_NAMES.contains(&key.as_str()) {
+                if ILLEGAL_CLAIM_NAMES.contains(&key.as_str())
+                    || additional_illegal_claims.contains(&key)
+                {
                     return Err(SdJwtDecodeError::InvalidDisclosure);
                 }
             }
