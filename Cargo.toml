@@ -76,10 +76,6 @@ ureq = "3.3.0"
 [profile.dev]
 debug = false
 
-[patch."https://github.com/zaverucha/signature-proof"]
-# patches signature-proof to not enable pasta curves
-halo2curves = { git = "https://github.com/heidiverse/signature-proof.git" }
-
 # next-gen-signatures comes from the same upstream workspace as these crates. Keep one copy of
 # their code and dependency graph in the final native library by using the local workspace crates.
 [patch."https://github.com/heidiverse/zk-bridge-services.git"]
@@ -92,3 +88,12 @@ rdf-util = { path = "crates/rdf-util" }
 kapun-crypto-provider = { path = "crates/kapun-crypto-provider" }
 zkp-util = { path = "crates/zkp-util" }
 rdf-util = { path = "crates/rdf-util" }
+
+# HPI's workspace patch isn't inherited by downstream consumers. Keep its Midnight
+# packages unified so `single-h-commitment` resolves against the lockfile's revision.
+[patch.crates-io]
+midnight-circuits = { git = "https://github.com/midnightntwrk/midnight-zk", branch = "main" }
+midnight-curves = { git = "https://github.com/midnightntwrk/midnight-zk", branch = "main" }
+midnight-proofs = { git = "https://github.com/midnightntwrk/midnight-zk", branch = "main" }
+midnight-zk-stdlib = { git = "https://github.com/midnightntwrk/midnight-zk", branch = "main" }
+ark-secp256r1 = { git = "https://github.com/arkworks-rs/curves", rev = "e2d16a27" }

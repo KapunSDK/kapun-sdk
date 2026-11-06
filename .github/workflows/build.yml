@@ -157,6 +157,10 @@ jobs:
           trap - INT TERM
           exit "$exit_code"
 
+      - name: Test Sigma device binding
+        if: matrix.platform == 'jvm-linux'
+        run: cargo test --manifest-path crates/zkp-util/Cargo.toml --test device-binding device_binding_with_both_and_special
+
       # The normal Android matrix builds 64-bit ABIs. Check every SDK module's 32-bit ARM
       # release link on every branch push; it is not exercised by the dev-profile build above.
       - name: Check Android ARMv7 release link
