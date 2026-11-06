@@ -47,7 +47,7 @@ const UNDISCLOSABLE_CLAIMS: [&str; 13] = [
     "validUntil",
 ];
 
-/// Additional illegal claims registered with the sdjwt parser.
+/// Additional undisclosable claims registered with the sdjwt parser.
 pub(crate) static REGISTERED_UNDISCLOSABLE_CLAIMS: LazyLock<Mutex<Vec<String>>> =
     LazyLock::new(|| Mutex::new(Vec::new()));
 
