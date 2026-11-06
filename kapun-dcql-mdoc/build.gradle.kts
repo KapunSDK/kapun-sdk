@@ -44,7 +44,6 @@ kotlin {
 
 skie { analytics { enabled = false; disableUpload = true } }
 uniffi {
-    bindgenFromGitTag("https://github.com/UbiqueInnovation/uniffi-kotlin-multiplatform-bindings.git", libs.versions.uniffi.bindgen.get())
     generateFromLibrary()
 }
 cargo { packageDirectory = layout.projectDirectory.dir("rust"); ndkVersion = libs.versions.android.ndk.get() }
