@@ -23,7 +23,7 @@ pub trait SignatureCreator: Send + Sync {
     fn sign(&self, bytes: Vec<u8>) -> Result<Vec<u8>, SigningError>;
 }
 
-/// Registers invalid and undisclosable SD-JWT claims in this native component's parser copy.
+/// Replaces this native component's additional illegal and undisclosable SD-JWT claim lists.
 #[cfg_attr(
     feature = "uniffi",
     uniffi::export(default(illegal_claims), default(undisclosable_claims))

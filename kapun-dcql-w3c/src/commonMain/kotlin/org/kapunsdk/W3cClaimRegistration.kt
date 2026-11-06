@@ -11,7 +11,7 @@ package org.kapunsdk
 
 import org.kapunsdk.credentials.registerInvalidAndUndisclosableClaims as registerSdJwtClaims
 
-/** Registers additional illegal and undisclosable claims for SD-JWT parsing in this module. */
+/** Replaces the additional illegal and undisclosable claims for standalone SD-JWT and W3C parsing. */
 public fun registerInvalidAndUndisclosableClaims(
 	illegalClaims: List<String> = emptyList(),
 	undisclosableClaims: List<String> = emptyList(),

@@ -22,10 +22,10 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import org.kapunsdk.credentials.SdJwt
+import org.kapunsdk.credentials.registerInvalidAndUndisclosableClaims
 import org.kapunsdk.credentials.toClaimsPointer
 import uniffi.kapun_credential_core_rust.SignatureCreator
 import uniffi.kapun_dcql_sdjwt_rust.SdJwtDecodeException
-import uniffi.kapun_dcql_sdjwt_rust.registerInvalidAndUndisclosableClaims
 import uniffi.kapun_util_rust.Value
 
 class SignatureCreatorBridgeTest {

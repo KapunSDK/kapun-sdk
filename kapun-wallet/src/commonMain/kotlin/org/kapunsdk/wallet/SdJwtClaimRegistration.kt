@@ -12,8 +12,8 @@ package org.kapunsdk.wallet
 import org.kapunsdk.registerInvalidAndUndisclosableClaims as registerW3cClaims
 
 /**
- * Registers additional illegal and undisclosable claims in the SD-JWT parser copies used by the
- * standalone SD-JWT, W3C, and wallet native components.
+ * Replaces the additional illegal and undisclosable claim lists in the SD-JWT parser copies used
+ * by the standalone SD-JWT, W3C, and wallet native components.
  */
 public fun registerInvalidAndUndisclosableClaims(
 	illegalClaims: List<String> = emptyList(),

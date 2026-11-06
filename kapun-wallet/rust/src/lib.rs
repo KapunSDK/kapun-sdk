@@ -67,7 +67,7 @@ pub fn set_user_agent(user_agent: Option<String>) {
     kapun_util_rust::network::set_user_agent(user_agent);
 }
 
-/// Registers invalid and undisclosable SD-JWT claims in this native component's parser copy.
+/// Replaces this native component's additional illegal and undisclosable SD-JWT claim lists.
 #[cfg_attr(
     feature = "uniffi",
     uniffi::export(default(illegal_claims), default(undisclosable_claims))
@@ -80,6 +80,92 @@ pub fn register_invalid_and_undisclosable_claims(
         illegal_claims,
         undisclosable_claims,
     );
+}
+
+#[cfg(test)]
+mod claim_registration_tests {
+    use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
+    use kapun_credential_core_rust::models::PointerPart;
+    use kapun_dcql_sdjwt_rust::{
+        sdjwt::decode_sdjwt,
+        sdjwt_util::{SdJwtBuilder, SdJwtDecodeError, hash_algs::SdJwtHasher},
+    };
+    use kapun_util_rust::value::Value;
+
+    struct ResetRegisteredClaims;
+
+    impl Drop for ResetRegisteredClaims {
+        fn drop(&mut self) {
+            super::register_invalid_and_undisclosable_claims(vec![], vec![]);
+        }
+    }
+
+    fn issue_sdjwt_with_disclosed_claim(claim_name: &str) -> Option<String> {
+        let salt = "test-salt";
+        let value = "test-value";
+        let disclosure = URL_SAFE_NO_PAD.encode(
+            serde_json::to_vec(&serde_json::json!([salt, claim_name, value])).ok()?,
+        );
+        let digest = SdJwtHasher::from_str("sha-256").hash(
+            disclosure.clone(),
+            salt.to_string(),
+            Some(claim_name.to_string()),
+            Value::String(value.to_string()),
+        );
+        let header = URL_SAFE_NO_PAD.encode(
+            serde_json::to_vec(&serde_json::json!({"alg": "none", "typ": "dc+sd-jwt"}))
+                .ok()?,
+        );
+        let payload = URL_SAFE_NO_PAD.encode(
+            serde_json::to_vec(&serde_json::json!({
+                "_sd": [digest],
+                "_sd_alg": "sha-256",
+                "vct": "test-type"
+            }))
+            .ok()?,
+        );
+        let seed = format!("{header}.{payload}.signature~{disclosure}~");
+        let parsed = decode_sdjwt(&seed).ok()?;
+        let builder = SdJwtBuilder::from_sdjwt(&parsed);
+        builder
+            .add_disclosure(vec![PointerPart::String(claim_name.to_string())])
+            .ok()?;
+        builder.build(None).ok()
+    }
+
+    #[test]
+    fn wallet_registration_updates_its_embedded_sdjwt_parser() {
+        let _reset = ResetRegisteredClaims;
+        super::register_invalid_and_undisclosable_claims(vec![], vec![]);
+
+        let Some(undisclosable_jwt) = issue_sdjwt_with_disclosed_claim("wallet_secret") else {
+            panic!("failed to create SD-JWT test credential");
+        };
+        let Some(illegal_jwt) = issue_sdjwt_with_disclosed_claim("wallet_illegal") else {
+            panic!("failed to create SD-JWT test credential");
+        };
+        let Some(ordinary_jwt) = issue_sdjwt_with_disclosed_claim("ordinary_claim") else {
+            panic!("failed to create SD-JWT test credential");
+        };
+
+        assert!(decode_sdjwt(&undisclosable_jwt).is_ok());
+        assert!(decode_sdjwt(&illegal_jwt).is_ok());
+        assert!(decode_sdjwt(&ordinary_jwt).is_ok());
+
+        super::register_invalid_and_undisclosable_claims(
+            vec!["wallet_illegal".to_string()],
+            vec!["wallet_secret".to_string()],
+        );
+        assert!(matches!(
+            decode_sdjwt(&undisclosable_jwt),
+            Err(SdJwtDecodeError::InvalidDisclosure)
+        ));
+        assert!(matches!(
+            decode_sdjwt(&illegal_jwt),
+            Err(SdJwtDecodeError::InvalidDisclosure)
+        ));
+        assert!(decode_sdjwt(&ordinary_jwt).is_ok());
+    }
 }
 
 #[cfg(all(feature = "reqwest", feature = "uniffi"))]
