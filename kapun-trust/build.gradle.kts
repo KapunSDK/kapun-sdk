@@ -94,10 +94,6 @@ skie {
 }
 
 uniffi {
-	bindgenFromGitTag(
-		"https://github.com/UbiqueInnovation/uniffi-kotlin-multiplatform-bindings.git",
-		libs.versions.uniffi.bindgen.get()
-	)
 	generateFromLibrary()
 }
 
