@@ -54,7 +54,7 @@ pub fn encode_to_json(sdjwt: &SdJwtRust) -> Option<String> {
 
 #[uniffi::export(default(illegal_claims), default(undisclosable_claims))]
 /// Registers additional invalid/undisclosable claims.
-/// The parser by default checks for the claims defined in [RFC 9100](https://www.ietf.org/archive/id/draft-ietf-oauth-sd-jwt-vc-25.html#name-registered-jwt-claims) and extends it with certain relevant JSON-LD claims.
+/// The parser by default checks for the claims defined in [SD-JWT-VC](https://www.ietf.org/archive/id/draft-ietf-oauth-sd-jwt-vc-25.html#name-registered-jwt-claims) and extends it with certain relevant JSON-LD claims.
 ///
 /// In particular this contains the following claims:
 /// - "iss"

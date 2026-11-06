@@ -338,16 +338,20 @@ fn reconstruct(
 }
 
 pub fn decode_sdjwt(payload: &str) -> Result<ParsedSdJwt, SdJwtDecodeError> {
-    let Ok(additional_illegal_claims_lock) = REGISTERED_ILLEGAL_CLAIM_NAMES.lock() else {
-        return Err(SdJwtDecodeError::InvalidDisclosure);
+    let additional_illegal_claims = {
+        let Ok(additional_illegal_claims_lock) = REGISTERED_ILLEGAL_CLAIM_NAMES.lock() else {
+            return Err(SdJwtDecodeError::InvalidDisclosure);
+        };
+        additional_illegal_claims_lock.clone()
     };
-    let Ok(additional_undisclosable_claims_lock) = REGISTERED_UNDISCLOSABLE_CLAIMS.lock() else {
-        return Err(SdJwtDecodeError::InvalidDisclosure);
+    let additional_undisclosable_claims = {
+        let Ok(additional_undisclosable_claims_lock) = REGISTERED_UNDISCLOSABLE_CLAIMS.lock()
+        else {
+            return Err(SdJwtDecodeError::InvalidDisclosure);
+        };
+        additional_undisclosable_claims_lock.clone()
     };
-    let additional_illegal_claims = additional_illegal_claims_lock.clone();
-    let additional_undisclosable_claims = additional_undisclosable_claims_lock.clone();
-    drop(additional_illegal_claims_lock);
-    drop(additional_undisclosable_claims_lock);
+
     // Remove whitespace from the payload
     let payload = {
         let mut tmp = payload.to_string();
