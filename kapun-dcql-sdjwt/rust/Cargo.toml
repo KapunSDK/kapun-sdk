@@ -17,7 +17,7 @@ chrono.workspace = true
 rand.workspace = true
 kapun-util-rust = { path = "../../kapun-util/rust" }
 kapun-credential-core-rust = { path = "../../kapun-credential-core/rust" }
-curve25519-dalek = { version = "=4.1.2", features = ["rand_core", "digest"], optional = true }
+curve25519-dalek = { version = "=4.1.3", features = ["rand_core", "digest"], optional = true }
 
 [dev-dependencies]
 p256 = { version = "0.13.2", features = ["jwk", "ecdsa"] }
