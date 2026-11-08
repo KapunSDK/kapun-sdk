@@ -119,10 +119,17 @@ impl PossumExpression {
             serde_json::from_str(data).map_err(|e| PossumError::InvalidData {
                 reason: e.to_string(),
             })?;
-        // Evaluated as JsonLogic: Possum's own evaluator can't compare dates or booleans.
-        jsonlogic::apply(&self.expression.to_json_logic(), &data).map_err(|e| PossumError::Evaluation {
-                reason: e.to_string(),
-            })
+        match self
+            .expression
+            .eval(&data)
+            .map_err(|reason| PossumError::Evaluation { reason })?
+        {
+            jlc::Expression::Atomic(value) => Ok(value.to_serde_json()),
+            // Anything else means the expression did not reduce to a value.
+            other => Err(PossumError::Evaluation {
+                reason: format!("expression did not evaluate to a value: {other:?}"),
+            }),
+        }
     }
 }
 
@@ -195,5 +202,58 @@ mod tests {
         assert_eq!(json("claims.licenceCategories.1.categoryCode"), "\"C\"");
         assert_eq!(json("claims.missing"), "null");
         assert!(matches!(bool("claims.dateOfExpiration"), Err(PossumError::Evaluation { .. })));
+    }
+
+    #[test]
+    fn object_results_keep_a_stable_key_order() {
+        // Possum keeps objects in a HashMap, so make sure its iteration order
+        // cannot reach the JSON callers read.
+        let expression = PossumExpression::parse("claims.licenceCategories.1").unwrap();
+        let first = expression.evaluate_json(DATA).unwrap();
+        for _ in 0..50 {
+            assert_eq!(expression.evaluate_json(DATA).unwrap(), first);
+        }
+        assert_eq!(
+            first,
+            r#"{"categoryCode":"C","categoryDateOfExpiration":"2025-01-23"}"#
+        );
+    }
+
+    #[test]
+    fn date_arithmetic_comes_back_as_a_date() {
+        assert_eq!(json("now() + 3#days"), "\"2026-10-30T10:15:00+00:00\"");
+        assert_eq!(json("now()"), "\"2026-10-27T10:15:00Z\"");
+    }
+
+    const NO_CLOCK: &str = r#"{"claims": {"dateOfExpiration": "2031-10-27"}}"#;
+
+    #[test]
+    fn a_missing_validation_clock_is_reported() {
+        // A credential expiring in 2031 must not read as expired just because
+        // the caller left out external.validationClock.
+        let expression =
+            PossumExpression::parse("(claims.dateOfExpiration as DateTime) is after now()")
+                .unwrap();
+        assert!(matches!(
+            expression.evaluate_bool(NO_CLOCK),
+            Err(PossumError::Evaluation { .. })
+        ));
+        assert!(matches!(
+            expression.evaluate_json(NO_CLOCK),
+            Err(PossumError::Evaluation { .. })
+        ));
+        let reason = expression.evaluate_bool(NO_CLOCK).unwrap_err().to_string();
+        assert!(reason.contains("validationClock"), "unhelpful reason: {reason}");
+    }
+
+    #[test]
+    fn the_legacy_api_still_hides_a_missing_clock() {
+        // Recorded, not endorsed: `evaluate` has no error channel, so callers
+        // on the old API still see a 2031 credential as not valid. They have to
+        // move to evaluate_bool to find out why.
+        let expression = PossumExpression::from_str(
+            "(claims.dateOfExpiration as DateTime) is after now()",
+        );
+        assert!(!expression.evaluate(NO_CLOCK).is_truthy());
     }
 }
