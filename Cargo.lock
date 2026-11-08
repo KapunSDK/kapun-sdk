@@ -4795,7 +4795,7 @@ dependencies = [
 [[package]]
 name = "jlc"
 version = "0.3.0"
-source = "git+https://github.com/heidiverse/possum.git#0909892e9448e0500475d8c5827745c9697a2a5b"
+source = "git+https://github.com/heidiverse/possum.git#994d5b2e21da38e2674f87d4cc3a993a344805ce"
 dependencies = [
  "chrono",
  "jsonlogic",
@@ -5322,7 +5322,6 @@ name = "kapun-possum-rust"
 version = "0.1.0"
 dependencies = [
  "jlc",
- "jsonlogic",
  "kapun-util-rust",
  "serde_json",
  "uniffi",

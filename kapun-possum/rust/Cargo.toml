@@ -12,7 +12,6 @@ uniffi.workspace = true
 serde_json.workspace = true
 # Possum, with its JsonLogic engine: it evaluates CertLogic operations such as date comparisons.
 jlc = { git = "https://github.com/heidiverse/possum.git" }
-jsonlogic = { git = "https://github.com/ubamrein/jsonlogic_rs.git" }
 kapun-util-rust = { path = "../../kapun-util/rust" }
 
 [features]
