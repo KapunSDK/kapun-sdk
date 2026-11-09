@@ -23,6 +23,7 @@ import org.kapunsdk.presentation.request.PresentationRequest
 import org.kapunsdk.trust.di.KapunTrustKoinComponent
 import org.kapunsdk.trust.framework.DidWebTrustAnchorProvider
 import org.kapunsdk.trust.framework.DocumentProvider
+import org.kapunsdk.trust.framework.DomainTrustAnchorProvider
 import org.kapunsdk.trust.framework.X509TrustAnchorProvider
 import org.kapunsdk.trust.framework.TrustFramework
 import org.kapunsdk.trust.framework.ValidationInfo
@@ -68,7 +69,8 @@ class Oid4VpTrustFramework(
     val documentProvider: DocumentProvider,
     val x509TrustAnchorProvider: X509TrustAnchorProvider = StaticX509TrustAnchorProvider(),
     val didWebTrustAnchorProvider: DidWebTrustAnchorProvider = StaticDidWebTrustAnchorProvider(),
-    private val trustedDomains: List<String>
+    trustedDomains: List<String> = listOf(),
+    val domainTrustAnchorProvider: DomainTrustAnchorProvider = StaticDomainTrustAnchorProvider(trustedDomains),
 ) : TrustFramework, KapunTrustKoinComponent {
     override val frameworkId: String
         get() = OID4VP_BASIC_TRUST
@@ -78,7 +80,7 @@ class Oid4VpTrustFramework(
         credentialIssuerMetadata: CredentialIssuerMetadata
     ): AgentInformation {
         val host = runCatching { Url(baseUrl).host }.getOrDefault(baseUrl)
-        val isTrusted = trustedDomains.contains(host)
+        val isTrusted = domainTrustAnchorProvider.isTrusted(host)
         val displayName = credentialIssuerMetadata.claims.display?.firstOrNull()?.name ?: baseUrl
         val displayLogo = credentialIssuerMetadata.claims.display?.firstOrNull()?.logo?.uri
         val mutableMap = mutableMapOf<String, Value>()
