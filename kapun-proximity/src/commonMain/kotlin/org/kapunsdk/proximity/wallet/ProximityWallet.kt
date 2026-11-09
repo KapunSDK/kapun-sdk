@@ -17,6 +17,7 @@ package org.kapunsdk.proximity.wallet
 
 import org.kapunsdk.proximity.ProximityProtocol
 import org.kapunsdk.proximity.ProximityError
+import org.kapunsdk.proximity.ProximityProcessEvent
 import org.kapunsdk.proximity.documents.DocumentRequest
 import org.kapunsdk.proximity.protocol.EngagementBuilder
 import org.kapunsdk.proximity.protocol.TransportProtocol
@@ -43,8 +44,11 @@ import org.kapunsdk.util.log.Logger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
@@ -69,15 +73,19 @@ class ProximityWallet private constructor(
 	private val transportProtocol: TransportProtocol,
 	private var sessionCipher: SessionCipher? = null,
 	var isDcApi: Boolean = false,
-	var isReverse : Boolean = false
+	var isReverse : Boolean = false,
+	/** Stable identifier for this created wallet process. */
+	val processId: Uuid = Uuid.random(),
 ) {
 	companion object {
 		private const val TAG = "ProximityWallet"
+		private const val L2CAP_COMPLETION_CLEANUP_DELAY_MS = 1_000L
 
 		fun createReverse(	protocol: ProximityProtocol,
 							  scope: CoroutineScope,
 						   readerEngagement: String,
-						   keyType: KeyType = KeyType.ED25519
+						   keyType: KeyType = KeyType.ED25519,
+						   enableL2cap: Boolean = true
 						   ) : ProximityWallet {
 			return when (protocol) {
 				ProximityProtocol.MDL -> {
@@ -89,7 +97,10 @@ class ProximityWallet private constructor(
 						TransportProtocol.Role.WALLET,
 						readerEngagement?.centralClientUuid,
 						readerEngagement?.peripheralServerUuid,
-						keypair
+						keypair,
+						l2capPsm = readerEngagement?.l2capPsm,
+						enableL2cap = enableL2cap,
+						isEngagementPresenter = false,
 					)
 					val engagementBuilder = MdlEngagementBuilder(
 						"",
@@ -116,7 +127,8 @@ class ProximityWallet private constructor(
 			scope: CoroutineScope,
 			serviceUuid: String,
 			peripheralServerUuid: String? = null,
-			keyType: KeyType = KeyType.ED25519
+			keyType: KeyType = KeyType.ED25519,
+			enableL2cap: Boolean = true
 		): ProximityWallet {
 			return when (protocol) {
 				ProximityProtocol.MDL -> {
@@ -127,7 +139,9 @@ class ProximityWallet private constructor(
 						TransportProtocol.Role.WALLET,
 						Uuid.parse(serviceUuid),
 						Uuid.parse(peripheralServerUuid!!),
-						keypair
+						keypair,
+						enableL2cap = enableL2cap,
+						isEngagementPresenter = true,
 					)
 					val engagementBuilder = MdlEngagementBuilder(
 						"",
@@ -155,7 +169,8 @@ class ProximityWallet private constructor(
 			scope: CoroutineScope,
 			serviceUuid: Uuid,
 			peripheralServerUuid: Uuid? = null,
-			keyType: KeyType = KeyType.ED25519
+			keyType: KeyType = KeyType.ED25519,
+			enableL2cap: Boolean = true
 		): ProximityWallet {
 			return when (protocol) {
 				ProximityProtocol.MDL -> {
@@ -166,7 +181,9 @@ class ProximityWallet private constructor(
 						TransportProtocol.Role.WALLET,
 						serviceUuid,
 						peripheralServerUuid!!,
-						keypair
+						keypair,
+						enableL2cap = enableL2cap,
+						isEngagementPresenter = true,
 					)
 					//TODO: we probably should expose the lis of capabilities somehow to the constructor, or at least let the constructor
 					// choose, which protocols we wish to support.
@@ -194,10 +211,14 @@ class ProximityWallet private constructor(
 
 	private val walletStateMutable = MutableStateFlow<ProximityWalletState>(ProximityWalletState.Initial)
 	val walletState = walletStateMutable.asStateFlow()
+	/** Wallet state events tagged with [processId]. */
+	val events = walletStateMutable.map { state -> ProximityProcessEvent(processId, state) }
 
 	private var verifierName: String? = null
 
 	private var deviceEngagementSent = false
+	private var l2capCleanupJob: Job? = null
+	private var l2capTerminationSent = false
 
 	init {
 		transportProtocol.setListener(
@@ -219,7 +240,10 @@ class ProximityWallet private constructor(
 				}
 
 				override fun onDisconnected() {
-					if (walletStateMutable.value !is ProximityWalletState.Error && !markSubmissionCompleted()) {
+					if (walletStateMutable.value !is ProximityWalletState.Error &&
+						walletStateMutable.value !is ProximityWalletState.PresentationCompleted &&
+						!markSubmissionCompleted()
+					) {
 						walletStateMutable.update { ProximityWalletState.Disconnected }
 					}
 				}
@@ -237,11 +261,6 @@ class ProximityWallet private constructor(
 
 				override fun onTransportSpecificSessionTermination() {
 					disconnect()
-					if (!markSubmissionCompleted()) {
-						walletStateMutable.update {
-							ProximityWalletState.Disconnected
-						}
-					}
 				}
 
 				override fun onError(error: ProximityError) {
@@ -263,8 +282,10 @@ class ProximityWallet private constructor(
 			when (protocol) {
 				ProximityProtocol.MDL -> {
 					if(!this@ProximityWallet.isReverse) {
+						val psm = (transportProtocol as? MdlTransportProtocol)?.prepareL2capPsm()
+						(engagementBuilder as? MdlEngagementBuilder)?.l2capPsm = psm
 						val qrCodeData = engagementBuilder!!.createQrCodeForEngagement()
-						Logger(TAG).debug("startEngagement: QR ready, qrChars=${qrCodeData.length}")
+						Logger(TAG).debug("startEngagement: QR ready, qrChars=${qrCodeData.length} l2capPsm=${psm ?: "none"}")
 						walletStateMutable.update {
 							ProximityWalletState.ReadyForEngagement(qrCodeData)
 						}
@@ -326,12 +347,18 @@ class ProximityWallet private constructor(
 				walletStateMutable.update { ProximityWalletState.SubmittingDocuments(progress = progress) }
 				if (progress != null && progress >= 1.0) {
 					markSubmissionCompleted()
+					if (walletStateMutable.value is ProximityWalletState.PresentationCompleted) {
+						scheduleL2capCleanup()
+					}
 				}
 			}
 		}.onFailure { error ->
 			Logger(TAG).error("submitDocument send failed: ${error.message ?: error::class.simpleName}")
 			val message = error.message ?: error::class.simpleName ?: "Unknown error"
 			walletStateMutable.update { ProximityWalletState.Error(ProximityError.Unknown(message)) }
+			if ((transportProtocol as? MdlTransportProtocol)?.hasUsedL2cap() == true) {
+				disconnect()
+			}
 		}
 	}
 
@@ -350,6 +377,7 @@ class ProximityWallet private constructor(
 		)
 
 		// Transport layer handles fragmentation; payload is already CBOR encoded
+		l2capTerminationSent = true
 		transportProtocol.sendMessage(sessionData, null)
 
 		walletStateMutable.update { ProximityWalletState.Disconnected }
@@ -359,9 +387,57 @@ class ProximityWallet private constructor(
 	}
 
 	fun disconnect() {
+		l2capCleanupJob?.cancel()
+		l2capCleanupJob = null
+		val previousState = walletStateMutable.value
+		sendL2capSessionTermination(previousState)
 		transportProtocol.disconnect()
-		if (!markSubmissionCompleted()) {
+		if (previousState !is ProximityWalletState.Error &&
+			!markSubmissionCompleted() &&
+			walletStateMutable.value !is ProximityWalletState.PresentationCompleted
+		) {
 			walletStateMutable.update { ProximityWalletState.Disconnected }
+		}
+	}
+
+	private fun sendL2capSessionTermination(previousState: ProximityWalletState) {
+		val mdlTransport = transportProtocol as? MdlTransportProtocol ?: return
+		if (l2capTerminationSent || previousState is ProximityWalletState.Disconnected ||
+			previousState is ProximityWalletState.Error ||
+			previousState is ProximityWalletState.PresentationCompleted ||
+			sessionCipher == null || !mdlTransport.hasUsedL2cap()
+		) return
+
+		val termination = encodeCbor(
+			mapOf(
+				"data" to Value.Null,
+				"status" to TerminationReason.GENERAL_ERROR.code,
+			).toCbor()
+		)
+		runCatching {
+			Logger(TAG).debug("Sending ISO session termination over active L2CAP before closing the channel")
+			transportProtocol.sendMessage(termination, null)
+			l2capTerminationSent = true
+		}.onFailure { error ->
+			Logger(TAG).warn("Unable to send ISO session termination before L2CAP close: ${error.message}")
+		}
+	}
+
+	private fun scheduleL2capCleanup() {
+		val mdlTransport = transportProtocol as? MdlTransportProtocol ?: return
+		if (walletStateMutable.value !is ProximityWalletState.PresentationCompleted) return
+		if (!mdlTransport.hasUsedL2cap()) return
+
+		l2capCleanupJob?.cancel()
+		Logger(TAG).debug(
+			"L2CAP presentation sent; waiting ${L2CAP_COMPLETION_CLEANUP_DELAY_MS}ms for reader termination before closing channel"
+		)
+		l2capCleanupJob = scope.launch {
+			delay(L2CAP_COMPLETION_CLEANUP_DELAY_MS)
+			if (walletStateMutable.value is ProximityWalletState.PresentationCompleted && mdlTransport.hasUsedL2cap()) {
+				Logger(TAG).debug("L2CAP reader did not terminate the channel; closing BLE transport after completion timeout")
+				disconnect()
+			}
 		}
 	}
 
@@ -390,9 +466,15 @@ class ProximityWallet private constructor(
 						// The reader selected dcAPI
 						if(sessionEstablishment.dcApiSelected == true) {
 							isDcApi = true
-							val origin = ProximityMdlUtils.buildIsoOriginFromSessionTranscript(
-								(transportProtocol as MdlTransportProtocolExtensions).sessionTranscript!!
-							)
+							val sessionTranscript = (transportProtocol as MdlTransportProtocolExtensions).sessionTranscript ?: run {
+								Logger(TAG).error("Wallet has no session transcript after deriving the session cipher")
+								walletStateMutable.update {
+									ProximityWalletState.Error(ProximityError.InvalidData("Missing session transcript"))
+								}
+								disconnect()
+								return@launch
+							}
+							val origin = ProximityMdlUtils.buildIsoOriginFromSessionTranscript(sessionTranscript)
 							//TODO: handle multiple requests and such
 							//TODO: we should choose which protocols we support and wish (e.g .signed not signed)
 							val dcRequest = Json.decodeFromString<JsonObject>(result.decodeToString())
@@ -451,7 +533,7 @@ class ProximityWallet private constructor(
 						}
 						if (sessionData.status != null) {
 							Logger(TAG).debug("Wallet received terminal status=${sessionData.status}, disconnecting")
-							if (!markSubmissionCompleted()) {
+							if (!markSubmissionCompleted() && walletStateMutable.value !is ProximityWalletState.PresentationCompleted) {
 								walletStateMutable.update { ProximityWalletState.Disconnected }
 							}
 							disconnect()
@@ -487,9 +569,15 @@ class ProximityWallet private constructor(
 						if(isDcApi) {
 							isDcApi = true
 
-							val origin = ProximityMdlUtils.buildIsoOriginFromSessionTranscript(
-								(transportProtocol as MdlTransportProtocolExtensions).sessionTranscript!!
-							)
+							val sessionTranscript = (transportProtocol as MdlTransportProtocolExtensions).sessionTranscript ?: run {
+								Logger(TAG).error("Wallet has no session transcript while processing the DC API request")
+								walletStateMutable.update {
+									ProximityWalletState.Error(ProximityError.InvalidData("Missing session transcript"))
+								}
+								disconnect()
+								return@launch
+							}
+							val origin = ProximityMdlUtils.buildIsoOriginFromSessionTranscript(sessionTranscript)
 							//TODO: handle multiple requests and such
 							//TODO: we should choose which protocols we support and wish (e.g .signed not signed)
 							val dcRequest = Json.decodeFromString<JsonObject>(data.decodeToString())
@@ -564,6 +652,7 @@ class ProximityWallet private constructor(
 	private fun markSubmissionCompleted(): Boolean {
 		return if (walletStateMutable.value is ProximityWalletState.SubmittingDocuments) {
 			Logger(TAG).debug("markSubmissionCompleted: transitioning to PresentationCompleted")
+			(transportProtocol as? MdlTransportProtocol)?.markSessionCompleted()
 			walletStateMutable.update { ProximityWalletState.PresentationCompleted }
 			true
 		} else {
