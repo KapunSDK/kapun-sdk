@@ -20,6 +20,6 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class StyleJsonAttributeDetails(
-	val displayName: String,
-	val fieldType: StyleJsonFieldType = StyleJsonFieldType.OTHER,
+    val displayName: String,
+    val fieldType: StyleJsonFieldType = StyleJsonFieldType.OTHER,
 )

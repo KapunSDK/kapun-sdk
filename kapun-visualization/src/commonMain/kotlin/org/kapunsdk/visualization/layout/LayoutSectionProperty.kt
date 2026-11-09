@@ -19,7 +19,7 @@ package org.kapunsdk.visualization.layout
 import org.kapunsdk.visualization.oca.processing.AttributeValue
 
 data class LayoutSectionProperty(
-	val value: AttributeValue<*>?,
-	val label: String?,
-	val information: String?,
+    val value: AttributeValue<*>?,
+    val label: String?,
+    val information: String?,
 )

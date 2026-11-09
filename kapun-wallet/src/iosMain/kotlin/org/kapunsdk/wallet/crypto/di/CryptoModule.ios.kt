@@ -19,5 +19,5 @@ package org.kapunsdk.wallet.crypto.di
 import org.koin.core.module.Module
 
 actual fun Module.nativeSignerFactory() {
-	// Nothing to do here, the implementation of the iOS NativeSignerFactory is passed in in the KapunSdk initializer
+    // Nothing to do here, the implementation of the iOS NativeSignerFactory is passed in in the KapunSdk initializer
 }

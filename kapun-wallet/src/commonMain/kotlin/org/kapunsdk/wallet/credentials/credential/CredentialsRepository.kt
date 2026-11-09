@@ -18,6 +18,9 @@ package org.kapunsdk.wallet.credentials.credential
 
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
+import kotlinx.coroutines.flow.map
 import org.kapunsdk.credentials.models.credential.CredentialModel
 import org.kapunsdk.credentials.models.credential.CredentialType
 import org.kapunsdk.credentials.models.metadata.KeyMaterialType
@@ -27,9 +30,6 @@ import org.kapunsdk.util.extensions.toLong
 import org.kapunsdk.wallet.CredentialEntity
 import org.kapunsdk.wallet.KapunDatabase
 import org.kapunsdk.wallet.extensions.toModel
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
-import kotlinx.coroutines.flow.map
 import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.bind
 import org.koin.dsl.module
@@ -37,115 +37,137 @@ import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
 @OptIn(ExperimentalTime::class)
-class CredentialsRepository private constructor(db: KapunDatabase) : DocumentProvider {
-	companion object {
-		val koinModule = module {
-			singleOf(::CredentialsRepository).bind<DocumentProvider>()
-		}
-	}
+class CredentialsRepository private constructor(
+    db: KapunDatabase,
+) : DocumentProvider {
+    companion object {
+        val koinModule =
+            module {
+                singleOf(::CredentialsRepository).bind<DocumentProvider>()
+            }
+    }
 
-	private val queries = db.credentialQueries
-	private val ocaBundleQueries = db.ocaBundleQueries
+    private val queries = db.credentialQueries
+    private val ocaBundleQueries = db.ocaBundleQueries
 
-	override suspend fun getAllCredentials(): List<CredentialModel> {
-		return getAllEntities().mapNotNull { it.toModel { url -> getOcaBundleForCredential(url) } }
-	}
+    override suspend fun getAllCredentials(): List<CredentialModel> =
+        getAllEntities().mapNotNull {
+            it.toModel { url -> getOcaBundleForCredential(url) }
+        }
 
-	override suspend fun getCredentialsByDocType(docType: String, includeUsedCredentials: Boolean): List<CredentialModel> {
-		return getAllWhere(used = includeUsedCredentials, schemaId = docType)
-			.mapNotNull { it.toModel { url -> getOcaBundleForCredential(url) } }
-	}
+    override suspend fun getCredentialsByDocType(
+        docType: String,
+        includeUsedCredentials: Boolean,
+    ): List<CredentialModel> =
+        getAllWhere(used = includeUsedCredentials, schemaId = docType)
+            .mapNotNull { it.toModel { url -> getOcaBundleForCredential(url) } }
 
-	fun clear() {
-		queries.clear()
-	}
+    fun clear() {
+        queries.clear()
+    }
 
-	fun getAllEntities() = queries.getAll().executeAsList()
+    fun getAllEntities() = queries.getAll().executeAsList()
 
-	fun fullInsert(
-		id: Long,
-		name: String,
-		metadata: String,
-		keyMaterialType: KeyMaterialType,
-		credentialType: CredentialType,
-		payload: String,
-		docType: String,
-		ocaBundleUrl: String?,
-		identityId: Long,
-		used: Boolean,
-		createdAt: Long,
-	) = queries.fullInsert(
-		id,
-		name,
-		metadata,
-		keyMaterialType,
-		credentialType,
-		payload,
-		docType,
-		ocaBundleUrl,
-		identityId,
-		used.toLong(),
-		createdAt,
-	)
+    fun fullInsert(
+        id: Long,
+        name: String,
+        metadata: String,
+        keyMaterialType: KeyMaterialType,
+        credentialType: CredentialType,
+        payload: String,
+        docType: String,
+        ocaBundleUrl: String?,
+        identityId: Long,
+        used: Boolean,
+        createdAt: Long,
+    ) = queries.fullInsert(
+        id,
+        name,
+        metadata,
+        keyMaterialType,
+        credentialType,
+        payload,
+        docType,
+        ocaBundleUrl,
+        identityId,
+        used.toLong(),
+        createdAt,
+    )
 
-	fun insertCredential(
-		name: String,
-		metadata: String,
-		keyMaterialType: KeyMaterialType,
-		credentialType: CredentialType,
-		payload: String,
-		docType: String,
-		ocaBundleUrl: String?,
-		identityName: String,
-	) = queries.transactionWithResult {
-		queries.insert(name, metadata, keyMaterialType, credentialType, payload, docType, ocaBundleUrl, identityName, Clock.System.now().toEpochMilliseconds())
-		val credential = queries.getByName(name).executeAsOne()
-		return@transactionWithResult credential
-	}
+    fun insertCredential(
+        name: String,
+        metadata: String,
+        keyMaterialType: KeyMaterialType,
+        credentialType: CredentialType,
+        payload: String,
+        docType: String,
+        ocaBundleUrl: String?,
+        identityName: String,
+    ) = queries.transactionWithResult {
+        queries.insert(
+            name,
+            metadata,
+            keyMaterialType,
+            credentialType,
+            payload,
+            docType,
+            ocaBundleUrl,
+            identityName,
+            Clock.System.now().toEpochMilliseconds(),
+        )
+        val credential = queries.getByName(name).executeAsOne()
+        return@transactionWithResult credential
+    }
 
-	fun getAll() = queries.getAll().executeAsList()
+    fun getAll() = queries.getAll().executeAsList()
 
-	fun getAllUnusedFlow() = queries.getAllUnused().asFlow().mapToList(Dispatchers.IO).map { it.onlyUsable() }
+    fun getAllUnusedFlow() =
+        queries
+            .getAllUnused()
+            .asFlow()
+            .mapToList(Dispatchers.IO)
+            .map { it.onlyUsable() }
 
-	fun getAllFor(identityId: Long) = queries.getByIdentity(identityId).executeAsList().onlyUsable()
+    fun getAllFor(identityId: Long) = queries.getByIdentity(identityId).executeAsList().onlyUsable()
 
-	fun getAllWhere(
-		used: Boolean,
-		schemaId: String,
-		types: Set<CredentialType> = CredentialType.SUPPORTED,
-	) = queries.getAllByTypesAndDocTypeWhere(used.toLong(), types, schemaId).executeAsList().onlyUsable()
+    fun getAllWhere(
+        used: Boolean,
+        schemaId: String,
+        types: Set<CredentialType> = CredentialType.SUPPORTED,
+    ) = queries.getAllByTypesAndDocTypeWhere(used.toLong(), types, schemaId).executeAsList().onlyUsable()
 
-	fun getAllWhere(
-		used: Boolean,
-		types: Set<CredentialType> = CredentialType.SUPPORTED,
-	) = queries.getAllByTypesWhere(used.toLong(), types).executeAsList().onlyUsable()
+    fun getAllWhere(
+        used: Boolean,
+        types: Set<CredentialType> = CredentialType.SUPPORTED,
+    ) = queries.getAllByTypesWhere(used.toLong(), types).executeAsList().onlyUsable()
 
-	fun getUnusedByTypeAndDocType(
-		type: CredentialType,
-		docType: String,
-	) = queries.getUnusedByTypeAndDocType(type, docType).executeAsList().onlyUsable()
+    fun getUnusedByTypeAndDocType(
+        type: CredentialType,
+        docType: String,
+    ) = queries.getUnusedByTypeAndDocType(type, docType).executeAsList().onlyUsable()
 
-	fun getById(id: Long) = queries.getById(id).executeAsOneOrNull()
+    fun getById(id: Long) = queries.getById(id).executeAsOneOrNull()
 
-	fun getByName(name: String) = queries.getByName(name).executeAsOneOrNull()
+    fun getByName(name: String) = queries.getByName(name).executeAsOneOrNull()
 
-	fun removeByName(name: String) = queries.removeByName(name)
+    fun removeByName(name: String) = queries.removeByName(name)
 
-	fun updateMetadataById(id: Long, metadata: String) = queries.updateMetadataById(metadata = metadata, id = id)
+    fun updateMetadataById(
+        id: Long,
+        metadata: String,
+    ) = queries.updateMetadataById(metadata = metadata, id = id)
 
-	fun useCredential(id: Long) {
-		queries.transaction {
-			queries.useCredential(id)
-		}
-	}
+    fun useCredential(id: Long) {
+        queries.transaction {
+            queries.useCredential(id)
+        }
+    }
 
-	/**
-	 * Filters out credentials that don't have a usable key material
-	 */
-	private fun List<CredentialEntity>.onlyUsable() = this.filter { it.key_material_type != KeyMaterialType.UNUSABLE }
+    /**
+     * Filters out credentials that don't have a usable key material
+     */
+    private fun List<CredentialEntity>.onlyUsable() = this.filter { it.key_material_type != KeyMaterialType.UNUSABLE }
 
-	private fun getOcaBundleForCredential(ocaBundleUrl: String): OcaBundleModel? {
-		return ocaBundleQueries.getByUrl(ocaBundleUrl).executeAsOneOrNull()?.toModel()
-	}
-
+    private fun getOcaBundleForCredential(ocaBundleUrl: String): OcaBundleModel? =
+        ocaBundleQueries.getByUrl(ocaBundleUrl).executeAsOneOrNull()?.toModel()
 }

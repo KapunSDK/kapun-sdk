@@ -19,12 +19,12 @@ package org.kapunsdk.wallet.process.refresh.eaa
 import org.kapunsdk.wallet.process.ProcessStep
 
 sealed interface EaaRefreshProcessStep : ProcessStep {
-	data class Error(
-		val errorMessage: String,
-		val errorCode: String? = null,
-		val cause: Exception? = null,
-		val retry: (() -> Unit)? = null,
-	) : EaaRefreshProcessStep
+    data class Error(
+        val errorMessage: String,
+        val errorCode: String? = null,
+        val cause: Exception? = null,
+        val retry: (() -> Unit)? = null,
+    ) : EaaRefreshProcessStep
 
-	data object Success : EaaRefreshProcessStep
+    data object Success : EaaRefreshProcessStep
 }

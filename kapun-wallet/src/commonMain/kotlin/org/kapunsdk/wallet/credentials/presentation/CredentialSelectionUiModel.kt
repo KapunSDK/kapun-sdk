@@ -16,21 +16,21 @@ under the License.
 
 package org.kapunsdk.wallet.credentials.presentation
 
-import org.kapunsdk.wallet.credentials.identity.IdentityUiModel
 import org.kapunsdk.credentials.models.credential.CredentialType
 import org.kapunsdk.credentials.models.metadata.KeyAssurance
 import org.kapunsdk.visualization.oca.processing.ProcessedAttribute
+import org.kapunsdk.wallet.credentials.identity.IdentityUiModel
 import uniffi.kapun_wallet_rust.PresentableCredential
 import uniffi.kapun_wallet_rust.VerifiableCredential
 
 data class CredentialSelectionUiModel(
-	val credentialId: Long,
-	val identityUiModel: IdentityUiModel,
-	val values: List<ProcessedAttribute>,
-	val format: CredentialType,
-	val keyAssurance : KeyAssurance,
-	val credential: VerifiableCredential,
-	val presentableCredential: PresentableCredential? = null,
-	val responseId: String,
+    val credentialId: Long,
+    val identityUiModel: IdentityUiModel,
+    val values: List<ProcessedAttribute>,
+    val format: CredentialType,
+    val keyAssurance: KeyAssurance,
+    val credential: VerifiableCredential,
+    val presentableCredential: PresentableCredential? = null,
+    val responseId: String,
     val requiresCryptographicHolderBinding: Boolean,
 )

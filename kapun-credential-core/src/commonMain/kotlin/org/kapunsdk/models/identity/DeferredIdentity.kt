@@ -17,10 +17,10 @@ under the License.
 package org.kapunsdk.credentials.models.identity
 
 data class DeferredIdentity(
-	val id: Long,
-	val transactionId : String,
-	val metadata : String,
-	val docType : String,
-	val identityName: String ,
-	val used : Boolean = false,
+    val id: Long,
+    val transactionId: String,
+    val metadata: String,
+    val docType: String,
+    val identityName: String,
+    val used: Boolean = false,
 )

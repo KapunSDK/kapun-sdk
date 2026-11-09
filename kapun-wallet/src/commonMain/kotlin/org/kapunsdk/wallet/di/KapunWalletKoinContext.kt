@@ -11,30 +11,30 @@ software distributed under the License is distributed on an
 "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
-under the License.   
+under the License.
  */
 package org.kapunsdk.wallet.di
 
+import org.kapunsdk.util.network.KapunNetworkConfiguration
+import org.kapunsdk.wallet.DEFAULT_DATABASE_NAME
 import org.koin.core.Koin
 import org.koin.core.KoinApplication
 import org.koin.dsl.koinApplication
-import org.kapunsdk.wallet.DEFAULT_DATABASE_NAME
-import org.kapunsdk.util.network.KapunNetworkConfiguration
 
 internal object KapunWalletKoinContext {
+    private lateinit var koinApp: KoinApplication
+    lateinit var koin: Koin
 
-	private lateinit var koinApp: KoinApplication
-	lateinit var koin: Koin
-
-	fun initialize(
-		databaseName: String = DEFAULT_DATABASE_NAME,
-		networkConfiguration: KapunNetworkConfiguration = KapunNetworkConfiguration(),
-		declaration: KoinApplication.() -> Unit = {},
-	) {
-		koinApp = koinApplication {
-			declaration()
-			kapunWalletModules(databaseName, networkConfiguration)
-		}
-		koin = koinApp.koin
-	}
+    fun initialize(
+        databaseName: String = DEFAULT_DATABASE_NAME,
+        networkConfiguration: KapunNetworkConfiguration = KapunNetworkConfiguration(),
+        declaration: KoinApplication.() -> Unit = {},
+    ) {
+        koinApp =
+            koinApplication {
+                declaration()
+                kapunWalletModules(databaseName, networkConfiguration)
+            }
+        koin = koinApp.koin
+    }
 }

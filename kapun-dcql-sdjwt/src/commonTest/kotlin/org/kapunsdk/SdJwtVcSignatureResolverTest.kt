@@ -1,10 +1,10 @@
 package org.kapunsdk
 
+import org.kapunsdk.credentials.sdjwt.SdJwtVcSignatureResolver
 import kotlin.test.Test
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import org.kapunsdk.credentials.sdjwt.SdJwtVcSignatureResolver
 
 class SdJwtVcSignatureResolverTest {
     @Test
@@ -16,9 +16,10 @@ class SdJwtVcSignatureResolverTest {
 
     @Test
     fun issuerMetadataDiscoveryBuildsHttpUrl() {
-        val url = assertNotNull(
-            SdJwtVcSignatureResolver.jwtVcIssuerMetadataUrl("https://issuer.example/tenant")
-        )
+        val url =
+            assertNotNull(
+                SdJwtVcSignatureResolver.jwtVcIssuerMetadataUrl("https://issuer.example/tenant"),
+            )
 
         assertTrue(url.toString().startsWith("https://issuer.example"))
     }

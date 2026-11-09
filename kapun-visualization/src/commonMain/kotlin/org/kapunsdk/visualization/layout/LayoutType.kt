@@ -22,19 +22,21 @@ import org.kapunsdk.visualization.oca.model.overlay.presentation.ClusterOrdering
 import org.kapunsdk.visualization.oca.model.overlay.presentation.UbiqueStyleJsonOverlay
 import kotlin.reflect.KClass
 
-enum class LayoutType(vararg val supportedOverlays: KClass<out Overlay>) {
-	/**
-	 * Represent a VC as a card layout, be that in a list or a detail view
-	 */
-	CARD(
-		UbiqueStyleJsonOverlay::class,
-		AriesBrandingOverlay::class,
-	),
+enum class LayoutType(
+    vararg val supportedOverlays: KClass<out Overlay>,
+) {
+    /**
+     * Represent a VC as a card layout, be that in a list or a detail view
+     */
+    CARD(
+        UbiqueStyleJsonOverlay::class,
+        AriesBrandingOverlay::class,
+    ),
 
-	/**
-	 * Represent a VC as a list of detail information
-	 */
-	DETAIL_LIST(
-		ClusterOrderingOverlay::class,
-	),
+    /**
+     * Represent a VC as a list of detail information
+     */
+    DETAIL_LIST(
+        ClusterOrderingOverlay::class,
+    ),
 }

@@ -17,14 +17,15 @@ under the License.
 package org.kapunsdk.credentials.models.credential
 
 enum class CredentialType {
-	SdJwt,
-	Mdoc,
-	BbsTermwise,
-	W3C_VCDM,
+    SdJwt,
+    Mdoc,
+    BbsTermwise,
+    W3C_VCDM,
     OpenBadge303,
-	Unknown;
+    Unknown,
+    ;
 
-	companion object {
-		val SUPPORTED = setOf(SdJwt, Mdoc, BbsTermwise, W3C_VCDM, OpenBadge303)
-	}
+    companion object {
+        val SUPPORTED = setOf(SdJwt, Mdoc, BbsTermwise, W3C_VCDM, OpenBadge303)
+    }
 }

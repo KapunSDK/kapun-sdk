@@ -16,64 +16,87 @@ under the License.
 
 package org.kapunsdk.visualization.oca.serialization
 
-import org.kapunsdk.visualization.oca.model.overlay.Overlay
-import org.kapunsdk.visualization.oca.model.overlay.input.*
-import org.kapunsdk.visualization.oca.model.overlay.presentation.AriesBrandingOverlay
-import org.kapunsdk.visualization.oca.model.overlay.presentation.ClusterOrderingOverlay
-import org.kapunsdk.visualization.oca.model.overlay.presentation.SensitiveOverlay
-import org.kapunsdk.visualization.oca.model.overlay.presentation.UbiqueStyleJsonOverlay
-import org.kapunsdk.visualization.oca.model.overlay.semantic.*
-import org.kapunsdk.visualization.oca.model.overlay.transformation.AttributeMappingOverlay
-import org.kapunsdk.visualization.oca.model.overlay.transformation.EntryCodeMappingOverlay
-import org.kapunsdk.visualization.oca.model.overlay.transformation.SubsetOverlay
-import org.kapunsdk.visualization.oca.model.overlay.transformation.TemplateOverlay
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.JsonContentPolymorphicSerializer
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import org.kapunsdk.visualization.oca.model.overlay.Overlay
+import org.kapunsdk.visualization.oca.model.overlay.input.*
+import org.kapunsdk.visualization.oca.model.overlay.presentation.AriesBrandingOverlay
+import org.kapunsdk.visualization.oca.model.overlay.presentation.ClusterOrderingOverlay
 import org.kapunsdk.visualization.oca.model.overlay.presentation.OrderOverlay
+import org.kapunsdk.visualization.oca.model.overlay.presentation.SensitiveOverlay
+import org.kapunsdk.visualization.oca.model.overlay.presentation.UbiqueStyleJsonOverlay
+import org.kapunsdk.visualization.oca.model.overlay.semantic.*
+import org.kapunsdk.visualization.oca.model.overlay.transformation.AttributeMappingOverlay
 import org.kapunsdk.visualization.oca.model.overlay.transformation.DataSourceOverlay
+import org.kapunsdk.visualization.oca.model.overlay.transformation.EntryCodeMappingOverlay
+import org.kapunsdk.visualization.oca.model.overlay.transformation.SubsetOverlay
+import org.kapunsdk.visualization.oca.model.overlay.transformation.TemplateOverlay
 
 internal object OverlaySerializer : JsonContentPolymorphicSerializer<Overlay>(Overlay::class) {
+    private val typeRegex = ".+\\/overlays\\/(.+)\\/.+".toRegex()
 
-	private val typeRegex = ".+\\/overlays\\/(.+)\\/.+".toRegex()
+    override fun selectDeserializer(element: JsonElement): DeserializationStrategy<Overlay> {
+        val json = element.jsonObject
+        val type =
+            json["type"]?.jsonPrimitive?.content
+                ?: throw SerializationException("Overlay does not have a type")
 
-	override fun selectDeserializer(element: JsonElement): DeserializationStrategy<Overlay> {
-		val json = element.jsonObject
-		val type = json["type"]?.jsonPrimitive?.content
-			?: throw SerializationException("Overlay does not have a type")
+        val overlayName =
+            typeRegex.matchEntire(type)?.groupValues?.get(1)
+                ?: throw IllegalArgumentException("Overlay type does not conform to type spec: $type")
 
-		val overlayName = typeRegex.matchEntire(type)?.groupValues?.get(1)
-			?: throw IllegalArgumentException("Overlay type does not conform to type spec: $type")
+        // TODO There's probably a better way rather than hardcoding all the overlay types
+        return when (overlayName) {
+            "branding" -> AriesBrandingOverlay.serializer()
 
-		// TODO There's probably a better way rather than hardcoding all the overlay types
-		return when (overlayName) {
-			"branding" -> AriesBrandingOverlay.serializer()
-			"cardinality" -> CardinalityOverlay.serializer()
-			"character_encoding" -> CharacterEncodingOverlay.serializer()
-			"cluster_ordering" -> ClusterOrderingOverlay.serializer()
-			"conditional" -> ConditionalOverlay.serializer()
-			"conformance" -> ConformanceOverlay.serializer()
-			"data_source" -> DataSourceOverlay.serializer()
-			"entry" -> EntryOverlay.serializer()
-			"entry_code" -> EntryCodeOverlay.serializer()
-			"entry_code_mapping" -> EntryCodeMappingOverlay.serializer()
-			"format" -> FormatOverlay.serializer()
-			"information" -> InformationOverlay.serializer()
-			"label" -> LabelOverlay.serializer()
-			"mapping" -> AttributeMappingOverlay.serializer()
-			"meta" -> MetaOverlay.serializer()
-			"order" -> OrderOverlay.serializer()
-			"sensitive" -> SensitiveOverlay.serializer()
-			"standard" -> StandardOverlay.serializer()
-			"style_json" -> UbiqueStyleJsonOverlay.serializer()
-			"subset" -> SubsetOverlay.serializer()
-			"unit" -> UnitOverlay.serializer()
-			"template" -> TemplateOverlay.serializer()
-			// TODO UnitMappingOverlay is missing because the spec defines the same name as for the UnitOverlay?
-			else -> throw IllegalArgumentException("Unknown overlay type: $type")
-		}
-	}
+            "cardinality" -> CardinalityOverlay.serializer()
+
+            "character_encoding" -> CharacterEncodingOverlay.serializer()
+
+            "cluster_ordering" -> ClusterOrderingOverlay.serializer()
+
+            "conditional" -> ConditionalOverlay.serializer()
+
+            "conformance" -> ConformanceOverlay.serializer()
+
+            "data_source" -> DataSourceOverlay.serializer()
+
+            "entry" -> EntryOverlay.serializer()
+
+            "entry_code" -> EntryCodeOverlay.serializer()
+
+            "entry_code_mapping" -> EntryCodeMappingOverlay.serializer()
+
+            "format" -> FormatOverlay.serializer()
+
+            "information" -> InformationOverlay.serializer()
+
+            "label" -> LabelOverlay.serializer()
+
+            "mapping" -> AttributeMappingOverlay.serializer()
+
+            "meta" -> MetaOverlay.serializer()
+
+            "order" -> OrderOverlay.serializer()
+
+            "sensitive" -> SensitiveOverlay.serializer()
+
+            "standard" -> StandardOverlay.serializer()
+
+            "style_json" -> UbiqueStyleJsonOverlay.serializer()
+
+            "subset" -> SubsetOverlay.serializer()
+
+            "unit" -> UnitOverlay.serializer()
+
+            "template" -> TemplateOverlay.serializer()
+
+            // TODO UnitMappingOverlay is missing because the spec defines the same name as for the UnitOverlay?
+            else -> throw IllegalArgumentException("Unknown overlay type: $type")
+        }
+    }
 }

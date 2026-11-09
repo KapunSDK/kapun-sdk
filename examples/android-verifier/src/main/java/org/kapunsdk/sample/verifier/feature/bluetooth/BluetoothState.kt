@@ -11,7 +11,7 @@ software distributed under the License is distributed on an
 "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
-under the License.   
+under the License.
  */
 @file:OptIn(ExperimentalUuidApi::class)
 
@@ -21,17 +21,19 @@ import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 sealed interface BluetoothState {
+    data object Idle : BluetoothState
 
-	data object Idle : BluetoothState
+    data object Disconnected : BluetoothState
 
-	data object Disconnected : BluetoothState
+    data class Advertising(
+        val serviceUuid: Uuid,
+    ) : BluetoothState
 
-	data class Advertising(val serviceUuid: Uuid) : BluetoothState
+    data class Scanning(
+        val serviceUuid: Uuid,
+    ) : BluetoothState
 
-	data class Scanning(val serviceUuid: Uuid) : BluetoothState
+    data object Connecting : BluetoothState
 
-	data object Connecting : BluetoothState
-
-	data object Connected : BluetoothState
-
+    data object Connected : BluetoothState
 }

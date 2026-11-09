@@ -21,59 +21,57 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class StringExtensionsTest {
+    @Test
+    fun testHexShortRGB() {
+        val color = "#3A5".toArgb()
+        assertEquals(0xFF33AA55, color)
+    }
 
-	@Test
-	fun testHexShortRGB() {
-		val color = "#3A5".toArgb()
-		assertEquals(0xFF33AA55, color)
-	}
+    @Test
+    fun testHexShortARGB() {
+        val color = "#4F5A".toArgb()
+        assertEquals(0x44FF55AA, color)
+    }
 
-	@Test
-	fun testHexShortARGB() {
-		val color = "#4F5A".toArgb()
-		assertEquals(0x44FF55AA, color)
-	}
+    @Test
+    fun testHexFullRGB() {
+        val color = "#32674E".toArgb()
+        assertEquals(0xFF32674E, color)
+    }
 
-	@Test
-	fun testHexFullRGB() {
-		val color = "#32674E".toArgb()
-		assertEquals(0xFF32674E, color)
-	}
+    @Test
+    fun testHexFullARGB() {
+        val color = "#FF32674E".toArgb()
+        assertEquals(0xFF32674E, color)
+    }
 
-	@Test
-	fun testHexFullARGB() {
-		val color = "#FF32674E".toArgb()
-		assertEquals(0xFF32674E, color)
-	}
+    @Test
+    fun testRgb() {
+        val color = "rgb(50, 103, 78)".toArgb()
+        assertEquals(0xFF32674E, color)
+    }
 
-	@Test
-	fun testRgb() {
-		val color = "rgb(50, 103, 78)".toArgb()
-		assertEquals(0xFF32674E, color)
-	}
+    @Test
+    fun testRgba() {
+        val color = "rgba(50, 103, 78, 0.5)".toArgb()
+        assertEquals(0x8032674E, color)
+    }
 
-	@Test
-	fun testRgba() {
-		val color = "rgba(50, 103, 78, 0.5)".toArgb()
-		assertEquals(0x8032674E, color)
-	}
+    @Test
+    fun testArgb() {
+        val color = "argb(0.5, 50, 103, 78)".toArgb()
+        assertEquals(0x8032674E, color)
+    }
 
-	@Test
-	fun testArgb() {
-		val color = "argb(0.5, 50, 103, 78)".toArgb()
-		assertEquals(0x8032674E, color)
-	}
+    @Test
+    fun testInvalidHexLength() {
+        val color = "#12345".toArgb(default = 0xFFFFFFFF)
+        assertEquals(0xFFFFFFFF, color)
+    }
 
-	@Test
-	fun testInvalidHexLength() {
-		val color = "#12345".toArgb(default = 0xFFFFFFFF)
-		assertEquals(0xFFFFFFFF, color)
-	}
-
-	@Test
-	fun testInvalidPrefix() {
-		val color = "invalidColor".toArgb(default = 0xFFFFFFFF)
-		assertEquals(0xFFFFFFFF, color)
-	}
-
+    @Test
+    fun testInvalidPrefix() {
+        val color = "invalidColor".toArgb(default = 0xFFFFFFFF)
+        assertEquals(0xFFFFFFFF, color)
+    }
 }

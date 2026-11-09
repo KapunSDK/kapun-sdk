@@ -20,8 +20,8 @@ import app.cash.sqldelight.TransacterImpl
 import app.cash.sqldelight.db.SqlDriver
 
 internal class MigrationTransacter(
-	driver: SqlDriver,
-	private val block: SqlDriver.() -> Unit,
+    driver: SqlDriver,
+    private val block: SqlDriver.() -> Unit,
 ) : TransacterImpl(driver) {
-	fun execute() = this.transaction { driver.block() }
+    fun execute() = this.transaction { driver.block() }
 }

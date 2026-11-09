@@ -16,25 +16,29 @@ under the License.
 
 package org.kapunsdk.visualization.oca.model.overlay.semantic
 
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import org.kapunsdk.visualization.oca.model.SAID_HASH_PLACEHOLDER
 import org.kapunsdk.visualization.oca.model.content.AttributeName
 import org.kapunsdk.visualization.oca.model.content.SAID
 import org.kapunsdk.visualization.oca.model.overlay.Localized
 import org.kapunsdk.visualization.oca.model.overlay.Overlay
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
 
 @Serializable
 data class LabelOverlay(
-	@SerialName("attribute_labels") val attributeLabels: Map<AttributeName, String>,
-	@SerialName("attribute_categories") val attributeCategories: List<String> = emptyList(),
-	@SerialName("category_labels") val categoryLabels: Map<String, String> = emptyMap(),
-	@SerialName("capture_base") override val captureBase: SAID,
-	@SerialName("type") override val type: String = "spec/overlays/label/1.0",
-	@SerialName("language") override val language: String,
-	@SerialName("digest") override val digest: SAID = SAID_HASH_PLACEHOLDER,
-) : SemanticOverlay, Localized {
+    @SerialName("attribute_labels") val attributeLabels: Map<AttributeName, String>,
+    @SerialName("attribute_categories") val attributeCategories: List<String> = emptyList(),
+    @SerialName("category_labels") val categoryLabels: Map<String, String> = emptyMap(),
+    @SerialName("capture_base") override val captureBase: SAID,
+    @SerialName("type") override val type: String = "spec/overlays/label/1.0",
+    @SerialName("language") override val language: String,
+    @SerialName("digest") override val digest: SAID = SAID_HASH_PLACEHOLDER,
+) : SemanticOverlay,
+    Localized {
+    fun getLabel(attributeName: AttributeName) = attributeLabels[attributeName]
 
-	fun getLabel(attributeName: AttributeName) = attributeLabels[attributeName]
-	override fun updateDigest(digest: SAID, captureBase: SAID): Overlay = copy(digest = digest, captureBase = captureBase)
+    override fun updateDigest(
+        digest: SAID,
+        captureBase: SAID,
+    ): Overlay = copy(digest = digest, captureBase = captureBase)
 }

@@ -28,57 +28,60 @@ import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 data class SignedDocumentUiModel(
-	val id: Long,
-	val fileName: String,
-	val fileData: ByteArray,
-	val transactionId: String,
-	val signedDate: String
+    val id: Long,
+    val fileName: String,
+    val fileData: ByteArray,
+    val transactionId: String,
+    val signedDate: String,
 )
 
 @OptIn(ExperimentalTime::class)
 class SignedDocumentsController private constructor(
-	private val signedDocumentsRepository: SignedDocumentsRepository,
-	private val scope: CoroutineScope,
+    private val signedDocumentsRepository: SignedDocumentsRepository,
+    private val scope: CoroutineScope,
 ) {
-	companion object {
-		val koinModule = module {
-			factory { (scope: CoroutineScope) ->
-				SignedDocumentsController(
-					signedDocumentsRepository = get(),
-					scope = scope
-				)
-			}
-		}
-	}
+    companion object {
+        val koinModule =
+            module {
+                factory { (scope: CoroutineScope) ->
+                    SignedDocumentsController(
+                        signedDocumentsRepository = get(),
+                        scope = scope,
+                    )
+                }
+            }
+    }
 
-	val allSignedDocuments: StateFlow<List<SignedDocumentUiModel>> = 
-		signedDocumentsRepository.getAllAsFlow()
-			.map { documents -> documents.map { it.toUiModel() } }
-			.stateIn(
-				scope = scope,
-				started = SharingStarted.WhileSubscribed(5000),
-				initialValue = emptyList()
-			)
+    val allSignedDocuments: StateFlow<List<SignedDocumentUiModel>> =
+        signedDocumentsRepository
+            .getAllAsFlow()
+            .map { documents -> documents.map { it.toUiModel() } }
+            .stateIn(
+                scope = scope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = emptyList(),
+            )
 
-	fun getSignedDocumentById(id: Long): SignedDocumentUiModel? {
-		return signedDocumentsRepository.getById(id)?.toUiModel()
-	}
+    fun getSignedDocumentById(id: Long): SignedDocumentUiModel? = signedDocumentsRepository.getById(id)?.toUiModel()
 
-	fun removeSignedDocument(id: Long) {
-		signedDocumentsRepository.removeById(id)
-	}
+    fun removeSignedDocument(id: Long) {
+        signedDocumentsRepository.removeById(id)
+    }
 
-	private fun SignedDocumentModel.toUiModel(): SignedDocumentUiModel {
-		val instant = Instant.fromEpochMilliseconds(this.signedDate)
-		val localDateTime = instant.toLocalDateTime(TimeZone.currentSystemDefault())
-		val formattedDate = "${localDateTime.dayOfMonth.toString().padStart(2, '0')}.${localDateTime.monthNumber.toString().padStart(2, '0')}.${localDateTime.year}"
+    private fun SignedDocumentModel.toUiModel(): SignedDocumentUiModel {
+        val instant = Instant.fromEpochMilliseconds(this.signedDate)
+        val localDateTime = instant.toLocalDateTime(TimeZone.currentSystemDefault())
+        val formattedDate = "${localDateTime.dayOfMonth.toString().padStart(
+            2,
+            '0',
+        )}.${localDateTime.monthNumber.toString().padStart(2, '0')}.${localDateTime.year}"
 		
-		return SignedDocumentUiModel(
-			id = this.id,
-			fileName = this.fileName,
-			fileData = this.fileData,
-			transactionId = this.transactionId,
-			signedDate = formattedDate
-		)
-	}
+        return SignedDocumentUiModel(
+            id = this.id,
+            fileName = this.fileName,
+            fileData = this.fileData,
+            transactionId = this.transactionId,
+            signedDate = formattedDate,
+        )
+    }
 }

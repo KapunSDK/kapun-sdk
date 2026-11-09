@@ -25,16 +25,15 @@ import org.koin.core.module.dsl.factoryOf
 import org.koin.dsl.module
 
 internal class CredentialOfferService(
-	private val httpClient: HttpClient,
+    private val httpClient: HttpClient,
 ) {
+    companion object {
+        val koinModule =
+            module {
+                factoryOf(::CredentialOfferService)
+            }
+    }
 
-	companion object {
-		val koinModule = module {
-			factoryOf(::CredentialOfferService)
-		}
-	}
-
-	suspend fun doCredentialOfferRequest(offerUrl: String): CredentialOfferParameters {
-		return httpClient.get(offerUrl.decodeURLPart()).body<CredentialOfferParameters>()
-	}
+    suspend fun doCredentialOfferRequest(offerUrl: String): CredentialOfferParameters =
+        httpClient.get(offerUrl.decodeURLPart()).body<CredentialOfferParameters>()
 }

@@ -16,10 +16,6 @@ under the License.
 
 package org.kapunsdk.issuance.metadata
 
-import org.kapunsdk.issuance.metadata.data.CredentialIssuerMetadata
-import org.kapunsdk.issuance.metadata.data.AuthorizationServerMetadata
-import org.kapunsdk.issuance.metadata.data.CredentialIssuerMetadataClaims
-import org.kapunsdk.util.extensions.json
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.get
@@ -30,6 +26,10 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.URLBuilder
 import io.ktor.http.Url
 import io.ktor.http.appendPathSegments
+import org.kapunsdk.issuance.metadata.data.AuthorizationServerMetadata
+import org.kapunsdk.issuance.metadata.data.CredentialIssuerMetadata
+import org.kapunsdk.issuance.metadata.data.CredentialIssuerMetadataClaims
+import org.kapunsdk.util.extensions.json
 import org.koin.core.module.dsl.factoryOf
 import org.koin.dsl.module
 import uniffi.kapun_crypto_rust.parseEncodedJwtPayload
@@ -37,71 +37,85 @@ import uniffi.kapun_util_rust.FederationResult
 import uniffi.kapun_util_rust.fetchMetadataFromIssuerUrl
 
 internal class MetadataService(
-	private val httpClient: HttpClient,
+    private val httpClient: HttpClient,
 ) {
+    companion object {
+        val koinModule =
+            module {
+                factoryOf(::MetadataService)
+            }
 
-	companion object {
-		val koinModule = module {
-			factoryOf(::MetadataService)
-		}
-
-		private const val WELL_KNOWN_PATH = ".well-known"
+        private const val WELL_KNOWN_PATH = ".well-known"
         private const val AUTHORIZATION_SERVER_METADATA_PATH_PART = "oauth-authorization-server"
-		private const val AUTHORIZATION_SERVER_METADATA_PATH = "/$WELL_KNOWN_PATH/$AUTHORIZATION_SERVER_METADATA_PATH_PART"
-		// Fallback for old drafts (Yes, looking at you ...)
+        private const val AUTHORIZATION_SERVER_METADATA_PATH =
+            "/$WELL_KNOWN_PATH/$AUTHORIZATION_SERVER_METADATA_PATH_PART"
+
+        // Fallback for old drafts (Yes, looking at you ...)
         private const val AUTHORIZATION_SERVER_METADATA_PATH_FALLBACK_PART = "openid-configuration"
-		private const val AUTHORIZATION_SERVER_METADATA_PATH_FALLBACK = "/$WELL_KNOWN_PATH/$AUTHORIZATION_SERVER_METADATA_PATH_FALLBACK_PART"
+        private const val AUTHORIZATION_SERVER_METADATA_PATH_FALLBACK =
+            "/$WELL_KNOWN_PATH/$AUTHORIZATION_SERVER_METADATA_PATH_FALLBACK_PART"
         private const val CREDENTIAL_ISSUER_METADATA_PATH_PART = "openid-credential-issuer"
         private const val CREDENTIAL_ISSUER_METADATA_PATH = "/$WELL_KNOWN_PATH/$CREDENTIAL_ISSUER_METADATA_PATH_PART"
 
-        private fun prependPath(url: String, path: List<String>): Url =
-            URLBuilder(url).apply {
-                val segments = pathSegments.toMutableList()
-                if (segments.isEmpty()){
-                    segments.add("")
-                }
-                path.forEachIndexed { i, segment ->
-                    segments.add(i + 1, segment)
-                }
-                pathSegments = segments
-            }.build()
+        private fun prependPath(
+            url: String,
+            path: List<String>,
+        ): Url =
+            URLBuilder(url)
+                .apply {
+                    val segments = pathSegments.toMutableList()
+                    if (segments.isEmpty()) {
+                        segments.add("")
+                    }
+                    path.forEachIndexed { i, segment ->
+                        segments.add(i + 1, segment)
+                    }
+                    pathSegments = segments
+                }.build()
 
         fun oidcAuthorizationServerMetadataUrl(baseUrl: String): Url =
-            URLBuilder(baseUrl).apply {
-                appendPathSegments(AUTHORIZATION_SERVER_METADATA_PATH)
-            }.build()
+            URLBuilder(baseUrl)
+                .apply {
+                    appendPathSegments(AUTHORIZATION_SERVER_METADATA_PATH)
+                }.build()
 
         fun ietfAuthorizationServerMetadataUrl(baseUrl: String): Url =
             prependPath(baseUrl, listOf(WELL_KNOWN_PATH, AUTHORIZATION_SERVER_METADATA_PATH_PART))
 
         fun oidcFallbackAuthorizationServerMetadataUrl(baseUrl: String): Url =
-            URLBuilder(baseUrl).apply {
-                appendPathSegments(AUTHORIZATION_SERVER_METADATA_PATH_FALLBACK)
-            }.build()
+            URLBuilder(baseUrl)
+                .apply {
+                    appendPathSegments(AUTHORIZATION_SERVER_METADATA_PATH_FALLBACK)
+                }.build()
 
         fun ietfFallbackAuthorizationServerMetadataUrl(baseUrl: String): Url =
             prependPath(baseUrl, listOf(WELL_KNOWN_PATH, AUTHORIZATION_SERVER_METADATA_PATH_FALLBACK_PART))
 
         fun oidcCredentialIssuerEndpoint(baseUrl: String): Url =
-            URLBuilder(baseUrl).apply {
-                appendPathSegments(CREDENTIAL_ISSUER_METADATA_PATH)
-            }.build()
+            URLBuilder(baseUrl)
+                .apply {
+                    appendPathSegments(CREDENTIAL_ISSUER_METADATA_PATH)
+                }.build()
 
         fun ietfCredentialIssuerEndpoint(baseUrl: String): Url =
             prependPath(baseUrl, listOf(WELL_KNOWN_PATH, CREDENTIAL_ISSUER_METADATA_PATH_PART))
     }
 
-    suspend fun doAuthorizationServerMetadataRequest(url: Url): AuthorizationServerMetadata {
-        return httpClient.get(url).body<AuthorizationServerMetadata>()
-    }
-    suspend fun doCredentialIssuerMetadataRequest(url: Url, signed: Boolean): CredentialIssuerMetadata {
-        val resp = httpClient.get(url) {
-            if (signed) {
-                header(HttpHeaders.Accept, "application/jwt")
-            } else {
-                header(HttpHeaders.Accept, ContentType.Application.Json)
+    suspend fun doAuthorizationServerMetadataRequest(url: Url): AuthorizationServerMetadata =
+        httpClient.get(url).body<AuthorizationServerMetadata>()
+
+    suspend fun doCredentialIssuerMetadataRequest(
+        url: Url,
+        signed: Boolean,
+    ): CredentialIssuerMetadata {
+        val resp =
+            httpClient.get(url) {
+                if (signed) {
+                    header(HttpHeaders.Accept, "application/jwt")
+                } else {
+                    header(HttpHeaders.Accept, ContentType.Application.Json)
+                }
             }
-        }
 
         return if (signed) {
             val jwt = resp.bodyAsText()
@@ -113,7 +127,5 @@ internal class MetadataService(
         }
     }
 
-	suspend fun resolveOpenIdFederation(baseUrl: String) : FederationResult {
-		return fetchMetadataFromIssuerUrl(baseUrl, null)
-	}
+    suspend fun resolveOpenIdFederation(baseUrl: String): FederationResult = fetchMetadataFromIssuerUrl(baseUrl, null)
 }

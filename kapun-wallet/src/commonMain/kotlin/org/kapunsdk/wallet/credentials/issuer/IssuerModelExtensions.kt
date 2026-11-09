@@ -16,22 +16,24 @@ under the License.
 
 package org.kapunsdk.wallet.credentials.issuer
 
+import kotlinx.serialization.json.Json
 import org.kapunsdk.credentials.models.issuer.IssuerModel
 import org.kapunsdk.issuance.metadata.data.CredentialIssuerMetadataClaims
 import org.kapunsdk.util.locale.LocaleMatcher
-import kotlinx.serialization.json.Json
 
 fun IssuerModel.getDisplayName(userLocale: String): String {
-	val json = Json {
-		ignoreUnknownKeys = true
-		explicitNulls = false
-	}
-	val parsedIssuerMetadata = json.decodeFromString<CredentialIssuerMetadataClaims>(this.credentialIssuerMetadata)
+    val json =
+        Json {
+            ignoreUnknownKeys = true
+            explicitNulls = false
+        }
+    val parsedIssuerMetadata = json.decodeFromString<CredentialIssuerMetadataClaims>(this.credentialIssuerMetadata)
 
-	return parsedIssuerMetadata.display?.firstOrNull { display ->
-		val locale = display.locale
-		locale != null && LocaleMatcher.matches(locale, userLocale)
-	}?.name
-		?: parsedIssuerMetadata.display?.firstOrNull()?.name
-		?: parsedIssuerMetadata.credentialIssuer
+    return parsedIssuerMetadata.display
+        ?.firstOrNull { display ->
+            val locale = display.locale
+            locale != null && LocaleMatcher.matches(locale, userLocale)
+        }?.name
+        ?: parsedIssuerMetadata.display?.firstOrNull()?.name
+        ?: parsedIssuerMetadata.credentialIssuer
 }

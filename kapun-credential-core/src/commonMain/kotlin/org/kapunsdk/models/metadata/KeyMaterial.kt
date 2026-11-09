@@ -21,78 +21,100 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 sealed interface KeyMaterial {
+    val storage: KeyStorage
+    val type: KeyMaterialType
 
-	val storage: KeyStorage
-	val type: KeyMaterialType
+    @Serializable
+    sealed interface Local : KeyMaterial {
+        @Serializable
+        @SerialName("KeyMaterial.Local.HardwareBacked")
+        data class HardwareBacked(
+            val deviceKeyReference: ByteArray,
+            val publicKey: ByteArray,
+        ) : Local {
+            override val storage = KeyStorage.Local
 
-	@Serializable
-	sealed interface Local : KeyMaterial {
-		@Serializable
-		@SerialName("KeyMaterial.Local.HardwareBacked")
-		data class HardwareBacked(
-			val deviceKeyReference: ByteArray,
-			val publicKey: ByteArray,
-		) : Local {
-			override val storage = KeyStorage.Local
-			@SerialName("keyMaterialType") override val type = KeyMaterialType.LOCAL
-		}
+            @SerialName("keyMaterialType")
+            override val type = KeyMaterialType.LOCAL
+        }
 
-		@Serializable
-		@SerialName("KeyMaterial.Local.SoftwareBacked")
-		data class SoftwareBacked(val privateKey: ByteArray): Local {
-			override val storage = KeyStorage.Local
-			@SerialName("keyMaterialType") override val type = KeyMaterialType.LOCAL
-		}
-		@Serializable
-		@SerialName("KeyMaterial.Local.ClaimBased")
-		class ClaimBased() : Local {
-			override val storage: KeyStorage
-				get() = KeyStorage.Local
-			@SerialName("keyMaterialType") override val type = KeyMaterialType.LOCAL
-		}
-	}
+        @Serializable
+        @SerialName("KeyMaterial.Local.SoftwareBacked")
+        data class SoftwareBacked(
+            val privateKey: ByteArray,
+        ) : Local {
+            override val storage = KeyStorage.Local
 
-	@Serializable
-	@SerialName("KeyMaterial.Cloud")
-	data class Cloud(
-		val aesKey: AesReference,
-		val deviceKeyReference: ByteArray,
-		val hsmReference: HsmReference,
-	) : KeyMaterial {
-		override val storage = KeyStorage.Cloud
-		@SerialName("keyMaterialType") override val type = KeyMaterialType.CLOUD
+            @SerialName("keyMaterialType")
+            override val type = KeyMaterialType.LOCAL
+        }
 
-		@Serializable
-		data class AesReference(val key: ByteArray, val nonce: ByteArray)
+        @Serializable
+        @SerialName("KeyMaterial.Local.ClaimBased")
+        class ClaimBased : Local {
+            override val storage: KeyStorage
+                get() = KeyStorage.Local
 
-		@Serializable
-		data class HsmReference(
-			val walletAttestation: String? = null,
-			val uuid: String,
-			val publicKey: ByteArray,
-			val batchPublicKey: ByteArray? = null,
-			val batchKeyId: String? = null,
-		)
-	}
+            @SerialName("keyMaterialType")
+            override val type = KeyMaterialType.LOCAL
+        }
+    }
 
-	@Serializable
-	@SerialName("KeyMaterial.Frost")
-	data class Frost(val hsmReference: HsmReference) : KeyMaterial {
-		override val storage = KeyStorage.Cloud
-		@SerialName("keyMaterialType") override val type = KeyMaterialType.FROST
+    @Serializable
+    @SerialName("KeyMaterial.Cloud")
+    data class Cloud(
+        val aesKey: AesReference,
+        val deviceKeyReference: ByteArray,
+        val hsmReference: HsmReference,
+    ) : KeyMaterial {
+        override val storage = KeyStorage.Cloud
 
-		@Serializable
-		data class HsmReference(val walletAttestation: String? = null, val uuid: String, val publicKey: ByteArray)
-	}
+        @SerialName("keyMaterialType")
+        override val type = KeyMaterialType.CLOUD
 
-	/**
-	 * This key material is unusable, e.g. because it was imported from a backup but its key material could not be restored
-	 */
-	@Serializable
-	@SerialName("KeyMaterial.Unsuable")
-	data object Unusable : KeyMaterial {
-		override val storage = KeyStorage.Local
-		@SerialName("keyMaterialType") override val type = KeyMaterialType.UNUSABLE
-	}
+        @Serializable
+        data class AesReference(
+            val key: ByteArray,
+            val nonce: ByteArray,
+        )
 
+        @Serializable
+        data class HsmReference(
+            val walletAttestation: String? = null,
+            val uuid: String,
+            val publicKey: ByteArray,
+            val batchPublicKey: ByteArray? = null,
+            val batchKeyId: String? = null,
+        )
+    }
+
+    @Serializable
+    @SerialName("KeyMaterial.Frost")
+    data class Frost(
+        val hsmReference: HsmReference,
+    ) : KeyMaterial {
+        override val storage = KeyStorage.Cloud
+
+        @SerialName("keyMaterialType")
+        override val type = KeyMaterialType.FROST
+
+        @Serializable
+        data class HsmReference(
+            val walletAttestation: String? = null,
+            val uuid: String,
+            val publicKey: ByteArray,
+        )
+    }
+
+    /**
+     * This key material is unusable, e.g. because it was imported from a backup but its key material could not be restored
+     */
+    @Serializable
+    @SerialName("KeyMaterial.Unsuable")
+    data object Unusable : KeyMaterial {
+        override val storage = KeyStorage.Local
+
+        @SerialName("keyMaterialType")
+        override val type = KeyMaterialType.UNUSABLE
+    }
 }

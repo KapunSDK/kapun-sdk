@@ -22,31 +22,50 @@ import org.koin.dsl.module
 import uniffi.kapun_wallet_rust.VerifiableCredential
 
 // TODO Now that this is no longer used in Rust, we can get rid of it and use the CredentialsRepository directly?
-class CredentialStore private constructor(private val repository: CredentialsRepository) {
-	companion object {
-		val koinModule = module {
-			singleOf(::CredentialStore)
-		}
-	}
+class CredentialStore private constructor(
+    private val repository: CredentialsRepository,
+) {
+    companion object {
+        val koinModule =
+            module {
+                singleOf(::CredentialStore)
+            }
+    }
 
-	fun getAllWhere(used: Boolean): List<VerifiableCredential> = repository.getAllWhere(used)
-		.map { VerifiableCredential(it.id, it.fk_identity_id, it.name, it.metadata, it.payload) }
+    fun getAllWhere(used: Boolean): List<VerifiableCredential> =
+        repository
+            .getAllWhere(used)
+            .map { VerifiableCredential(it.id, it.fk_identity_id, it.name, it.metadata, it.payload) }
 
-	fun getAllWhereSchemaId(used: Boolean, schemaId: String): List<VerifiableCredential> = repository.getAllWhere(used, schemaId)
-		.map { VerifiableCredential(it.id, it.fk_identity_id, it.name, it.metadata, it.payload) }
+    fun getAllWhereSchemaId(
+        used: Boolean,
+        schemaId: String,
+    ): List<VerifiableCredential> =
+        repository
+            .getAllWhere(used, schemaId)
+            .map { VerifiableCredential(it.id, it.fk_identity_id, it.name, it.metadata, it.payload) }
 
-	fun getUnusedMdoc() = repository.getAllWhere(
-		used = false,
-		types = setOf(CredentialType.Mdoc)
-	).map { VerifiableCredential(it.id, it.fk_identity_id, it.name, it.metadata, it.payload) }
+    fun getUnusedMdoc() =
+        repository
+            .getAllWhere(
+                used = false,
+                types = setOf(CredentialType.Mdoc),
+            ).map { VerifiableCredential(it.id, it.fk_identity_id, it.name, it.metadata, it.payload) }
 
-	fun getUnusedMdocOfType(docType: String) = repository.getUnusedByTypeAndDocType(
-		CredentialType.Mdoc,
-		docType
-	).map { VerifiableCredential(it.id, it.fk_identity_id, it.name, it.metadata, it.payload) }
+    fun getUnusedMdocOfType(docType: String) =
+        repository
+            .getUnusedByTypeAndDocType(
+                CredentialType.Mdoc,
+                docType,
+            ).map { VerifiableCredential(it.id, it.fk_identity_id, it.name, it.metadata, it.payload) }
 
-	fun getByIdentityId(identityId: Long) = repository.getAllFor(identityId)
-		.map { VerifiableCredential(it.id, it.fk_identity_id, it.name, it.metadata, it.payload) }
+    fun getByIdentityId(identityId: Long) =
+        repository
+            .getAllFor(identityId)
+            .map { VerifiableCredential(it.id, it.fk_identity_id, it.name, it.metadata, it.payload) }
 
-	fun getByName(name: String) = repository.getByName(name)?.let { VerifiableCredential(it.id, it.fk_identity_id, it.name, it.metadata, it.payload) }
+    fun getByName(name: String) =
+        repository.getByName(name)?.let {
+            VerifiableCredential(it.id, it.fk_identity_id, it.name, it.metadata, it.payload)
+        }
 }

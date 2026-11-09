@@ -32,86 +32,78 @@ import uniffi.kapun_wallet_rust.VerifiableCredential
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
-inline fun DeferredCredentialEntity.decodeMetadata(): List<CredentialMetadata>? {
-	return CredentialMetadata.fromStringToList(this.metadata)
-}
+inline fun DeferredCredentialEntity.decodeMetadata(): List<CredentialMetadata>? =
+    CredentialMetadata.fromStringToList(this.metadata)
 
-inline fun CredentialEntity.decodeMetadata(): CredentialMetadata? {
-	return CredentialMetadata.fromString(this.metadata)
-}
+inline fun CredentialEntity.decodeMetadata(): CredentialMetadata? = CredentialMetadata.fromString(this.metadata)
 
-inline fun VerifiableCredential.decodeMetadata(): CredentialMetadata? {
-	return CredentialMetadata.fromString(this.metadata)
-}
+inline fun VerifiableCredential.decodeMetadata(): CredentialMetadata? = CredentialMetadata.fromString(this.metadata)
 
-fun IssuerEntity.toModel() = IssuerModel(
-	url = url,
-	credentialIssuerMetadata = credential_issuer_metadata,
-	authorizationServerMetadata = authorization_server_metadata,
-)
+fun IssuerEntity.toModel() =
+    IssuerModel(
+        url = url,
+        credentialIssuerMetadata = credential_issuer_metadata,
+        authorizationServerMetadata = authorization_server_metadata,
+    )
 
-fun OcaBundleEntity.toModel() = OcaBundleModel(
-	url = url,
-	content = content,
-	updatedAt = updated_at,
-)
+fun OcaBundleEntity.toModel() =
+    OcaBundleModel(
+        url = url,
+        content = content,
+        updatedAt = updated_at,
+    )
 
-fun CredentialEntity.toModel(
-	ocaBundleProvider: (String) -> OcaBundleModel?,
-): CredentialModel? {
-	return this.decodeMetadata()?.let { metadata ->
-		CredentialModel(
-			this.id,
-			this.fk_identity_id,
-			this.name,
-			metadata,
-			this.key_material_type,
-			this.credential_type,
-			this.payload,
-			this.doc_type,
-			this.fk_oca_bundle_url?.let { ocaBundleProvider.invoke(it) },
-			this.used.toBoolean(),
-			this.created_at
-		)
-	}
-}
+fun CredentialEntity.toModel(ocaBundleProvider: (String) -> OcaBundleModel?): CredentialModel? =
+    this.decodeMetadata()?.let { metadata ->
+        CredentialModel(
+            this.id,
+            this.fk_identity_id,
+            this.name,
+            metadata,
+            this.key_material_type,
+            this.credential_type,
+            this.payload,
+            this.doc_type,
+            this.fk_oca_bundle_url?.let { ocaBundleProvider.invoke(it) },
+            this.used.toBoolean(),
+            this.created_at,
+        )
+    }
 
 fun CredentialEntity.toSummaryModel(
-	includePayload: Boolean,
-	ocaBundleProvider: (String) -> OcaBundleModel?,
-): CredentialSummaryModel? {
-	return this.decodeMetadata()?.let { metadata ->
-		CredentialSummaryModel(
-			id = this.id,
-			identityId = this.fk_identity_id,
-			name = this.name,
-			metadata = metadata,
-			keyMaterialType = this.key_material_type,
-			credentialType = this.credential_type,
-			payload = this.payload.takeIf { includePayload },
-			docType = this.doc_type,
-			ocaBundle = this.fk_oca_bundle_url?.let { ocaBundleProvider.invoke(it) },
-			isUsed = this.used.toBoolean(),
-			createdAt = this.created_at,
-		)
-	}
-}
+    includePayload: Boolean,
+    ocaBundleProvider: (String) -> OcaBundleModel?,
+): CredentialSummaryModel? =
+    this.decodeMetadata()?.let { metadata ->
+        CredentialSummaryModel(
+            id = this.id,
+            identityId = this.fk_identity_id,
+            name = this.name,
+            metadata = metadata,
+            keyMaterialType = this.key_material_type,
+            credentialType = this.credential_type,
+            payload = this.payload.takeIf { includePayload },
+            docType = this.doc_type,
+            ocaBundle = this.fk_oca_bundle_url?.let { ocaBundleProvider.invoke(it) },
+            isUsed = this.used.toBoolean(),
+            createdAt = this.created_at,
+        )
+    }
 
 @OptIn(ExperimentalTime::class)
-fun DeferredCredentialEntity.toModel() : CredentialModel? {
-	return this.decodeMetadata()?.firstOrNull()?.let { metadata ->
-		CredentialModel(
-			this.id,
-			this.fk_identity_id,
-			this.transaction_id,
-			metadata,
-			KeyMaterialType.UNUSABLE,
-			CredentialType.Unknown,
-			this.transaction_id,
-			this.doc_type,
-			null,
-			false,
-			Clock.System.now().toEpochMilliseconds()
-		)
-	}
-}
+fun DeferredCredentialEntity.toModel(): CredentialModel? =
+    this.decodeMetadata()?.firstOrNull()?.let { metadata ->
+        CredentialModel(
+            this.id,
+            this.fk_identity_id,
+            this.transaction_id,
+            metadata,
+            KeyMaterialType.UNUSABLE,
+            CredentialType.Unknown,
+            this.transaction_id,
+            this.doc_type,
+            null,
+            false,
+            Clock.System.now().toEpochMilliseconds(),
+        )
+    }

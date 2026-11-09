@@ -17,6 +17,6 @@ under the License.
 package org.kapunsdk.proximity
 
 actual class KapunProximity {
-	actual fun initialize() {
-	}
+    actual fun initialize() {
+    }
 }

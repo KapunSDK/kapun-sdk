@@ -32,8 +32,8 @@ class MdlEngagementBuilder(
     private val peripheralServerModeSupported: Boolean,
     private val capabilities: MdlCapabilities? = null,
 ) : EngagementBuilder {
-	/** Assigned by the platform listener before the QR engagement is encoded. */
-	internal var l2capPsm: Int? = null
+    /** Assigned by the platform listener before the QR engagement is encoded. */
+    internal var l2capPsm: Int? = null
 
     @OptIn(ExperimentalEncodingApi::class)
     override fun createQrCodeForEngagement(): String {
@@ -43,37 +43,42 @@ class MdlEngagementBuilder(
                 .encode(data)
         }"
     }
-    fun getEngagementBytes() : ByteArray {
-        val deviceEngagement = mutableMapOf(
-            0 to "1.1",
-            1 to listOf(
-                1,
-                24 to coseKey.toCbor()
-            ),
-        )
-        //TODO: UBAM make allow to have either/or
-        if(centralClientUuid != null || peripheralServerUuid != null) {
+
+    fun getEngagementBytes(): ByteArray {
+        val deviceEngagement =
+            mutableMapOf(
+                0 to "1.1",
+                1 to
+                    listOf(
+                        1,
+                        24 to coseKey.toCbor(),
+                    ),
+            )
+        // TODO: UBAM make allow to have either/or
+        if (centralClientUuid != null || peripheralServerUuid != null) {
             val bleTransportOptions = mutableMapOf<Int, Any>()
             bleTransportOptions.put(0, peripheralServerModeSupported)
-            if(peripheralServerModeSupported) {
+            if (peripheralServerModeSupported) {
                 peripheralServerUuid?.let {
                     bleTransportOptions.put(10, it.toByteArray())
                 }
             }
             bleTransportOptions.put(1, centralClientModeSupported)
-            if(centralClientModeSupported) {
+            if (centralClientModeSupported) {
                 centralClientUuid?.let {
                     bleTransportOptions.put(11, it.toByteArray())
                 }
             }
-			l2capPsm?.let { bleTransportOptions.put(21, it) }
-            deviceEngagement.put(2, listOf(
+            l2capPsm?.let { bleTransportOptions.put(21, it) }
+            deviceEngagement.put(
+                2,
+                listOf(
                     listOf(
                         2,
                         1,
-                       bleTransportOptions
-                    )
-                )
+                        bleTransportOptions,
+                    ),
+                ),
             )
         }
         capabilities?.let {

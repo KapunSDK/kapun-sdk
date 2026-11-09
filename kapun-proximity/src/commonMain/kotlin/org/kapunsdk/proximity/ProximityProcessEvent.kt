@@ -19,6 +19,6 @@ import kotlin.uuid.Uuid
 
 /** A state event emitted by one wallet or verifier process. */
 public data class ProximityProcessEvent<out T>(
-	val processId: Uuid,
-	val state: T,
+    val processId: Uuid,
+    val state: T,
 )

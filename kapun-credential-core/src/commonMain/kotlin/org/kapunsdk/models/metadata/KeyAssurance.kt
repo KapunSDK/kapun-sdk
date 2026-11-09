@@ -20,5 +20,5 @@ enum class KeyAssurance {
     CloudHigh,
     EmergencyHigh,
     HardwareMedium,
-    SoftwareLow
+    SoftwareLow,
 }

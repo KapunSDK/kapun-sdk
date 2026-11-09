@@ -11,7 +11,7 @@ software distributed under the License is distributed on an
 "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
-under the License.   
+under the License.
  */
 package org.kapunsdk.sample.verifier
 
@@ -21,15 +21,16 @@ import androidx.appcompat.app.AppCompatActivity
 import org.kapunsdk.sample.verifier.feature.bluetooth.BluetoothFragment
 
 class VerifierActivity : AppCompatActivity() {
-	override fun onCreate(savedInstanceState: Bundle?) {
-		super.onCreate(savedInstanceState)
-		enableEdgeToEdge()
-		setContentView(R.layout.activity_verifier)
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        setContentView(R.layout.activity_verifier)
 
-		if (savedInstanceState == null) {
-			supportFragmentManager.beginTransaction()
-				.replace(R.id.fragmentContainerView, BluetoothFragment.newInstance())
-				.commit()
-		}
-	}
+        if (savedInstanceState == null) {
+            supportFragmentManager
+                .beginTransaction()
+                .replace(R.id.fragmentContainerView, BluetoothFragment.newInstance())
+                .commit()
+        }
+    }
 }

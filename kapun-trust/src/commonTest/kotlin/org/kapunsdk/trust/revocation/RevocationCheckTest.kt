@@ -16,22 +16,23 @@ limitations under the License.
 package org.kapunsdk.trust.revocation
 
 import kotlinx.serialization.json.Json
+import uniffi.kapun_crypto_rust.base64UrlEncode
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import uniffi.kapun_crypto_rust.base64UrlEncode
 
 class RevocationCheckTest {
-	@Test
-	fun readsIssuerFromStatusListHeaderKid() {
-		val header = base64UrlEncode(
-			"{\"kid\":\"decentralized_identifier:did:webvh:issuer#status-list-key\"}"
-				.encodeToByteArray()
-		)
-		val payload = base64UrlEncode("{}".encodeToByteArray())
+    @Test
+    fun readsIssuerFromStatusListHeaderKid() {
+        val header =
+            base64UrlEncode(
+                "{\"kid\":\"decentralized_identifier:did:webvh:issuer#status-list-key\"}"
+                    .encodeToByteArray(),
+            )
+        val payload = base64UrlEncode("{}".encodeToByteArray())
 
-		assertEquals(
-			"did:webvh:issuer",
-			extractStatusListIssuer("$header.$payload.signature", Json.Default),
-		)
-	}
+        assertEquals(
+            "did:webvh:issuer",
+            extractStatusListIssuer("$header.$payload.signature", Json.Default),
+        )
+    }
 }

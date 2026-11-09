@@ -11,7 +11,7 @@ software distributed under the License is distributed on an
 "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
-under the License.   
+under the License.
  */
 package org.kapunsdk.proximity.protocol.mdl
 
@@ -49,556 +49,616 @@ import uniffi.kapun_util_rust.encodeCbor
 import kotlin.uuid.Uuid
 
 internal class MdlCentralClientModeTransportProtocol(
-	role: Role,
-	private val serviceUuid: Uuid,
-	private val ephemeralKey: EphemeralKey,
-	private val deviceMacAddress: String? = null,
-	private val options: ProximityBleOptions = ProximityBleOptions.Default,
-	private val l2capPsm: Int? = null,
-	private val enableL2cap: Boolean = true,
-) : BleTransportProtocol(role), KapunProximityKoinComponent, MdlTransportProtocolExtensions {
-	companion object {
-		private const val TAG = "MdlCentralClientMode"
+    role: Role,
+    private val serviceUuid: Uuid,
+    private val ephemeralKey: EphemeralKey,
+    private val deviceMacAddress: String? = null,
+    private val options: ProximityBleOptions = ProximityBleOptions.Default,
+    private val l2capPsm: Int? = null,
+    private val enableL2cap: Boolean = true,
+) : BleTransportProtocol(role),
+    KapunProximityKoinComponent,
+    MdlTransportProtocolExtensions {
+    companion object {
+        private const val TAG = "MdlCentralClientMode"
 
-		// ISO-18013-5 Table 12
-		val characteristicStateUuid = Uuid.parse("00000005-A123-48CE-896B-4C76973373E6")
-		val characteristicClient2ServerUuid = Uuid.parse("00000006-A123-48CE-896B-4C76973373E6")
-		val characteristicServer2ClientUuid = Uuid.parse("00000007-A123-48CE-896B-4C76973373E6")
-		val characteristicIdentUuid = Uuid.parse("00000008-A123-48CE-896B-4C76973373E6")
-	}
+        // ISO-18013-5 Table 12
+        val characteristicStateUuid = Uuid.parse("00000005-A123-48CE-896B-4C76973373E6")
+        val characteristicClient2ServerUuid = Uuid.parse("00000006-A123-48CE-896B-4C76973373E6")
+        val characteristicServer2ClientUuid = Uuid.parse("00000007-A123-48CE-896B-4C76973373E6")
+        val characteristicIdentUuid = Uuid.parse("00000008-A123-48CE-896B-4C76973373E6")
+    }
 
-	private val gattFactory by inject<BleGattFactory>()
-	private val characteristicsFactory by inject<MdlCharacteristicsFactory>()
+    private val gattFactory by inject<BleGattFactory>()
+    private val characteristicsFactory by inject<MdlCharacteristicsFactory>()
 
-	private var gattServer: BleGattServer? = null
-	private var gattClient: BleGattClient? = null
-	private var l2capServer: BleL2capServer? = null
-	private var l2capClient: BleL2capConnection? = null
-	private var preparedL2capPsm: Int? = null
-	private var l2capServerHasAcceptedPeer = false
-	private var l2capConnectionWasEstablished = false
-	private var l2capFallbackToGatt = false
-	private var l2capFallbackGattConnected = false
-	private var l2capSidecarOnly = false
-	private var l2capSessionCompleted = false
-	override var sessionTranscript: Value? = null
-	private val gattAdvertiserListener = object : BleAdvertiserListener {
-		override fun onError(msg: String) {
-			reportError(ProximityError.Unknown(msg))
-		}
-	}
+    private var gattServer: BleGattServer? = null
+    private var gattClient: BleGattClient? = null
+    private var l2capServer: BleL2capServer? = null
+    private var l2capClient: BleL2capConnection? = null
+    private var preparedL2capPsm: Int? = null
+    private var l2capServerHasAcceptedPeer = false
+    private var l2capConnectionWasEstablished = false
+    private var l2capFallbackToGatt = false
+    private var l2capFallbackGattConnected = false
+    private var l2capSidecarOnly = false
+    private var l2capSessionCompleted = false
+    override var sessionTranscript: Value? = null
+    private val gattAdvertiserListener =
+        object : BleAdvertiserListener {
+            override fun onError(msg: String) {
+                reportError(ProximityError.Unknown(msg))
+            }
+        }
 
-	suspend fun prepareL2capServer(): Int? {
-		if (role != Role.VERIFIER || !enableL2cap) return null
-		if (l2capServer != null) return preparedL2capPsm
-		val server = gattFactory.createL2capServer() ?: run {
-			Logger(TAG).debug("L2CAP server is unavailable on this platform; using GATT")
-			return null
-		}
-		return try {
-			val psm = server.listen()
-			l2capServer = server
-			preparedL2capPsm = psm
-			Logger(TAG).debug("L2CAP listener ready for reverse engagement: psm=$psm")
-			psm
-		} catch (e: Exception) {
-			server.close()
-			Logger(TAG).warn("Unable to open reverse-engagement L2CAP listener: ${e.message}")
-			null
-		}
-	}
+    suspend fun prepareL2capServer(): Int? {
+        if (role != Role.VERIFIER || !enableL2cap) return null
+        if (l2capServer != null) return preparedL2capPsm
+        val server =
+            gattFactory.createL2capServer() ?: run {
+                Logger(TAG).debug("L2CAP server is unavailable on this platform; using GATT")
+                return null
+            }
+        return try {
+            val psm = server.listen()
+            l2capServer = server
+            preparedL2capPsm = psm
+            Logger(TAG).debug("L2CAP listener ready for reverse engagement: psm=$psm")
+            psm
+        } catch (e: Exception) {
+            server.close()
+            Logger(TAG).warn("Unable to open reverse-engagement L2CAP listener: ${e.message}")
+            null
+        }
+    }
 
-	fun hasUsedL2cap(): Boolean = l2capConnectionWasEstablished && !l2capFallbackToGatt
+    fun hasUsedL2cap(): Boolean = l2capConnectionWasEstablished && !l2capFallbackToGatt
 
-	fun markSessionCompleted() {
-		l2capSessionCompleted = true
-	}
+    fun markSessionCompleted() {
+        l2capSessionCompleted = true
+    }
 
-	fun hasPreparedL2capServer(): Boolean = l2capServer != null
+    fun hasPreparedL2capServer(): Boolean = l2capServer != null
 
-	fun isSupported(): Boolean {
-		if (this.role == Role.VERIFIER) {
-			return gattFactory.isBleAdvSupported()
-		}
-		return true
-	}
+    fun isSupported(): Boolean {
+        if (this.role == Role.VERIFIER) {
+            return gattFactory.isBleAdvSupported()
+        }
+        return true
+    }
 
 	/*
-	* Get the session cipher struct, for session encryption. In the case of the mDl (wallet) we only use eReaderKeyBytes
-	* as they are part of the session transcript and also the peer public key.
-	* For the mDl reader we need the public key, which was presented in the QR-Code.
-	* */
-	override fun getSessionCipher(engagementBytes: ByteArray, eReaderKeyBytes: ByteArray, peerCoseKey: ByteArray?): SessionCipher? {
-		sessionTranscript = listOf(24 to engagementBytes, 24 to eReaderKeyBytes, Value.Null).toCbor()
-		val sessionTranscriptBs = encodeCbor(sessionTranscript!!)
-		val sessionTranscriptBytes = encodeCbor(
-			(24 to sessionTranscriptBs).toCbor()
-		)
-		// Use the peerKey if we are the mdl reader
-		val coseKey = decodeCbor(peerCoseKey ?: eReaderKeyBytes)
-		val kty = coseKey.asOrderedObject()?.get(Value.Number(JsonNumber.Integer(1)))!!.asLong() ?: return null
-		val publicKey = when(kty) {
-			// OKP, only x coordinate
-			1L -> {
-				coseKey.asOrderedObject()?.get(Value.Number(JsonNumber.Integer(-2)))!!.asBytes() ?: return null
-			}
-			// EC key sec1 bytes
-			2L -> {
-				val x = coseKey.asOrderedObject()?.get(Value.Number(JsonNumber.Integer(-2)))!!.asBytes() ?: return null
-				val y = coseKey.asOrderedObject()?.get(Value.Number(JsonNumber.Integer(-3)))!!.asBytes() ?: return null
-				byteArrayOf(0x04) + x + y
-			}
-			else -> return null
-		}
-		return this.ephemeralKey.getSessionCipher(sessionTranscriptBytes, publicKey)
-	}
+	 * Get the session cipher struct, for session encryption. In the case of the mDl (wallet) we only use eReaderKeyBytes
+	 * as they are part of the session transcript and also the peer public key.
+	 * For the mDl reader we need the public key, which was presented in the QR-Code.
+	 * */
+    override fun getSessionCipher(
+        engagementBytes: ByteArray,
+        eReaderKeyBytes: ByteArray,
+        peerCoseKey: ByteArray?,
+    ): SessionCipher? {
+        sessionTranscript = listOf(24 to engagementBytes, 24 to eReaderKeyBytes, Value.Null).toCbor()
+        val sessionTranscriptBs = encodeCbor(sessionTranscript!!)
+        val sessionTranscriptBytes =
+            encodeCbor(
+                (24 to sessionTranscriptBs).toCbor(),
+            )
+        // Use the peerKey if we are the mdl reader
+        val coseKey = decodeCbor(peerCoseKey ?: eReaderKeyBytes)
+        val kty = coseKey.asOrderedObject()?.get(Value.Number(JsonNumber.Integer(1)))!!.asLong() ?: return null
+        val publicKey =
+            when (kty) {
+                // OKP, only x coordinate
+                1L -> {
+                    coseKey.asOrderedObject()?.get(Value.Number(JsonNumber.Integer(-2)))!!.asBytes() ?: return null
+                }
 
-	override suspend fun connect() {
-		restoreCallbacksForReconnect()
-		l2capSidecarOnly = false
-		l2capFallbackToGatt = false
-		l2capFallbackGattConnected = false
-		l2capSessionCompleted = false
-		// In central client mode, the wallet (or mDL) acts as the client (scanning) and the verifier (or mDL reader) acts as the server (advertising)
-		when (role) {
-			Role.WALLET -> connectAsClient()
-			Role.VERIFIER -> connectAsServer()
-		}
-	}
+                // EC key sec1 bytes
+                2L -> {
+                    val x =
+                        coseKey.asOrderedObject()?.get(Value.Number(JsonNumber.Integer(-2)))!!.asBytes() ?: return null
+                    val y =
+                        coseKey.asOrderedObject()?.get(Value.Number(JsonNumber.Integer(-3)))!!.asBytes() ?: return null
+                    byteArrayOf(0x04) + x + y
+                }
 
-	/** Starts only the central-mode L2CAP leg while another GATT mode remains selected. */
-	suspend fun connectL2capSidecar() {
-		restoreCallbacksForReconnect()
-		l2capSidecarOnly = true
-		l2capConnectionWasEstablished = false
-		l2capFallbackToGatt = false
-		l2capFallbackGattConnected = false
-		l2capServerHasAcceptedPeer = false
-		l2capSessionCompleted = false
-		when (role) {
-			Role.VERIFIER -> connectAsServer()
-			Role.WALLET -> connectAsL2capClientOnly()
-		}
-	}
+                else -> {
+                    return null
+                }
+            }
+        return this.ephemeralKey.getSessionCipher(sessionTranscriptBytes, publicKey)
+    }
 
-	override fun disconnect() {
-		reportDisconnected()
-		inhibitCallbacks()
+    override suspend fun connect() {
+        restoreCallbacksForReconnect()
+        l2capSidecarOnly = false
+        l2capFallbackToGatt = false
+        l2capFallbackGattConnected = false
+        l2capSessionCompleted = false
+        // In central client mode, the wallet (or mDL) acts as the client (scanning) and the verifier (or mDL reader) acts as the server (advertising)
+        when (role) {
+            Role.WALLET -> connectAsClient()
+            Role.VERIFIER -> connectAsServer()
+        }
+    }
 
-		runCatching { sendTransportSpecificTerminationMessage() }
-		l2capServer?.close()
-		l2capServer = null
-		preparedL2capPsm = null
-		l2capServerHasAcceptedPeer = false
-		l2capConnectionWasEstablished = false
-		l2capClient?.close()
-		l2capClient = null
+    /** Starts only the central-mode L2CAP leg while another GATT mode remains selected. */
+    suspend fun connectL2capSidecar() {
+        restoreCallbacksForReconnect()
+        l2capSidecarOnly = true
+        l2capConnectionWasEstablished = false
+        l2capFallbackToGatt = false
+        l2capFallbackGattConnected = false
+        l2capServerHasAcceptedPeer = false
+        l2capSessionCompleted = false
+        when (role) {
+            Role.VERIFIER -> connectAsServer()
+            Role.WALLET -> connectAsL2capClientOnly()
+        }
+    }
 
-		gattServer?.apply {
-			stopAdvertising()
-			setListener(null)
-			stop()
-			gattServer = null
-		}
+    override fun disconnect() {
+        reportDisconnected()
+        inhibitCallbacks()
 
-		gattClient?.apply {
-			stopScanning()
-			setListener(null)
-			disconnect()
-			gattClient = null
-		}
-	}
+        runCatching { sendTransportSpecificTerminationMessage() }
+        l2capServer?.close()
+        l2capServer = null
+        preparedL2capPsm = null
+        l2capServerHasAcceptedPeer = false
+        l2capConnectionWasEstablished = false
+        l2capClient?.close()
+        l2capClient = null
 
-	override fun sendMessage(data: ByteArray, onProgress: ((sent: Int, total: Int) -> Unit)?) {
-		if (l2capClient?.isConnected == true || l2capServer?.isConnected == true) {
-			val connection = l2capClient ?: l2capServer ?: error("No L2CAP connection available")
-			connection.writeMessage(data)
-			onProgress?.invoke(data.size, data.size)
-			return
-		}
-		val charUuid = when (role) {
-			Role.WALLET -> characteristicClient2ServerUuid
-			Role.VERIFIER -> characteristicServer2ClientUuid
-		}
+        gattServer?.apply {
+            stopAdvertising()
+            setListener(null)
+            stop()
+            gattServer = null
+        }
 
-		when {
-			gattServer != null -> gattServer?.writeCharacteristic(charUuid, data, onProgress)
-			gattClient != null -> gattClient?.writeCharacteristic(charUuid, data, onProgress)
-			else -> throw IllegalStateException("No Gatt Server or Gatt Client available")
-		}
-	}
+        gattClient?.apply {
+            stopScanning()
+            setListener(null)
+            disconnect()
+            gattClient = null
+        }
+    }
 
-	override fun sendTransportSpecificTerminationMessage() {
-		if (l2capConnectionWasEstablished && !l2capFallbackToGatt) {
-			Logger(TAG).debug("L2CAP CoC has no transport-specific termination frame; channel close will terminate the session")
-			return
-		}
-		val terminationCode = byteArrayOf(0x02.toByte())
-		when {
-			gattServer != null -> gattServer?.writeCharacteristic(characteristicStateUuid, terminationCode)
-			gattClient != null -> gattClient?.writeCharacteristic(characteristicStateUuid, terminationCode)
-			else -> throw IllegalStateException("No Gatt Server or Gatt Client available")
-		}
-	}
+    override fun sendMessage(data: ByteArray, onProgress: ((sent: Int, total: Int) -> Unit)?) {
+        if (l2capClient?.isConnected == true || l2capServer?.isConnected == true) {
+            val connection = l2capClient ?: l2capServer ?: error("No L2CAP connection available")
+            connection.writeMessage(data)
+            onProgress?.invoke(data.size, data.size)
+            return
+        }
+        val charUuid =
+            when (role) {
+                Role.WALLET -> characteristicClient2ServerUuid
+                Role.VERIFIER -> characteristicServer2ClientUuid
+            }
 
-	override fun supportsTransportSpecificTerminationMessage(): Boolean {
-		if (l2capConnectionWasEstablished && !l2capFallbackToGatt) return false
-		return when {
-			gattServer != null -> gattServer?.supportsSessionTermination() ?: false
-			gattClient != null -> gattClient?.supportsSessionTermination() ?: false
-			else -> false
-		}
-	}
+        when {
+            gattServer != null -> gattServer?.writeCharacteristic(charUuid, data, onProgress)
+            gattClient != null -> gattClient?.writeCharacteristic(charUuid, data, onProgress)
+            else -> throw IllegalStateException("No Gatt Server or Gatt Client available")
+        }
+    }
 
-	private fun connectAsServer() {
-		l2capServerHasAcceptedPeer = false
-		if (l2capServer != null) {
-			Logger(TAG).debug("Waiting for reverse-engagement L2CAP peer on psm=$preparedL2capPsm")
-			l2capServer?.accept(l2capListener)
-		}
-		gattServer = gattFactory.createServer(serviceUuid).apply {
-			setListener(serverListener)
-			val characteristics = characteristicsFactory.createServerVerifierCharacteristics()
-			if (!start(characteristics)) {
-				reportError(ProximityError.Unknown("Error starting Gatt Server"))
-				stop()
-				gattServer = null
-				return
-			}
+    override fun sendTransportSpecificTerminationMessage() {
+        if (l2capConnectionWasEstablished && !l2capFallbackToGatt) {
+            Logger(
+                TAG,
+            ).debug("L2CAP CoC has no transport-specific termination frame; channel close will terminate the session")
+            return
+        }
+        val terminationCode = byteArrayOf(0x02.toByte())
+        when {
+            gattServer != null -> gattServer?.writeCharacteristic(characteristicStateUuid, terminationCode)
+            gattClient != null -> gattClient?.writeCharacteristic(characteristicStateUuid, terminationCode)
+            else -> throw IllegalStateException("No Gatt Server or Gatt Client available")
+        }
+    }
 
-			startAdvertising(gattAdvertiserListener)
-		}
-	}
+    override fun supportsTransportSpecificTerminationMessage(): Boolean {
+        if (l2capConnectionWasEstablished && !l2capFallbackToGatt) return false
+        return when {
+            gattServer != null -> gattServer?.supportsSessionTermination() ?: false
+            gattClient != null -> gattClient?.supportsSessionTermination() ?: false
+            else -> false
+        }
+    }
 
-	private fun connectAsClient() {
-		if (l2capPsm != null && enableL2cap) {
-			Logger(TAG).debug("Reverse engagement includes L2CAP PSM=$l2capPsm; trying L2CAP before GATT")
-			val client = gattFactory.createL2capClient()
-			if (client != null) {
-				l2capClient = client
-				try {
-					client.connect(serviceUuid, l2capPsm, deviceMacAddress, l2capListener)
-					return
-				} catch (e: Exception) {
-					Logger(TAG).warn("Unable to start reverse-engagement L2CAP connection, falling back to GATT: ${e.message}")
-					client.close()
-					l2capClient = null
-				}
-			}
-		}
-		connectAsGattClient()
-	}
+    private fun connectAsServer() {
+        l2capServerHasAcceptedPeer = false
+        if (l2capServer != null) {
+            Logger(TAG).debug("Waiting for reverse-engagement L2CAP peer on psm=$preparedL2capPsm")
+            l2capServer?.accept(l2capListener)
+        }
+        gattServer =
+            gattFactory.createServer(serviceUuid).apply {
+                setListener(serverListener)
+                val characteristics = characteristicsFactory.createServerVerifierCharacteristics()
+                if (!start(characteristics)) {
+                    reportError(ProximityError.Unknown("Error starting Gatt Server"))
+                    stop()
+                    gattServer = null
+                    return
+                }
 
-	private fun connectAsL2capClientOnly() {
-		if (l2capPsm == null || !enableL2cap) {
-			Logger(TAG).debug("L2CAP sidecar unavailable; selected GATT mode remains active")
-			reportError(ProximityError.Unknown("L2CAP PSM is unavailable"))
-			return
-		}
-		val client = gattFactory.createL2capClient() ?: run {
-			Logger(TAG).debug("L2CAP client unavailable; selected GATT mode remains active")
-			reportError(ProximityError.Unknown("L2CAP client is unavailable"))
-			return
-		}
-		l2capClient = client
-		try {
-			Logger(TAG).debug("Starting central-mode L2CAP sidecar: psm=$l2capPsm")
-			client.connect(serviceUuid, l2capPsm, deviceMacAddress, l2capListener)
-		} catch (e: Exception) {
-			Logger(TAG).warn("Unable to start L2CAP sidecar; selected GATT mode remains active: ${e.message}")
-			client.close()
-			l2capClient = null
-			reportError(ProximityError.Unknown(e.message ?: "Unable to start L2CAP client"))
-		}
-	}
+                startAdvertising(gattAdvertiserListener)
+            }
+    }
 
-	private fun connectAsGattClient() {
-		gattClient = gattFactory.createClient(serviceUuid, options).apply {
-			setListener(clientListener)
+    private fun connectAsClient() {
+        if (l2capPsm != null && enableL2cap) {
+            Logger(TAG).debug("Reverse engagement includes L2CAP PSM=$l2capPsm; trying L2CAP before GATT")
+            val client = gattFactory.createL2capClient()
+            if (client != null) {
+                l2capClient = client
+                try {
+                    client.connect(serviceUuid, l2capPsm, deviceMacAddress, l2capListener)
+                    return
+                } catch (e: Exception) {
+                    Logger(
+                        TAG,
+                    ).warn("Unable to start reverse-engagement L2CAP connection, falling back to GATT: ${e.message}")
+                    client.close()
+                    l2capClient = null
+                }
+            }
+        }
+        connectAsGattClient()
+    }
 
-			if (!deviceMacAddress.isNullOrEmpty()) {
-				connect(deviceMacAddress)
-			} else {
-				startScanning(
-					object : BleScannerListener {
-						override fun onError(msg: String) {
-							reportError(ProximityError.Unknown(msg))
-						}
-					}
-				)
-			}
-		}
-	}
+    private fun connectAsL2capClientOnly() {
+        if (l2capPsm == null || !enableL2cap) {
+            Logger(TAG).debug("L2CAP sidecar unavailable; selected GATT mode remains active")
+            reportError(ProximityError.Unknown("L2CAP PSM is unavailable"))
+            return
+        }
+        val client =
+            gattFactory.createL2capClient() ?: run {
+                Logger(TAG).debug("L2CAP client unavailable; selected GATT mode remains active")
+                reportError(ProximityError.Unknown("L2CAP client is unavailable"))
+                return
+            }
+        l2capClient = client
+        try {
+            Logger(TAG).debug("Starting central-mode L2CAP sidecar: psm=$l2capPsm")
+            client.connect(serviceUuid, l2capPsm, deviceMacAddress, l2capListener)
+        } catch (e: Exception) {
+            Logger(TAG).warn("Unable to start L2CAP sidecar; selected GATT mode remains active: ${e.message}")
+            client.close()
+            l2capClient = null
+            reportError(ProximityError.Unknown(e.message ?: "Unable to start L2CAP client"))
+        }
+    }
 
-	private val l2capListener = object : BleL2capListener {
-		override fun onConnected() {
-			if (role == Role.VERIFIER) l2capServerHasAcceptedPeer = true
-			l2capConnectionWasEstablished = true
-			Logger(TAG).debug("L2CAP transport connected: role=$role")
-			reportConnected()
-			gattServer?.stopAdvertising()
-		}
+    private fun connectAsGattClient() {
+        gattClient =
+            gattFactory.createClient(serviceUuid, options).apply {
+                setListener(clientListener)
 
-		override fun onMessageReceived(data: ByteArray) {
-			Logger(TAG).debug("L2CAP transport received message: bytes=${data.size}")
-			reportMessageReceived(data)
-		}
+                if (!deviceMacAddress.isNullOrEmpty()) {
+                    connect(deviceMacAddress)
+                } else {
+                    startScanning(
+                        object : BleScannerListener {
+                            override fun onError(msg: String) {
+                                reportError(ProximityError.Unknown(msg))
+                            }
+                        },
+                    )
+                }
+            }
+    }
 
-		override fun onDisconnected() {
-			if (!l2capSidecarOnly && l2capFallbackToGatt && !l2capConnectionWasEstablished) {
-				Logger(TAG).debug("Ignoring L2CAP cleanup disconnect after GATT fallback started")
-				return
-			}
-			if (role == Role.VERIFIER && l2capServer != null && !l2capServerHasAcceptedPeer) {
-				Logger(TAG).debug("L2CAP listener ended before accepting a peer; GATT remains available")
-				return
-			}
-			if (!l2capSidecarOnly && l2capConnectionWasEstablished && l2capSessionCompleted) {
-				Logger(TAG).debug("L2CAP disconnected after successful session completion; not starting GATT fallback")
-				reportDisconnected()
-				return
-			}
-			if (!l2capSidecarOnly && !l2capConnectionWasEstablished && l2capPsm != null && !l2capFallbackToGatt) {
-				l2capFallbackToGatt = true
-				l2capClient?.close()
-				l2capClient = null
-				Logger(TAG).warn("L2CAP disconnected before connecting; falling back to GATT: role=$role")
-				connectAsGattClient()
-				return
-			}
-			if (!l2capSidecarOnly && l2capConnectionWasEstablished) {
-				l2capFallbackToGatt = true
-				l2capFallbackGattConnected = false
-				l2capServerHasAcceptedPeer = false
-				Logger(TAG).warn("L2CAP channel disconnected; keeping the session and falling back to GATT: role=$role")
-				if (role == Role.VERIFIER) {
-					gattServer?.startAdvertising(gattAdvertiserListener)
-				} else {
-					connectAsGattClient()
-				}
-				return
-			}
-			Logger(TAG).debug("L2CAP transport disconnected: role=$role")
-			reportDisconnected()
-		}
+    private val l2capListener =
+        object : BleL2capListener {
+            override fun onConnected() {
+                if (role == Role.VERIFIER) l2capServerHasAcceptedPeer = true
+                l2capConnectionWasEstablished = true
+                Logger(TAG).debug("L2CAP transport connected: role=$role")
+                reportConnected()
+                gattServer?.stopAdvertising()
+            }
 
-		override fun onError(message: String) {
-			if (!l2capSidecarOnly && l2capFallbackToGatt && !l2capConnectionWasEstablished) {
-				Logger(TAG).debug("Ignoring late L2CAP error after GATT fallback started: $message")
-				return
-			}
-			val client = l2capClient
-			if (client != null && !isConnected) {
-				Logger(TAG).warn(
-					if (l2capSidecarOnly) "L2CAP sidecar failed; selected GATT mode remains active: $message"
-					else "L2CAP connection failed, falling back to GATT: $message"
-				)
-				client.close()
-				l2capClient = null
-				if (!l2capSidecarOnly) {
-					l2capFallbackToGatt = true
-					l2capFallbackGattConnected = false
-					connectAsGattClient()
-				}
-				else reportError(ProximityError.Unknown(message))
-			} else if (!l2capSidecarOnly && l2capConnectionWasEstablished) {
-				Logger(TAG).warn("L2CAP channel error after connection; waiting for disconnect callback to switch to GATT: $message")
-			} else if (role == Role.VERIFIER && l2capServer != null && !l2capServerHasAcceptedPeer) {
-				Logger(TAG).warn("L2CAP accept failed; GATT advertising remains available: $message")
-				if (l2capSidecarOnly) reportError(ProximityError.Unknown(message))
-			} else {
-				Logger(TAG).warn("L2CAP transport failed: $message")
-				reportError(ProximityError.Unknown(message))
-			}
-		}
-	}
+            override fun onMessageReceived(data: ByteArray) {
+                Logger(TAG).debug("L2CAP transport received message: bytes=${data.size}")
+                reportMessageReceived(data)
+            }
 
-	private val serverListener = object : BleGattServerListener {
-		override fun onPeerConnecting() {
-			if (!l2capSidecarOnly) reportConnecting()
-		}
+            override fun onDisconnected() {
+                if (!l2capSidecarOnly && l2capFallbackToGatt && !l2capConnectionWasEstablished) {
+                    Logger(TAG).debug("Ignoring L2CAP cleanup disconnect after GATT fallback started")
+                    return
+                }
+                if (role == Role.VERIFIER && l2capServer != null && !l2capServerHasAcceptedPeer) {
+                    Logger(TAG).debug("L2CAP listener ended before accepting a peer; GATT remains available")
+                    return
+                }
+                if (!l2capSidecarOnly && l2capConnectionWasEstablished && l2capSessionCompleted) {
+                    Logger(
+                        TAG,
+                    ).debug("L2CAP disconnected after successful session completion; not starting GATT fallback")
+                    reportDisconnected()
+                    return
+                }
+                if (!l2capSidecarOnly && !l2capConnectionWasEstablished && l2capPsm != null && !l2capFallbackToGatt) {
+                    l2capFallbackToGatt = true
+                    l2capClient?.close()
+                    l2capClient = null
+                    Logger(TAG).warn("L2CAP disconnected before connecting; falling back to GATT: role=$role")
+                    connectAsGattClient()
+                    return
+                }
+                if (!l2capSidecarOnly && l2capConnectionWasEstablished) {
+                    l2capFallbackToGatt = true
+                    l2capFallbackGattConnected = false
+                    l2capServerHasAcceptedPeer = false
+                    Logger(
+                        TAG,
+                    ).warn("L2CAP channel disconnected; keeping the session and falling back to GATT: role=$role")
+                    if (role == Role.VERIFIER) {
+                        gattServer?.startAdvertising(gattAdvertiserListener)
+                    } else {
+                        connectAsGattClient()
+                    }
+                    return
+                }
+                Logger(TAG).debug("L2CAP transport disconnected: role=$role")
+                reportDisconnected()
+            }
 
-		override fun onPeerConnected() {
-			gattServer?.stopAdvertising()
-		}
+            override fun onError(message: String) {
+                if (!l2capSidecarOnly && l2capFallbackToGatt && !l2capConnectionWasEstablished) {
+                    Logger(TAG).debug("Ignoring late L2CAP error after GATT fallback started: $message")
+                    return
+                }
+                val client = l2capClient
+                if (client != null && !isConnected) {
+                    Logger(TAG).warn(
+                        if (l2capSidecarOnly) {
+                            "L2CAP sidecar failed; selected GATT mode remains active: $message"
+                        } else {
+                            "L2CAP connection failed, falling back to GATT: $message"
+                        },
+                    )
+                    client.close()
+                    l2capClient = null
+                    if (!l2capSidecarOnly) {
+                        l2capFallbackToGatt = true
+                        l2capFallbackGattConnected = false
+                        connectAsGattClient()
+                    } else {
+                        reportError(ProximityError.Unknown(message))
+                    }
+                } else if (!l2capSidecarOnly && l2capConnectionWasEstablished) {
+                    Logger(
+                        TAG,
+                    ).warn(
+                        "L2CAP channel error after connection; waiting for disconnect callback to switch to GATT: $message",
+                    )
+                } else if (role == Role.VERIFIER && l2capServer != null && !l2capServerHasAcceptedPeer) {
+                    Logger(TAG).warn("L2CAP accept failed; GATT advertising remains available: $message")
+                    if (l2capSidecarOnly) reportError(ProximityError.Unknown(message))
+                } else {
+                    Logger(TAG).warn("L2CAP transport failed: $message")
+                    reportError(ProximityError.Unknown(message))
+                }
+            }
+        }
 
-		override fun onPeerDisconnected() {
-			if (l2capServerHasAcceptedPeer) {
-				Logger(TAG).debug("Ignoring GATT disconnect after L2CAP accepted the peer; L2CAP owns session lifecycle")
-				return
-			}
-			if (l2capFallbackToGatt && !l2capFallbackGattConnected) {
-				Logger(TAG).debug("Ignoring GATT disconnect before L2CAP-to-GATT fallback completed; keeping advertising available")
-				gattServer?.startAdvertising(gattAdvertiserListener)
-				return
-			}
-			if (l2capServer != null && !l2capServerHasAcceptedPeer && !isConnected) {
-				Logger(TAG).debug("GATT peer left before session handshake; preserving engagement and restarting advertising")
-				gattServer?.startAdvertising(gattAdvertiserListener)
-				return
-			}
-			if (!l2capSidecarOnly) reportDisconnected()
-		}
+    private val serverListener =
+        object : BleGattServerListener {
+            override fun onPeerConnecting() {
+                if (!l2capSidecarOnly) reportConnecting()
+            }
 
-		override fun onError(error: ProximityError) {
-			if (!l2capSidecarOnly) reportError(error)
-		}
+            override fun onPeerConnected() {
+                gattServer?.stopAdvertising()
+            }
 
-		override fun onDescriptorWriteRequest(descriptor: BleGattCharacteristicDescriptor): GattRequestResult {
-			Logger(TAG).debug("descriptor write request")
-			return super.onDescriptorWriteRequest(descriptor)
-		}
+            override fun onPeerDisconnected() {
+                if (l2capServerHasAcceptedPeer) {
+                    Logger(
+                        TAG,
+                    ).debug("Ignoring GATT disconnect after L2CAP accepted the peer; L2CAP owns session lifecycle")
+                    return
+                }
+                if (l2capFallbackToGatt && !l2capFallbackGattConnected) {
+                    Logger(
+                        TAG,
+                    ).debug(
+                        "Ignoring GATT disconnect before L2CAP-to-GATT fallback completed; keeping advertising available",
+                    )
+                    gattServer?.startAdvertising(gattAdvertiserListener)
+                    return
+                }
+                if (l2capServer != null && !l2capServerHasAcceptedPeer && !isConnected) {
+                    Logger(
+                        TAG,
+                    ).debug("GATT peer left before session handshake; preserving engagement and restarting advertising")
+                    gattServer?.startAdvertising(gattAdvertiserListener)
+                    return
+                }
+                if (!l2capSidecarOnly) reportDisconnected()
+            }
 
-		override fun onCharacteristicReadRequest(characteristic: BleGattCharacteristic): GattRequestResult {
-			return super.onCharacteristicReadRequest(characteristic)
-		}
+            override fun onError(error: ProximityError) {
+                if (!l2capSidecarOnly) reportError(error)
+            }
 
-		override fun onMtuChanged(mtu: Int) {
-			super.onMtuChanged(mtu)
-			// after the mtu was negotiated we can start sending data.
-//			reportConnected()
-		}
+            override fun onDescriptorWriteRequest(descriptor: BleGattCharacteristicDescriptor): GattRequestResult {
+                Logger(TAG).debug("descriptor write request")
+                return super.onDescriptorWriteRequest(descriptor)
+            }
 
-		override fun onCharacteristicWriteRequest(characteristic: BleGattCharacteristic): GattRequestResult {
-			if (l2capSidecarOnly) return GattRequestResult(isSuccessful = true)
-			if (characteristic.uuid == characteristicStateUuid) {
-				val value = characteristic.value
-				return when {
-					value == null -> {
-						reportError(ProximityError.Unknown("Value is null"))
-						GattRequestResult(isSuccessful = false)
-					}
-					value.size != 1 -> {
-						reportError(ProximityError.Unknown("Value has invalid size (${value.size})"))
-						GattRequestResult(isSuccessful = false)
-					}
-					value[0] == 0x02.toByte() -> {
-						reportTransportSpecificSessionTermination()
-						GattRequestResult(isSuccessful = true)
-					}
-					value[0] == 0x01.toByte() -> {
-						if (l2capFallbackToGatt) l2capFallbackGattConnected = true
-						reportConnected()
-						GattRequestResult(isSuccessful = true)
-					}
-					else -> {
-						reportError(ProximityError.Unknown("Invalid value for state characteristic ${value.toHexString()}"))
-						GattRequestResult(isSuccessful = false)
-					}
-				}
-			} else {
-				characteristic.value?.let { reportMessageReceived(it) }
-				return GattRequestResult(isSuccessful = true)
-			}
-		}
+            override fun onCharacteristicReadRequest(characteristic: BleGattCharacteristic): GattRequestResult =
+                super
+                    .onCharacteristicReadRequest(
+                        characteristic,
+                    )
 
-	}
+            override fun onMtuChanged(mtu: Int) {
+                super.onMtuChanged(mtu)
+                // after the mtu was negotiated we can start sending data.
+// 			reportConnected()
+            }
 
-	private val clientListener = object : BleGattClientListener {
-		override fun onPeerConnecting() {
-			if (!l2capSidecarOnly) reportConnecting()
-		}
+            override fun onCharacteristicWriteRequest(characteristic: BleGattCharacteristic): GattRequestResult {
+                if (l2capSidecarOnly) return GattRequestResult(isSuccessful = true)
+                if (characteristic.uuid == characteristicStateUuid) {
+                    val value = characteristic.value
+                    return when {
+                        value == null -> {
+                            reportError(ProximityError.Unknown("Value is null"))
+                            GattRequestResult(isSuccessful = false)
+                        }
 
-		override fun onPeerConnected() {
-			if (l2capSidecarOnly) return
-			if (l2capFallbackToGatt) l2capFallbackGattConnected = true
-			// We report connected as soon as we start writing
-			// the on the state characteristic (or rather when we receive the callback)
-			gattClient?.writeCharacteristicNonChunked(characteristicStateUuid, byteArrayOf(0x01));
-		}
+                        value.size != 1 -> {
+                            reportError(ProximityError.Unknown("Value has invalid size (${value.size})"))
+                            GattRequestResult(isSuccessful = false)
+                        }
 
-		override fun onPeerDisconnected() {
-			if (l2capSidecarOnly) return
-			gattClient?.apply {
-				setListener(null)
-				disconnect()
-				gattClient = null
-			}
-			reportDisconnected()
-		}
+                        value[0] == 0x02.toByte() -> {
+                            reportTransportSpecificSessionTermination()
+                            GattRequestResult(isSuccessful = true)
+                        }
 
-		override fun onMtuChanged(mtu: Int) {
-			Logger(TAG).debug("MTU changed: mtu=$mtu")
-			// TODO Read Ident characteristic
-		}
+                        value[0] == 0x01.toByte() -> {
+                            if (l2capFallbackToGatt) l2capFallbackGattConnected = true
+                            reportConnected()
+                            GattRequestResult(isSuccessful = true)
+                        }
 
-		override fun onError(error: ProximityError) {
-			if (!l2capSidecarOnly) reportError(error)
-		}
+                        else -> {
+                            reportError(
+                                ProximityError.Unknown("Invalid value for state characteristic ${value.toHexString()}"),
+                            )
+                            GattRequestResult(isSuccessful = false)
+                        }
+                    }
+                } else {
+                    characteristic.value?.let { reportMessageReceived(it) }
+                    return GattRequestResult(isSuccessful = true)
+                }
+            }
+        }
 
-		override fun onServicesDiscovered(services: List<BleGattService>): List<BleGattCharacteristic> {
-			if (l2capSidecarOnly) return emptyList()
-			val service = services.singleOrNull { it.uuid == serviceUuid }
-			Logger(TAG).debug("services discovered")
-			if (service != null) {
-				val stateCharacteristic = service.characteristics.singleOrNull { it.uuid == characteristicStateUuid }
-				if (stateCharacteristic == null) {
-					reportError(ProximityError.Unknown("State characteristic not found"))
-					return emptyList()
-				}
+    private val clientListener =
+        object : BleGattClientListener {
+            override fun onPeerConnecting() {
+                if (!l2capSidecarOnly) reportConnecting()
+            }
 
-				val client2ServerCharacteristic =
-					service.characteristics.singleOrNull { it.uuid == characteristicClient2ServerUuid }
-				if (client2ServerCharacteristic == null) {
-					reportError(ProximityError.Unknown("Client2Server characteristic not found"))
-					return emptyList()
-				}
+            override fun onPeerConnected() {
+                if (l2capSidecarOnly) return
+                if (l2capFallbackToGatt) l2capFallbackGattConnected = true
+                // We report connected as soon as we start writing
+                // the on the state characteristic (or rather when we receive the callback)
+                gattClient?.writeCharacteristicNonChunked(characteristicStateUuid, byteArrayOf(0x01))
+            }
 
-				val server2ClientCharacteristic =
-					service.characteristics.singleOrNull { it.uuid == characteristicServer2ClientUuid }
-				if (server2ClientCharacteristic == null) {
-					reportError(ProximityError.Unknown("Server2Client characteristic not found"))
-					return emptyList()
-				}
+            override fun onPeerDisconnected() {
+                if (l2capSidecarOnly) return
+                gattClient?.apply {
+                    setListener(null)
+                    disconnect()
+                    gattClient = null
+                }
+                reportDisconnected()
+            }
 
-				val identCharacteristic = service.characteristics.singleOrNull { it.uuid == characteristicIdentUuid }
-				if (identCharacteristic == null) {
-					reportError(ProximityError.Unknown("Ident characteristic not found"))
-					return emptyList()
-				}
-				Logger(TAG).debug("all ISO-18013-5 characteristics resolved")
-				return listOf(
-					stateCharacteristic,
-					client2ServerCharacteristic,
-					server2ClientCharacteristic,
-					identCharacteristic
-				)
-			} else {
-				reportError(ProximityError.Unknown("Service not found"))
-				return emptyList()
-			}
-		}
+            override fun onMtuChanged(mtu: Int) {
+                Logger(TAG).debug("MTU changed: mtu=$mtu")
+                // TODO Read Ident characteristic
+            }
 
-		override fun onCharacteristicRead(characteristic: BleGattCharacteristic) {
-			if (l2capSidecarOnly) return
-			// TODO Protocol specific stuff (handle Ident)
-			characteristic.value?.let { reportMessageReceived(it) }
-		}
+            override fun onError(error: ProximityError) {
+                if (!l2capSidecarOnly) reportError(error)
+            }
 
-		override fun onCharacteristicWrite(characteristic: BleGattCharacteristic) {
-			if (l2capSidecarOnly) return
-			if (characteristic.uuid == characteristicStateUuid) {
-				reportConnected()
-			}
-		}
+            override fun onServicesDiscovered(services: List<BleGattService>): List<BleGattCharacteristic> {
+                if (l2capSidecarOnly) return emptyList()
+                val service = services.singleOrNull { it.uuid == serviceUuid }
+                Logger(TAG).debug("services discovered")
+                if (service != null) {
+                    val stateCharacteristic =
+                        service.characteristics.singleOrNull {
+                            it.uuid == characteristicStateUuid
+                        }
+                    if (stateCharacteristic == null) {
+                        reportError(ProximityError.Unknown("State characteristic not found"))
+                        return emptyList()
+                    }
 
-		override fun onCharacteristicChanged(characteristic: BleGattCharacteristic) {
-			if (l2capSidecarOnly) return
-			if (characteristic.uuid == characteristicStateUuid) {
-				val value = characteristic.value
-				when {
-					value == null -> reportError(ProximityError.Unknown("Value is null"))
-					value.size != 1 -> reportError(ProximityError.Unknown("Value has invalid size (${value.size})"))
-					value[0] == 0x02.toByte() -> reportTransportSpecificSessionTermination()
-					else -> reportError(ProximityError.Unknown("Invalid value for state characteristic"))
-				}
-			} else {
-				characteristic.value?.let { reportMessageReceived(it) }
-			}
-		}
+                    val client2ServerCharacteristic =
+                        service.characteristics.singleOrNull { it.uuid == characteristicClient2ServerUuid }
+                    if (client2ServerCharacteristic == null) {
+                        reportError(ProximityError.Unknown("Client2Server characteristic not found"))
+                        return emptyList()
+                    }
 
-		override fun onDescriptorWrite(descriptor: BleGattCharacteristicDescriptor) {
-			Logger(TAG).debug("descriptor write complete")
-		}
-	}
+                    val server2ClientCharacteristic =
+                        service.characteristics.singleOrNull { it.uuid == characteristicServer2ClientUuid }
+                    if (server2ClientCharacteristic == null) {
+                        reportError(ProximityError.Unknown("Server2Client characteristic not found"))
+                        return emptyList()
+                    }
+
+                    val identCharacteristic =
+                        service.characteristics.singleOrNull {
+                            it.uuid == characteristicIdentUuid
+                        }
+                    if (identCharacteristic == null) {
+                        reportError(ProximityError.Unknown("Ident characteristic not found"))
+                        return emptyList()
+                    }
+                    Logger(TAG).debug("all ISO-18013-5 characteristics resolved")
+                    return listOf(
+                        stateCharacteristic,
+                        client2ServerCharacteristic,
+                        server2ClientCharacteristic,
+                        identCharacteristic,
+                    )
+                } else {
+                    reportError(ProximityError.Unknown("Service not found"))
+                    return emptyList()
+                }
+            }
+
+            override fun onCharacteristicRead(characteristic: BleGattCharacteristic) {
+                if (l2capSidecarOnly) return
+                // TODO Protocol specific stuff (handle Ident)
+                characteristic.value?.let { reportMessageReceived(it) }
+            }
+
+            override fun onCharacteristicWrite(characteristic: BleGattCharacteristic) {
+                if (l2capSidecarOnly) return
+                if (characteristic.uuid == characteristicStateUuid) {
+                    reportConnected()
+                }
+            }
+
+            override fun onCharacteristicChanged(characteristic: BleGattCharacteristic) {
+                if (l2capSidecarOnly) return
+                if (characteristic.uuid == characteristicStateUuid) {
+                    val value = characteristic.value
+                    when {
+                        value == null -> reportError(ProximityError.Unknown("Value is null"))
+                        value.size != 1 -> reportError(ProximityError.Unknown("Value has invalid size (${value.size})"))
+                        value[0] == 0x02.toByte() -> reportTransportSpecificSessionTermination()
+                        else -> reportError(ProximityError.Unknown("Invalid value for state characteristic"))
+                    }
+                } else {
+                    characteristic.value?.let { reportMessageReceived(it) }
+                }
+            }
+
+            override fun onDescriptorWrite(descriptor: BleGattCharacteristicDescriptor) {
+                Logger(TAG).debug("descriptor write complete")
+            }
+        }
 }

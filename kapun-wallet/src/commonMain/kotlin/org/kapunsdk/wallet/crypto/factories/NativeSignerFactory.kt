@@ -20,13 +20,11 @@ import org.kapunsdk.credentials.models.metadata.KeyMaterial
 import uniffi.kapun_wallet_rust.NativeSigner
 
 interface NativeSignerFactory {
-
-	fun createSigner(
-		keyMaterial: KeyMaterial,
-		pin: String? = null,
-		frostBlob: String? = null,
-		passphrase: String? = null,
-		email: String? = null
-	): NativeSigner?
-
+    fun createSigner(
+        keyMaterial: KeyMaterial,
+        pin: String? = null,
+        frostBlob: String? = null,
+        passphrase: String? = null,
+        email: String? = null,
+    ): NativeSigner?
 }

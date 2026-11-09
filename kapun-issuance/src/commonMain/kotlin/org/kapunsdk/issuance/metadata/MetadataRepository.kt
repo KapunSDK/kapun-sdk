@@ -16,103 +16,106 @@ under the License.
 
 package org.kapunsdk.issuance.metadata
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
+import kotlinx.coroutines.withContext
 import org.kapunsdk.issuance.credential.offer.CredentialOfferParameters
 import org.kapunsdk.issuance.di.KapunIssuanceKoinComponent
 import org.kapunsdk.issuance.metadata.data.CredentialIssuerMetadata
 import org.kapunsdk.issuance.metadata.data.CredentialIssuerMetadataClaims
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
-import kotlinx.coroutines.withContext
 import org.kapunsdk.util.extensions.transform
 import org.koin.core.component.inject
 
-class MetadataRepository: KapunIssuanceKoinComponent {
+class MetadataRepository : KapunIssuanceKoinComponent {
+    private val metadataService by inject<MetadataService>()
 
-	private val metadataService by inject<MetadataService>()
+    // TODO UBMW: Keep a cache of the metadata
 
-	// TODO UBMW: Keep a cache of the metadata
+    suspend fun getAuthorizationServerMetadata(baseUrl: String) =
+        withContext(Dispatchers.IO) {
+            val result = runCatching { metadataService.resolveOpenIdFederation(baseUrl) }.getOrNull()
+            result?.let {
+                val metadata = it.metadata.get("oauth_authorization_server")
+                metadata?.let {
+                    // TODO UBAM: remove force unwrap
+                    return@withContext metadata.transform()!!
+                }
+            }
 
-	suspend fun getAuthorizationServerMetadata(baseUrl: String) = withContext(Dispatchers.IO) {
-		val result = runCatching { metadataService.resolveOpenIdFederation(baseUrl) }.getOrNull()
-		result?.let {
-			val metadata = it.metadata.get("oauth_authorization_server")
-			metadata?.let {
-				//TODO UBAM: remove force unwrap
-				return@withContext metadata.transform()!!
-			}
-		}
+            val ietfUrl = MetadataService.ietfAuthorizationServerMetadataUrl(baseUrl)
+            runCatching { metadataService.doAuthorizationServerMetadataRequest(ietfUrl) }
+                .getOrNull()
+                ?.let { return@withContext it }
 
-        val ietfUrl = MetadataService.ietfAuthorizationServerMetadataUrl(baseUrl)
-        runCatching { metadataService.doAuthorizationServerMetadataRequest(ietfUrl) }
-            .getOrNull()
-            ?.let { return@withContext it }
+            val ietfFallbackUrl = MetadataService.ietfFallbackAuthorizationServerMetadataUrl(baseUrl)
+            runCatching { metadataService.doAuthorizationServerMetadataRequest(ietfFallbackUrl) }
+                .getOrNull()
+                ?.let { return@withContext it }
 
-        val ietfFallbackUrl = MetadataService.ietfFallbackAuthorizationServerMetadataUrl(baseUrl)
-        runCatching { metadataService.doAuthorizationServerMetadataRequest(ietfFallbackUrl) }
-            .getOrNull()
-            ?.let { return@withContext it }
+            val oidcUrl = MetadataService.oidcAuthorizationServerMetadataUrl(baseUrl)
+            runCatching { metadataService.doAuthorizationServerMetadataRequest(oidcUrl) }
+                .getOrNull()
+                ?.let { return@withContext it }
 
-        val oidcUrl = MetadataService.oidcAuthorizationServerMetadataUrl(baseUrl)
-        runCatching { metadataService.doAuthorizationServerMetadataRequest(oidcUrl) }
-            .getOrNull()
-            ?.let { return@withContext it }
+            val oidcFallbackUrl = MetadataService.oidcFallbackAuthorizationServerMetadataUrl(baseUrl)
+            metadataService.doAuthorizationServerMetadataRequest(oidcFallbackUrl)
+        }
 
-        val oidcFallbackUrl = MetadataService.oidcFallbackAuthorizationServerMetadataUrl(baseUrl)
-		metadataService.doAuthorizationServerMetadataRequest(oidcFallbackUrl)
-	}
+    suspend fun getCredentialIssuerMetadata(baseUrl: String): CredentialIssuerMetadata =
+        withContext(Dispatchers.IO) {
+            val result = runCatching { metadataService.resolveOpenIdFederation(baseUrl) }.getOrNull()
+            result?.let {
+                // TODO UBAM: remove force unwrap
+                val metadata = it.metadata.get("openid_credential_issuer")
+                metadata?.let {
+                    val claims = metadata.transform<CredentialIssuerMetadataClaims>()!!
+                    return@withContext CredentialIssuerMetadata.Unsigned(claims)
+                }
+            }
 
-	suspend fun getCredentialIssuerMetadata(baseUrl: String): CredentialIssuerMetadata = withContext(Dispatchers.IO) {
-		val result = runCatching { metadataService.resolveOpenIdFederation(baseUrl) }.getOrNull()
-		result?.let {
-			//TODO UBAM: remove force unwrap
-			val metadata = it.metadata.get("openid_credential_issuer")
-			metadata?.let {
-                val claims = metadata.transform<CredentialIssuerMetadataClaims>()!!
-				return@withContext CredentialIssuerMetadata.Unsigned(claims)
-			}
-		}
+            // Try IETF Approach
+            // https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#name-credential-issuer-metadata-
+            val ietfUrl = MetadataService.ietfCredentialIssuerEndpoint(baseUrl)
+            runCatching { metadataService.doCredentialIssuerMetadataRequest(ietfUrl, signed = true) }
+                .getOrNull()
+                ?.let { return@withContext it }
+            runCatching { metadataService.doCredentialIssuerMetadataRequest(ietfUrl, signed = false) }
+                .getOrNull()
+                ?.let { return@withContext it }
 
-        // Try IETF Approach
-        // https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#name-credential-issuer-metadata-
-        val ietfUrl = MetadataService.ietfCredentialIssuerEndpoint(baseUrl)
-        runCatching { metadataService.doCredentialIssuerMetadataRequest(ietfUrl, signed = true) }
-            .getOrNull()
-            ?.let { return@withContext it }
-        runCatching { metadataService.doCredentialIssuerMetadataRequest(ietfUrl, signed = false) }
-            .getOrNull()
-            ?.let { return@withContext it }
+            // Try OIDC Approach
+            // https://openid.net/specs/openid-connect-discovery-1_0-final.html#ProviderConfig
+            val oidcUrl = MetadataService.oidcCredentialIssuerEndpoint(baseUrl)
+            runCatching { metadataService.doCredentialIssuerMetadataRequest(oidcUrl, signed = true) }
+                .getOrNull()
+                ?.let { return@withContext it }
+            metadataService.doCredentialIssuerMetadataRequest(oidcUrl, signed = false)
+        }
 
-        // Try OIDC Approach
-        // https://openid.net/specs/openid-connect-discovery-1_0-final.html#ProviderConfig
-        val oidcUrl = MetadataService.oidcCredentialIssuerEndpoint(baseUrl)
-        runCatching { metadataService.doCredentialIssuerMetadataRequest(oidcUrl, signed = true) }
-            .getOrNull()
-            ?.let { return@withContext it }
-        metadataService.doCredentialIssuerMetadataRequest(oidcUrl, signed = false)
-	}
+    fun getAuthorizationServerBaseUrl(
+        authorizationServers: List<String>,
+        credentialOfferParameters: CredentialOfferParameters,
+    ): String? {
+        val expectedAuthServer =
+            credentialOfferParameters.grants?.let {
+                it.preAuthorizedCode?.authorizationServer ?: it.authorizationCode?.authorizationServer
+            }
 
-	fun getAuthorizationServerBaseUrl(
-		authorizationServers: List<String>,
-		credentialOfferParameters: CredentialOfferParameters,
-	): String? {
-		val expectedAuthServer = credentialOfferParameters.grants?.let {
-			it.preAuthorizedCode?.authorizationServer ?: it.authorizationCode?.authorizationServer
-		}
+        return when {
+            expectedAuthServer != null -> {
+                // If a specific auth server is expected, return it if it is in the list
+                expectedAuthServer.takeIf { authorizationServers.contains(it) }
+            }
 
-		return when {
-			expectedAuthServer != null -> {
-				// If a specific auth server is expected, return it if it is in the list
-				expectedAuthServer.takeIf { authorizationServers.contains(it) }
-			}
-			authorizationServers.isNotEmpty() -> {
-				// Fallback to the first authorization server
-				authorizationServers.first()
-			}
-			else -> {
-				// Fallback to the credential issuer
-				credentialOfferParameters.credentialIssuer
-			}
-		}
-	}
+            authorizationServers.isNotEmpty() -> {
+                // Fallback to the first authorization server
+                authorizationServers.first()
+            }
 
+            else -> {
+                // Fallback to the credential issuer
+                credentialOfferParameters.credentialIssuer
+            }
+        }
+    }
 }

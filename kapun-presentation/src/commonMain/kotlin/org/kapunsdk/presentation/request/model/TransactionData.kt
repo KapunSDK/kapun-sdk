@@ -30,5 +30,5 @@ data class TransactionData(
     @SerialName("QC_hash")
     val qcHash: String?,
     @SerialName("QC_hashAlgorithmOID")
-    val qcHashAlgorithmOid: String?
+    val qcHashAlgorithmOid: String?,
 )

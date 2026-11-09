@@ -19,7 +19,7 @@ package org.kapunsdk.trust.framework.oid4vp
 import org.kapunsdk.trust.framework.DomainTrustAnchorProvider
 
 class StaticDomainTrustAnchorProvider(
-    private val trustedDomains: List<String> = listOf()
+    private val trustedDomains: List<String> = listOf(),
 ) : DomainTrustAnchorProvider {
     override fun isTrusted(domain: String): Boolean = trustedDomains.contains(domain)
 }

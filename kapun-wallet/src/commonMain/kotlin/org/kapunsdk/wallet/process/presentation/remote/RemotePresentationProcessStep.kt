@@ -28,40 +28,39 @@ import org.kapunsdk.wallet.process.presentation.ErrorModel
 import org.kapunsdk.wallet.process.presentation.PresentationStep
 
 sealed interface RemotePresentationProcessStep : ProcessStep {
+    data class Error(
+        val errorMessage: String,
+        val errorCode: String? = null,
+        val cause: Exception? = null,
+        val retry: (() -> Unit)? = null,
+    ) : RemotePresentationProcessStep
 
-	data class Error(
-		val errorMessage: String,
-		val errorCode: String? = null,
-		val cause: Exception? = null,
-		val retry: (() -> Unit)? = null,
-	) : RemotePresentationProcessStep
+    data class ConnectionDetails(
+        val agentInformation: AgentInformation,
+    ) : RemotePresentationProcessStep
 
-	data class ConnectionDetails(
-		val agentInformation: AgentInformation,
-	) : RemotePresentationProcessStep
+    sealed interface QesProcessStep : ProcessStep {
+        data class Preview(
+            val agentInformation: AgentInformation,
+        ) : QesProcessStep
 
-	sealed interface QesProcessStep : ProcessStep {
-		data class Preview(
-			val agentInformation: AgentInformation,
-		) : QesProcessStep
+        data class CreationAcceptance(
+            val agentInformation: AgentInformation,
+            val documents: List<TransactionData>,
+        ) : QesProcessStep
 
-		data class CreationAcceptance(
-			val agentInformation: AgentInformation,
-			val documents: List<TransactionData>
-		) : QesProcessStep
+        data class SignDocument(
+            val agentInformation: AgentInformation,
+            val documents: List<DocumentDigest>,
+        ) : QesProcessStep
+    }
 
-		data class SignDocument(
-			val agentInformation: AgentInformation,
-			val documents: List<DocumentDigest>
-		) : QesProcessStep
-	}
-
-	data class CredentialSelection(
-		override val presentationModel: PresentationUiModel,
-		override val agentInformation: AgentInformation,
-		override val validationInfo: ValidationInfo? = null
-	) : RemotePresentationProcessStep, PresentationStep.CredentialSelection
-
+    data class CredentialSelection(
+        override val presentationModel: PresentationUiModel,
+        override val agentInformation: AgentInformation,
+        override val validationInfo: ValidationInfo? = null,
+    ) : RemotePresentationProcessStep,
+        PresentationStep.CredentialSelection
 
     data class OutOfTokens(
         val isRefreshable: Boolean,
@@ -69,29 +68,30 @@ sealed interface RemotePresentationProcessStep : ProcessStep {
         val error: ErrorModel? = null,
     ) : RemotePresentationProcessStep
 
-	data class EnterPin(
-		val viewModel: Map.Entry<String, CredentialSelectionUiModel>,
-		val credentialsWithPin: MutableList<Map.Entry<String, CredentialSelectionUiModel>>,
-		val credentialsWithFrost: MutableList<Map.Entry<String, CredentialSelectionUiModel>>,
-		val needsBiometry: Boolean = false,
-		val error: PresentationError? = null,
-	) : RemotePresentationProcessStep
+    data class EnterPin(
+        val viewModel: Map.Entry<String, CredentialSelectionUiModel>,
+        val credentialsWithPin: MutableList<Map.Entry<String, CredentialSelectionUiModel>>,
+        val credentialsWithFrost: MutableList<Map.Entry<String, CredentialSelectionUiModel>>,
+        val needsBiometry: Boolean = false,
+        val error: PresentationError? = null,
+    ) : RemotePresentationProcessStep
 
-	data class EnterPassphrase(
-		val viewModel: Map.Entry<String, CredentialSelectionUiModel>,
-		val credentialsWithFrost: MutableList<Map.Entry<String, CredentialSelectionUiModel>>,
-		val error: PresentationError? = null,
-	) : RemotePresentationProcessStep
+    data class EnterPassphrase(
+        val viewModel: Map.Entry<String, CredentialSelectionUiModel>,
+        val credentialsWithFrost: MutableList<Map.Entry<String, CredentialSelectionUiModel>>,
+        val error: PresentationError? = null,
+    ) : RemotePresentationProcessStep
 
-	data class DcApiSuccess(val token: String) : RemotePresentationProcessStep
+    data class DcApiSuccess(
+        val token: String,
+    ) : RemotePresentationProcessStep
 
-	data class Success(
-		val message: String,
-		val redirectUri: String? = null,
-		val presentationScope: String? = null,
-		val authSession: String? = null,
-		val pdiSession: String? = null,
-		val isQes: Boolean = false,
-	) : RemotePresentationProcessStep
-
+    data class Success(
+        val message: String,
+        val redirectUri: String? = null,
+        val presentationScope: String? = null,
+        val authSession: String? = null,
+        val pdiSession: String? = null,
+        val isQes: Boolean = false,
+    ) : RemotePresentationProcessStep
 }

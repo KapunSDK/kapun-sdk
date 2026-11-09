@@ -17,5 +17,6 @@ under the License.
 package org.kapunsdk.credentials.models.metadata
 
 enum class KeyStorage {
-	Local, Cloud
+    Local,
+    Cloud,
 }

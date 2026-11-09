@@ -11,7 +11,7 @@ software distributed under the License is distributed on an
 "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
-under the License.   
+under the License.
  */
 package org.kapunsdk.sample.wallet.compose.components
 
@@ -29,55 +29,54 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalInspectionMode
-import org.kapunsdk.sample.wallet.utils.QrCodeGenerator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.kapunsdk.sample.wallet.utils.QrCodeGenerator
 
 @Composable
 fun QrCodeImage(
-	content: String,
-	modifier: Modifier = Modifier,
+    content: String,
+    modifier: Modifier = Modifier,
 ) {
-	val bitmapState = rememberQrCodeBitmap(content)
+    val bitmapState = rememberQrCodeBitmap(content)
 
-	AnimatedContent(
-		targetState = bitmapState.value,
-		transitionSpec = {
-			fadeIn(animationSpec = tween(220, delayMillis = 90)) togetherWith fadeOut(animationSpec = tween(90))
-		}
-	) { bitmap ->
-		if (bitmap != null) {
-			Image(
-				bitmap = bitmap,
-				contentDescription = null,
-				modifier = modifier
-			)
-		} else {
-			Box(
-				modifier = modifier,
-				contentAlignment = Alignment.Center,
-			) {
-				CircularProgressIndicator()
-			}
-		}
-	}
+    AnimatedContent(
+        targetState = bitmapState.value,
+        transitionSpec = {
+            fadeIn(animationSpec = tween(220, delayMillis = 90)) togetherWith fadeOut(animationSpec = tween(90))
+        },
+    ) { bitmap ->
+        if (bitmap != null) {
+            Image(
+                bitmap = bitmap,
+                contentDescription = null,
+                modifier = modifier,
+            )
+        } else {
+            Box(
+                modifier = modifier,
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator()
+            }
+        }
+    }
 }
 
 @Composable
-private fun rememberQrCodeBitmap(content: String): State<ImageBitmap?> {
-	return if (LocalInspectionMode.current) {
-		// Render synchronously for the inspection preview
-		val bitmap = QrCodeGenerator.createQRCode(content)
-		remember { mutableStateOf(bitmap?.asImageBitmap()) }
-	} else {
-		// Render asynchronously in normal mode
-		val initial: ImageBitmap? = null
-		produceState(initialValue = initial) {
-			// Produce the bitmap state on the IO dispatcher because rendering can take quite a few milliseconds
-			withContext(Dispatchers.IO) {
-				val bitmap = QrCodeGenerator.createQRCode(content)
-				value = bitmap?.asImageBitmap()
-			}
-		}
-	}
-}
+private fun rememberQrCodeBitmap(content: String): State<ImageBitmap?> =
+    if (LocalInspectionMode.current) {
+        // Render synchronously for the inspection preview
+        val bitmap = QrCodeGenerator.createQRCode(content)
+        remember { mutableStateOf(bitmap?.asImageBitmap()) }
+    } else {
+        // Render asynchronously in normal mode
+        val initial: ImageBitmap? = null
+        produceState(initialValue = initial) {
+            // Produce the bitmap state on the IO dispatcher because rendering can take quite a few milliseconds
+            withContext(Dispatchers.IO) {
+                val bitmap = QrCodeGenerator.createQRCode(content)
+                value = bitmap?.asImageBitmap()
+            }
+        }
+    }

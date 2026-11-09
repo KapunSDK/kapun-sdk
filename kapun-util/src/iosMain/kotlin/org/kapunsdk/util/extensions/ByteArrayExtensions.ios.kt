@@ -11,7 +11,7 @@ software distributed under the License is distributed on an
 "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
-under the License.   
+under the License.
  */
 @file:OptIn(ExperimentalForeignApi::class)
 
@@ -24,11 +24,11 @@ import platform.Foundation.NSData
 import platform.Foundation.dataWithBytes
 
 @OptIn(ExperimentalForeignApi::class)
-fun ByteArray.toData() : NSData {
-	if (this.isEmpty()) {
-		return NSData()
-	}
-	return this.usePinned {
-		NSData.dataWithBytes(it.addressOf(0), it.get().size.toULong())
-	}
+fun ByteArray.toData(): NSData {
+    if (this.isEmpty()) {
+        return NSData()
+    }
+    return this.usePinned {
+        NSData.dataWithBytes(it.addressOf(0), it.get().size.toULong())
+    }
 }

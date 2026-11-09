@@ -11,7 +11,7 @@ software distributed under the License is distributed on an
 "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
-under the License.   
+under the License.
  */
 package org.kapunsdk.sample.verifier.feature.bluetooth
 
@@ -33,81 +33,90 @@ import org.kapunsdk.sample.verifier.feature.scanner.QrScannerViewModel
 import org.koin.androidx.viewmodel.ext.android.viewModel
 
 class BluetoothFragment : Fragment() {
+    companion object {
+        val TAG = "BluetoothFragment"
 
-	companion object {
-		val TAG = "BluetoothFragment"
+        fun newInstance() = BluetoothFragment()
+    }
 
-		fun newInstance() = BluetoothFragment()
-	}
+    private val viewModel by viewModel<BluetoothViewModel>()
 
-	private val viewModel by viewModel<BluetoothViewModel>()
+    private val qrScannerViewModel by viewModel<QrScannerViewModel>()
 
-	private val qrScannerViewModel by viewModel<QrScannerViewModel>()
+    private var _binding: FragmentComposeBinding? = null
+    private val binding get() = _binding!!
 
-	private var _binding: FragmentComposeBinding? = null
-	private val binding get() = _binding!!
+    private val launcher =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
+            if (permissions.all { it.value }) {
+                locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+            }
+        }
 
-	private val launcher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
-		if (permissions.all { it.value }) {
-			locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-		}
-	}
+    private val locationPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) {
+                // TODO Handle permissions properly?
+            }
+        }
 
-	private val locationPermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-		if (granted) {
-			// TODO Handle permissions properly?
-		}
-	}
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?,
+    ): View {
+        _binding = FragmentComposeBinding.inflate(inflater, container, false)
+        return binding.root
+    }
 
-	override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
-		_binding = FragmentComposeBinding.inflate(inflater, container, false)
-		return binding.root
-	}
+    override fun onViewCreated(
+        view: View,
+        savedInstanceState: Bundle?,
+    ) {
+        super.onViewCreated(view, savedInstanceState)
+        launcher.launch(
+            arrayOf(
+                Manifest.permission.BLUETOOTH,
+                Manifest.permission.BLUETOOTH_SCAN,
+                Manifest.permission.BLUETOOTH_ADVERTISE,
+                Manifest.permission.BLUETOOTH_CONNECT,
+            ),
+        )
+        binding.composeView.setContent {
+            KapunTheme {
+                BluetoothScreen(
+                    state = viewModel.bluetoothState.collectAsState(),
+                    log = viewModel.bluetoothLog.collectAsState(),
+                    proofTemplate = viewModel.proofTemplate.collectAsState(),
+                    onProofTemplateChanged = viewModel::updateProofTemplate,
+                    onStartServer = viewModel::startServerMode,
+                    onStartClient = viewModel::startClientMode,
+                    qrScannerViewModel = qrScannerViewModel,
+                    scannerCallbacks =
+                        object : QrScannerScreenCallbacks {
+                            override fun onPermissionInSettingsChange() {
+                                val intent =
+                                    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                                        .addCategory(Intent.CATEGORY_DEFAULT)
+                                        .setData(Uri.parse("package:${requireContext().packageName}"))
+                                startActivity(intent)
+                            }
 
-	override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-		super.onViewCreated(view, savedInstanceState)
-		launcher.launch(
-			arrayOf(
-				Manifest.permission.BLUETOOTH,
-				Manifest.permission.BLUETOOTH_SCAN,
-				Manifest.permission.BLUETOOTH_ADVERTISE,
-				Manifest.permission.BLUETOOTH_CONNECT,
-			)
-		)
-		binding.composeView.setContent {
-			KapunTheme {
-				BluetoothScreen(
-					state = viewModel.bluetoothState.collectAsState(),
-					log = viewModel.bluetoothLog.collectAsState(),
-					proofTemplate = viewModel.proofTemplate.collectAsState(),
-					onProofTemplateChanged = viewModel::updateProofTemplate,
-					onStartServer = viewModel::startServerMode,
-					onStartClient = viewModel::startClientMode,
-					qrScannerViewModel = qrScannerViewModel,
-					scannerCallbacks = object : QrScannerScreenCallbacks {
-						override fun onPermissionInSettingsChange() {
-							val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
-								.addCategory(Intent.CATEGORY_DEFAULT)
-								.setData(Uri.parse("package:${requireContext().packageName}"))
-							startActivity(intent)
-						}
+                            override fun onSuccess(data: String) {
+                                viewModel.startEngagement(data)
+                            }
+                        },
+                    sendMessage = viewModel::sendMessage,
+                    onStopClicked = viewModel::stop,
+                    onResetClicked = viewModel::reset,
+                    onReverseEngagmentClicked = viewModel::startReverseEngagement,
+                )
+            }
+        }
+    }
 
-						override fun onSuccess(data: String) {
-							viewModel.startEngagement(data)
-						}
-					},
-					sendMessage = viewModel::sendMessage,
-					onStopClicked = viewModel::stop,
-					onResetClicked = viewModel::reset,
-					onReverseEngagmentClicked = viewModel::startReverseEngagement
-				)
-			}
-		}
-	}
-
-	override fun onDestroyView() {
-		super.onDestroyView()
-		_binding = null
-	}
-
+    override fun onDestroyView() {
+        super.onDestroyView()
+        _binding = null
+    }
 }

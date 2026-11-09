@@ -17,82 +17,90 @@ under the License.
 package org.kapunsdk.wallet.credentials.identity
 
 import org.kapunsdk.credentials.models.credential.CredentialModel
+import org.kapunsdk.visualization.layout.LayoutData
+import org.kapunsdk.wallet.credentials.ViewModelFactory
 import org.kapunsdk.wallet.credentials.activity.ActivityUiModel
 import org.kapunsdk.wallet.credentials.credential.CredentialUiModel
 import org.kapunsdk.wallet.credentials.signature.Signature
-import org.kapunsdk.visualization.layout.LayoutData
-import org.kapunsdk.wallet.credentials.ViewModelFactory
 
 sealed interface IdentityUiModel {
-	val id : Long
-	val isUsable: Boolean
-	val name: String
-	val docType: String
-	val hasEmergencyPass: Boolean
-	val hasOnlyEmergencyPass: Boolean
-	val card: LayoutData.Card
-	val isPid: Boolean
-	val title: String
-	val subtitle: String
-	val credentials: List<CredentialModel>
-	val activities: List<ActivityUiModel>
-	val isRevoked: Boolean
-	val isRefreshable: Boolean
-	val frostBlob: String?
-	var credentialUiModel : List<CredentialUiModel>
-	fun getCredentialUiModel(viewModelFactory: ViewModelFactory) : List<CredentialUiModel> {
-		if (credentialUiModel.isEmpty() || credentialUiModel.size != credentials.size) {
-			credentialUiModel = credentials.map { viewModelFactory.getCredentialViewModel(it, frostBlob) }
-		}
-		return credentialUiModel
-	}
-	fun getCredentialUiModelForSingle(cred: CredentialModel, viewModelFactory: ViewModelFactory) : CredentialUiModel {
-		return viewModelFactory.getCredentialViewModel(cred, frostBlob)
-	}
-	fun getCredentialUiModelForCredentialId(credId: Long, viewModelFactory: ViewModelFactory) : CredentialUiModel? {
-		val cred = credentials.firstOrNull{ it.id == credId } ?: return null
-		return viewModelFactory.getCredentialViewModel(cred, frostBlob)
-	}
-	data class IdentityUiCredentialModel(
-		override val id: Long,
-		override val name: String,
-		override val card: LayoutData.Card,
-		override val title: String,
-		override val subtitle: String,
-		val signature: Signature,
-		val detailList: LayoutData.DetailList,
-		override val hasEmergencyPass: Boolean,
-		override val hasOnlyEmergencyPass: Boolean,
-		override val credentials: List<CredentialModel>,
-		override val activities: List<ActivityUiModel>,
-		override val isPid: Boolean,
-		override val isUsable: Boolean,
-		override val isRevoked: Boolean,
-		override val isRefreshable: Boolean,
-		override val docType: String,
-		override val frostBlob: String?,
-		override var credentialUiModel: List<CredentialUiModel>,
-		) : IdentityUiModel
-	data class IdentityUiDeferredModel(
-		override val id: Long,
-		override val name : String,
-		override val isUsable: Boolean,
-		val transactionId: String,
-		override val docType: String,
-		override val hasEmergencyPass: Boolean = false,
-		override val hasOnlyEmergencyPass: Boolean = false,
-		override val card: LayoutData.Card,
-		override val isPid: Boolean = false,
-		override val title: String = card.title ?: "",
-		override val subtitle: String = card.subtitle ?: "",
-		override val credentials: List<CredentialModel> = emptyList(),
-		override val activities: List<ActivityUiModel> = emptyList(),
-		override val isRevoked: Boolean = false,
-		override val isRefreshable: Boolean = false,
-		override val frostBlob: String?,
-		override var credentialUiModel: List<CredentialUiModel>,
-	) : IdentityUiModel
-	fun isDeferred() : Boolean {
-		return this is IdentityUiDeferredModel
-	}
+    val id: Long
+    val isUsable: Boolean
+    val name: String
+    val docType: String
+    val hasEmergencyPass: Boolean
+    val hasOnlyEmergencyPass: Boolean
+    val card: LayoutData.Card
+    val isPid: Boolean
+    val title: String
+    val subtitle: String
+    val credentials: List<CredentialModel>
+    val activities: List<ActivityUiModel>
+    val isRevoked: Boolean
+    val isRefreshable: Boolean
+    val frostBlob: String?
+    var credentialUiModel: List<CredentialUiModel>
+
+    fun getCredentialUiModel(viewModelFactory: ViewModelFactory): List<CredentialUiModel> {
+        if (credentialUiModel.isEmpty() || credentialUiModel.size != credentials.size) {
+            credentialUiModel = credentials.map { viewModelFactory.getCredentialViewModel(it, frostBlob) }
+        }
+        return credentialUiModel
+    }
+
+    fun getCredentialUiModelForSingle(
+        cred: CredentialModel,
+        viewModelFactory: ViewModelFactory,
+    ): CredentialUiModel = viewModelFactory.getCredentialViewModel(cred, frostBlob)
+
+    fun getCredentialUiModelForCredentialId(
+        credId: Long,
+        viewModelFactory: ViewModelFactory,
+    ): CredentialUiModel? {
+        val cred = credentials.firstOrNull { it.id == credId } ?: return null
+        return viewModelFactory.getCredentialViewModel(cred, frostBlob)
+    }
+
+    data class IdentityUiCredentialModel(
+        override val id: Long,
+        override val name: String,
+        override val card: LayoutData.Card,
+        override val title: String,
+        override val subtitle: String,
+        val signature: Signature,
+        val detailList: LayoutData.DetailList,
+        override val hasEmergencyPass: Boolean,
+        override val hasOnlyEmergencyPass: Boolean,
+        override val credentials: List<CredentialModel>,
+        override val activities: List<ActivityUiModel>,
+        override val isPid: Boolean,
+        override val isUsable: Boolean,
+        override val isRevoked: Boolean,
+        override val isRefreshable: Boolean,
+        override val docType: String,
+        override val frostBlob: String?,
+        override var credentialUiModel: List<CredentialUiModel>,
+    ) : IdentityUiModel
+
+    data class IdentityUiDeferredModel(
+        override val id: Long,
+        override val name: String,
+        override val isUsable: Boolean,
+        val transactionId: String,
+        override val docType: String,
+        override val hasEmergencyPass: Boolean = false,
+        override val hasOnlyEmergencyPass: Boolean = false,
+        override val card: LayoutData.Card,
+        override val isPid: Boolean = false,
+        override val title: String = card.title ?: "",
+        override val subtitle: String = card.subtitle ?: "",
+        override val credentials: List<CredentialModel> = emptyList(),
+        override val activities: List<ActivityUiModel> = emptyList(),
+        override val isRevoked: Boolean = false,
+        override val isRefreshable: Boolean = false,
+        override val frostBlob: String?,
+        override var credentialUiModel: List<CredentialUiModel>,
+    ) : IdentityUiModel
+
+    fun isDeferred(): Boolean = this is IdentityUiDeferredModel
 }

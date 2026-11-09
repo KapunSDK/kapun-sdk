@@ -20,7 +20,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 enum class ImageType {
-	Regular,
-	Logo,
-	Icon
+    Regular,
+    Logo,
+    Icon,
 }

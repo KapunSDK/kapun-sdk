@@ -16,28 +16,28 @@ under the License.
 
 package org.kapunsdk.credentials.models.credential
 
-import org.kapunsdk.credentials.models.metadata.KeyMaterial
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import org.kapunsdk.credentials.models.metadata.KeyMaterial
 
 @Serializable
-data class CredentialMetadata(val keyMaterial: KeyMaterial, val credentialType: CredentialType) {
+data class CredentialMetadata(
+    val keyMaterial: KeyMaterial,
+    val credentialType: CredentialType,
+) {
+    companion object {
+        fun fromString(metadata: String): CredentialMetadata? =
+            try {
+                Json.decodeFromString(metadata)
+            } catch (e: Exception) {
+                null
+            }
 
-	companion object {
-		fun fromString(metadata: String): CredentialMetadata? {
-			return try {
-				Json.decodeFromString(metadata)
-			} catch (e: Exception) {
-				null
-			}
-		}
-		fun fromStringToList(metadatas: String) : List<CredentialMetadata>? {
-			return try {
-				Json.decodeFromString(metadatas)
-			} catch (e: Exception) {
-				null
-			}
-		}
-	}
-
+        fun fromStringToList(metadatas: String): List<CredentialMetadata>? =
+            try {
+                Json.decodeFromString(metadatas)
+            } catch (e: Exception) {
+                null
+            }
+    }
 }

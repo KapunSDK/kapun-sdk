@@ -16,19 +16,19 @@ under the License.
 
 package org.kapunsdk.util.json
 
-import org.kapunsdk.credentials.BbsPresentation
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import org.kapunsdk.credentials.BbsPresentation
 import uniffi.kapun_crypto_rust.base64UrlDecode
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class BbsTests {
-    final val ISSUER_PK =
+    final val issuerPk =
         "zUC78mVmVdBVqXy8TwzdweZ4Wov3yYSUWu3fjePGajPUXPuXNcnzVQEjVDpXuBDomHiy3ni1YWP9QDqKUehjiuSL1ibCmqXu1nZXTvxYv1qLVRS3K49Kv4WgsoTCWJjjQ3PgvFM"
 
     @Test
@@ -40,23 +40,24 @@ class BbsTests {
 
         assertTrue(presentation.getNumDisclosed() < presentation.getOriginalNumClaims())
 
-        val body = presentation.verify(
-            "[{ \"type\": \"required\", \"key\": \"http://schema.org/name\" }]",
-            mapOf(),
-            ISSUER_PK,
-            "did:example:issuer0",
-            "did:example:issuer0#bls12_381-g2-pub001",
-            // sha256("Hello, World")
-            dbMessage = base64UrlDecode("A2daxT_5zRU1zMffzfosRYxSGDcfQY3BNvLRmsH76KU"),
-            dbSecpLabel = "secp".encodeToByteArray(),
-            dbTomLabel = "tom".encodeToByteArray(),
-            dbBlsLabel = "bls".encodeToByteArray(),
-            dbBppSetupLabel = "bpp".encodeToByteArray()
-        )
+        val body =
+            presentation.verify(
+                "[{ \"type\": \"required\", \"key\": \"http://schema.org/name\" }]",
+                mapOf(),
+                issuerPk,
+                "did:example:issuer0",
+                "did:example:issuer0#bls12_381-g2-pub001",
+                // sha256("Hello, World")
+                dbMessage = base64UrlDecode("A2daxT_5zRU1zMffzfosRYxSGDcfQY3BNvLRmsH76KU"),
+                dbSecpLabel = "secp".encodeToByteArray(),
+                dbTomLabel = "tom".encodeToByteArray(),
+                dbBlsLabel = "bls".encodeToByteArray(),
+                dbBppSetupLabel = "bpp".encodeToByteArray(),
+            )
         var claims = Json.decodeFromString<JsonElement>(body)
         assertEquals(
             "John Doe",
-            claims.jsonObject["http://schema.org/name"]?.jsonPrimitive?.contentOrNull
+            claims.jsonObject["http://schema.org/name"]?.jsonPrimitive?.contentOrNull,
         )
     }
 }

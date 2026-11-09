@@ -19,6 +19,7 @@ package org.kapunsdk.proximity.protocol.mdl
 import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.module
 
-internal actual val iso180135Module = module {
-    singleOf(::MdlCharacteristicsFactory)
-}
+internal actual val iso180135Module =
+    module {
+        singleOf(::MdlCharacteristicsFactory)
+    }

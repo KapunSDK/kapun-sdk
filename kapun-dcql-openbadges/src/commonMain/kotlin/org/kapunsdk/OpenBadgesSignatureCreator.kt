@@ -23,6 +23,7 @@ internal fun CoreSignatureCreator?.asNativeOpenBadgesSignatureCreator(): NativeO
     this?.let { delegate ->
         object : NativeOpenBadgesSignatureCreator {
             override fun alg(): String = delegate.alg()
+
             override fun sign(bytes: ByteArray): ByteArray = delegate.sign(bytes)
         }
     }

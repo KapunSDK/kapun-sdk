@@ -16,32 +16,34 @@ under the License.
 
 package org.kapunsdk.visualization.oca.model.content
 
-import org.kapunsdk.visualization.oca.serialization.AttributeTypeSerializer
 import kotlinx.serialization.Serializable
+import org.kapunsdk.visualization.oca.serialization.AttributeTypeSerializer
 
 @Serializable(with = AttributeTypeSerializer::class)
 sealed interface AttributeType {
-	@Serializable
-	data object Text : AttributeType
+    @Serializable
+    data object Text : AttributeType
 
-	@Serializable
-	data object Numeric : AttributeType
+    @Serializable
+    data object Numeric : AttributeType
 
-	@Serializable
-	data object Reference : AttributeType
+    @Serializable
+    data object Reference : AttributeType
 
-	@Serializable
-	data object Boolean : AttributeType
+    @Serializable
+    data object Boolean : AttributeType
 
-	@Serializable
-	data object Binary : AttributeType
+    @Serializable
+    data object Binary : AttributeType
 
-	@Serializable
-	data object DateTime : AttributeType
+    @Serializable
+    data object DateTime : AttributeType
 
-	@Serializable
-	data class Array(val contentType: AttributeType) : AttributeType
+    @Serializable
+    data class Array(
+        val contentType: AttributeType,
+    ) : AttributeType
 
-	@Serializable
-	data object Unknown : AttributeType
+    @Serializable
+    data object Unknown : AttributeType
 }

@@ -16,5 +16,4 @@ under the License.
 
 package org.kapunsdk.trust.framework
 
-interface DomainTrustAnchorProvider : TrustAnchorProvider<String> {
-}
+interface DomainTrustAnchorProvider : TrustAnchorProvider<String>

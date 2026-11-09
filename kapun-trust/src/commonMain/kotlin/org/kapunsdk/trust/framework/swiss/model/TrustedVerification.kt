@@ -20,13 +20,13 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 class TrustedVerification(
-	val vct: String,
-	val iss: String,
-	val sub: String,
-	val iat: Long,
-	val nbf: Long,
-	val exp: Long,
-	val status: String?,
-	val schemaId: String,
-	val schemaIds: List<String>? = null
+    val vct: String,
+    val iss: String,
+    val sub: String,
+    val iat: Long,
+    val nbf: Long,
+    val exp: Long,
+    val status: String?,
+    val schemaId: String,
+    val schemaIds: List<String>? = null,
 )

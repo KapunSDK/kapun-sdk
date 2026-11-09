@@ -16,8 +16,17 @@ under the License.
 
 package org.kapunsdk.visualization.oca.model.overlay.presentation
 
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import org.kapunsdk.visualization.layout.*
+import org.kapunsdk.visualization.layout.ImageType
+import org.kapunsdk.visualization.layout.LayoutCardImage
+import org.kapunsdk.visualization.layout.LayoutCardOverlay
 import org.kapunsdk.visualization.layout.LayoutCardOverlayContent.*
+import org.kapunsdk.visualization.layout.LayoutData
+import org.kapunsdk.visualization.layout.LayoutSection
+import org.kapunsdk.visualization.layout.LayoutSectionProperty
+import org.kapunsdk.visualization.layout.LayoutType
 import org.kapunsdk.visualization.oca.model.SAID_HASH_PLACEHOLDER
 import org.kapunsdk.visualization.oca.model.content.AttributeName
 import org.kapunsdk.visualization.oca.model.content.SAID
@@ -30,171 +39,188 @@ import org.kapunsdk.visualization.oca.processing.ProcessedAttribute
 import org.kapunsdk.visualization.stylejson.model.StyleJson.StyleOverlay
 import org.kapunsdk.visualization.stylejson.model.StyleJsonSchema
 import org.kapunsdk.visualization.stylejson.template.StyleJsonTemplate
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
-import org.kapunsdk.visualization.layout.ImageType
-import org.kapunsdk.visualization.layout.LayoutCardImage
-import org.kapunsdk.visualization.layout.LayoutCardOverlay
-import org.kapunsdk.visualization.layout.LayoutData
-import org.kapunsdk.visualization.layout.LayoutSection
-import org.kapunsdk.visualization.layout.LayoutSectionProperty
-import org.kapunsdk.visualization.layout.LayoutType
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
 @Serializable
 data class UbiqueStyleJsonOverlay(
-	@SerialName("title") val title: String,
-	@SerialName("subtitle") val subtitle: String,
-	@SerialName("cardColor") val cardColor: Long,
-	@SerialName("textColor") val textColor: TextShade = TextShade.DARK,
-	@SerialName("backgroundCard") val backgroundCard: String? = null,
-	@SerialName("orderedProperties") val orderedProperties: List<AttributeName>,
-	@SerialName("capture_base") override val captureBase: SAID,
-	@SerialName("type") override val type: String = "ubique/overlays/style_json/1.0",
-	@SerialName("language") override val language: String,
-	@SerialName("frontOverlays") val frontOverlays: List<StyleOverlay>? = null,
-	@SerialName("digest") override val digest: SAID = SAID_HASH_PLACEHOLDER,
-) : PresentationOverlay, Localized {
-	override fun updateDigest(digest: SAID, captureBase: SAID): Overlay =
-		copy(digest = digest, captureBase = captureBase)
+    @SerialName("title") val title: String,
+    @SerialName("subtitle") val subtitle: String,
+    @SerialName("cardColor") val cardColor: Long,
+    @SerialName("textColor") val textColor: TextShade = TextShade.DARK,
+    @SerialName("backgroundCard") val backgroundCard: String? = null,
+    @SerialName("orderedProperties") val orderedProperties: List<AttributeName>,
+    @SerialName("capture_base") override val captureBase: SAID,
+    @SerialName("type") override val type: String = "ubique/overlays/style_json/1.0",
+    @SerialName("language") override val language: String,
+    @SerialName("frontOverlays") val frontOverlays: List<StyleOverlay>? = null,
+    @SerialName("digest") override val digest: SAID = SAID_HASH_PLACEHOLDER,
+) : PresentationOverlay,
+    Localized {
+    override fun updateDigest(
+        digest: SAID,
+        captureBase: SAID,
+    ): Overlay = copy(digest = digest, captureBase = captureBase)
 
-	companion object {
-		fun fromStyleJson(schema: StyleJsonSchema, captureBase: SAID, language: String): UbiqueStyleJsonOverlay {
-			return UbiqueStyleJsonOverlay(
-				schema.style.title,
-				schema.style.subtitle,
-				schema.style.cardColor,
-				schema.style.textColor.toTextShade(),
-				schema.style.backgroundCard,
-				schema.style.orderedProperties,
-				frontOverlays = schema.style.frontOverlays,
-				captureBase = captureBase,
-				language = language,
-			)
-		}
-	}
+    companion object {
+        fun fromStyleJson(
+            schema: StyleJsonSchema,
+            captureBase: SAID,
+            language: String,
+        ): UbiqueStyleJsonOverlay =
+            UbiqueStyleJsonOverlay(
+                schema.style.title,
+                schema.style.subtitle,
+                schema.style.cardColor,
+                schema.style.textColor.toTextShade(),
+                schema.style.backgroundCard,
+                schema.style.orderedProperties,
+                frontOverlays = schema.style.frontOverlays,
+                captureBase = captureBase,
+                language = language,
+            )
+    }
 
-	override fun presentsAttributes() = orderedProperties
+    override fun presentsAttributes() = orderedProperties
 
+    @OptIn(ExperimentalEncodingApi::class)
+    fun parseLayoutCardImage(input: String?): LayoutCardImage? =
+        when {
+            input?.startsWith("http") == true -> {
+                LayoutCardImage.Url(input)
+            }
 
-	@OptIn(ExperimentalEncodingApi::class)
-	fun parseLayoutCardImage(input: String?): LayoutCardImage? {
-		return when {
-			input?.startsWith("http") == true -> LayoutCardImage.Url(input)
-			!input.isNullOrEmpty() -> {
-				runCatching {
-					val data = if (input.startsWith("data:")) {
-						// Strip the data URI prefix and decode base64
-						Base64.decode(input.substringAfter(","))
-					} else {
-						Base64.decode(input)
-					}
-					LayoutCardImage.Base64(data)
-				}.getOrElse { null }
-			}
-			else -> null
-		}
-	}
+            !input.isNullOrEmpty() -> {
+                runCatching {
+                    val data =
+                        if (input.startsWith("data:")) {
+                            // Strip the data URI prefix and decode base64
+                            Base64.decode(input.substringAfter(","))
+                        } else {
+                            Base64.decode(input)
+                        }
+                    LayoutCardImage.Base64(data)
+                }.getOrElse { null }
+            }
 
-	fun parseLayoutCardImage(input: ProcessedAttribute): LayoutCardImage? {
-		return when (input.attributeValue) {
-			is AttributeValue.Image -> {
-				return LayoutCardImage.Base64(input.attributeValue.value)
-			}
-			is AttributeValue.Text -> {
-				if (input.attributeValue.value.startsWith("http")) {
-					return LayoutCardImage.Url(input.attributeValue.value)
-				}
-				return null
-			}
-			else -> null
-		}
-	}
+            else -> {
+                null
+            }
+        }
 
-	fun process(
-		layoutType: LayoutType,
-		meta: MetaOverlay?,
-		attributeProcessor: (AttributeName) -> ProcessedAttribute?,
-	): LayoutData {
-		return when (layoutType) {
-			LayoutType.CARD -> {
-				val backgroundImage = parseLayoutCardImage(backgroundCard)
-				val overlays = processFrontOverlays(frontOverlays, attributeProcessor)
+    fun parseLayoutCardImage(input: ProcessedAttribute): LayoutCardImage? {
+        return when (input.attributeValue) {
+            is AttributeValue.Image -> {
+                return LayoutCardImage.Base64(input.attributeValue.value)
+            }
 
-				LayoutData.Card(
-					credentialName = meta?.name,
-					issuerName = meta?.issuerName,
-					title = StyleJsonTemplate(title).interpolate { attributeProcessor(it)?.attributeValue?.asString() },
-					subtitle = StyleJsonTemplate(subtitle).interpolate { attributeProcessor(it)?.attributeValue?.asString() },
-					textColor = textColor,
-					cardColor = cardColor,
-					backgroundImage = backgroundImage,
-					overlays = overlays
-				)
-			}
-			LayoutType.DETAIL_LIST -> {
-				val sectionContent = orderedProperties.mapNotNull { attributeName ->
-					attributeProcessor.invoke(attributeName)?.let { attribute ->
-						LayoutSectionProperty(
-							attribute.attributeValue,
-							attribute.label,
-							attribute.information,
-						)
-					}
-				}
-				LayoutData.DetailList(
-					sections = listOf(
-						LayoutSection(
-							sectionTitle = null,
-							sectionContent = sectionContent,
-						)
-					)
-				)
-			}
-		}
-	}
+            is AttributeValue.Text -> {
+                if (input.attributeValue.value.startsWith("http")) {
+                    return LayoutCardImage.Url(input.attributeValue.value)
+                }
+                return null
+            }
 
-	private fun processFrontOverlays(
-		frontOverlays: List<StyleOverlay>?,
-		attributeProcessor: (AttributeName) -> ProcessedAttribute?,
-	): List<LayoutCardOverlay>? {
-		return frontOverlays?.mapNotNull { overlay ->
-			val attribute = attributeProcessor.invoke(overlay.content)
-			when (overlay.contentType) {
-				StyleOverlay.OverlayContentType.Text -> {
-					val overlayContent =
-						attribute?.attributeValue?.asString()?.let { Text(it) } ?: Text(overlay.content)
-					LayoutCardOverlay(overlayContent, overlay.position)
-				}
-				StyleOverlay.OverlayContentType.Image -> {
-					val image = attribute?.let { parseLayoutCardImage(it) }
-						?: parseLayoutCardImage(overlay.content)
-						?: return@mapNotNull null
-					LayoutCardOverlay(
-						Image(image, ImageType.Regular),
-						overlay.position
-					)
-				}
-				StyleOverlay.OverlayContentType.ImageLogo -> {
-					val image = attribute?.let { parseLayoutCardImage(it) }
-						?: parseLayoutCardImage(overlay.content)
-						?: return@mapNotNull null
-					LayoutCardOverlay(
-						Image(image, ImageType.Logo),
-						overlay.position
-					)
-				}
-				StyleOverlay.OverlayContentType.ImageIcon -> {
-					val image = attribute?.let { parseLayoutCardImage(it) }
-						?: parseLayoutCardImage(overlay.content)
-						?: return@mapNotNull null
-					LayoutCardOverlay(
-						Image(image, ImageType.Icon),
-						overlay.position
-					)
-				}
-			}
-		}
-	}
+            else -> {
+                null
+            }
+        }
+    }
+
+    fun process(
+        layoutType: LayoutType,
+        meta: MetaOverlay?,
+        attributeProcessor: (AttributeName) -> ProcessedAttribute?,
+    ): LayoutData =
+        when (layoutType) {
+            LayoutType.CARD -> {
+                val backgroundImage = parseLayoutCardImage(backgroundCard)
+                val overlays = processFrontOverlays(frontOverlays, attributeProcessor)
+
+                LayoutData.Card(
+                    credentialName = meta?.name,
+                    issuerName = meta?.issuerName,
+                    title = StyleJsonTemplate(title).interpolate { attributeProcessor(it)?.attributeValue?.asString() },
+                    subtitle =
+                        StyleJsonTemplate(
+                            subtitle,
+                        ).interpolate { attributeProcessor(it)?.attributeValue?.asString() },
+                    textColor = textColor,
+                    cardColor = cardColor,
+                    backgroundImage = backgroundImage,
+                    overlays = overlays,
+                )
+            }
+
+            LayoutType.DETAIL_LIST -> {
+                val sectionContent =
+                    orderedProperties.mapNotNull { attributeName ->
+                        attributeProcessor.invoke(attributeName)?.let { attribute ->
+                            LayoutSectionProperty(
+                                attribute.attributeValue,
+                                attribute.label,
+                                attribute.information,
+                            )
+                        }
+                    }
+                LayoutData.DetailList(
+                    sections =
+                        listOf(
+                            LayoutSection(
+                                sectionTitle = null,
+                                sectionContent = sectionContent,
+                            ),
+                        ),
+                )
+            }
+        }
+
+    private fun processFrontOverlays(
+        frontOverlays: List<StyleOverlay>?,
+        attributeProcessor: (AttributeName) -> ProcessedAttribute?,
+    ): List<LayoutCardOverlay>? {
+        return frontOverlays?.mapNotNull { overlay ->
+            val attribute = attributeProcessor.invoke(overlay.content)
+            when (overlay.contentType) {
+                StyleOverlay.OverlayContentType.Text -> {
+                    val overlayContent =
+                        attribute?.attributeValue?.asString()?.let { Text(it) } ?: Text(overlay.content)
+                    LayoutCardOverlay(overlayContent, overlay.position)
+                }
+
+                StyleOverlay.OverlayContentType.Image -> {
+                    val image =
+                        attribute?.let { parseLayoutCardImage(it) }
+                            ?: parseLayoutCardImage(overlay.content)
+                            ?: return@mapNotNull null
+                    LayoutCardOverlay(
+                        Image(image, ImageType.Regular),
+                        overlay.position,
+                    )
+                }
+
+                StyleOverlay.OverlayContentType.ImageLogo -> {
+                    val image =
+                        attribute?.let { parseLayoutCardImage(it) }
+                            ?: parseLayoutCardImage(overlay.content)
+                            ?: return@mapNotNull null
+                    LayoutCardOverlay(
+                        Image(image, ImageType.Logo),
+                        overlay.position,
+                    )
+                }
+
+                StyleOverlay.OverlayContentType.ImageIcon -> {
+                    val image =
+                        attribute?.let { parseLayoutCardImage(it) }
+                            ?: parseLayoutCardImage(overlay.content)
+                            ?: return@mapNotNull null
+                    LayoutCardOverlay(
+                        Image(image, ImageType.Icon),
+                        overlay.position,
+                    )
+                }
+            }
+        }
+    }
 }

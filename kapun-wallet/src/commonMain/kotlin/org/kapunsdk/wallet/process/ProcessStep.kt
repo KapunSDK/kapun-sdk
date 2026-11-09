@@ -17,22 +17,20 @@ under the License.
 package org.kapunsdk.wallet.process
 
 interface ProcessStep {
+    /**
+     * Generic loading step for all processes
+     */
+    data object Loading : ProcessStep
 
-	/**
-	 * Generic loading step for all processes
-	 */
-	data object Loading : ProcessStep
+    /**
+     * Indicator that the entire process has been completed
+     */
+    data object ProcessCompleted : ProcessStep
 
-	/**
-	 * Indicator that the entire process has been completed
-	 */
-	data object ProcessCompleted : ProcessStep
-
-	/**
-	 * Converts the current step to an intermediary loading step based on the input [event].
-	 * Defaults to [Loading] but can be overridden for a process specific loading state with more information.
-	 * May be overridden by any [ProcessStep] to transform to a more specific loading state.
-	 */
-	fun toLoading(event: org.kapunsdk.wallet.process.ProcessEvent): ProcessStep = Loading
-
+    /**
+     * Converts the current step to an intermediary loading step based on the input [event].
+     * Defaults to [Loading] but can be overridden for a process specific loading state with more information.
+     * May be overridden by any [ProcessStep] to transform to a more specific loading state.
+     */
+    fun toLoading(event: org.kapunsdk.wallet.process.ProcessEvent): ProcessStep = Loading
 }

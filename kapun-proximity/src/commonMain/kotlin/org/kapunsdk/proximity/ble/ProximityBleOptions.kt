@@ -23,25 +23,24 @@ package org.kapunsdk.proximity.ble
  * that baseline on the same device pair.
  */
 public data class ProximityBleOptions(
-	/**
-	 * Negotiate the ATT MTU before discovering services rather than after.
-	 *
-	 * Service discovery otherwise runs at the default ATT MTU of 23 bytes, where a Read By Type
-	 * Response carries a single 128-bit-UUID entry per PDU. Measured discovery cost scales with the
-	 * peer's service count at roughly 191 ms per service, which this is meant to reduce.
-	 */
-	public val mtuBeforeDiscovery: Boolean = false,
-
-	/**
-	 * Ask for the LE 2M PHY on connect and again once connected.
-	 *
-	 * The peer may refuse, in which case the link stays on 1M. The negotiated PHY is logged either
-	 * way, which is the part that is currently unobservable.
-	 */
-	public val preferLe2MPhy: Boolean = false,
+    /**
+     * Negotiate the ATT MTU before discovering services rather than after.
+     *
+     * Service discovery otherwise runs at the default ATT MTU of 23 bytes, where a Read By Type
+     * Response carries a single 128-bit-UUID entry per PDU. Measured discovery cost scales with the
+     * peer's service count at roughly 191 ms per service, which this is meant to reduce.
+     */
+    public val mtuBeforeDiscovery: Boolean = false,
+    /**
+     * Ask for the LE 2M PHY on connect and again once connected.
+     *
+     * The peer may refuse, in which case the link stays on 1M. The negotiated PHY is logged either
+     * way, which is the part that is currently unobservable.
+     */
+    public val preferLe2MPhy: Boolean = false,
 ) {
-	public companion object {
-		/** The pre-existing behaviour: MTU after discovery, no PHY preference. */
-		public val Default: ProximityBleOptions = ProximityBleOptions()
-	}
+    public companion object {
+        /** The pre-existing behaviour: MTU after discovery, no PHY preference. */
+        public val Default: ProximityBleOptions = ProximityBleOptions()
+    }
 }

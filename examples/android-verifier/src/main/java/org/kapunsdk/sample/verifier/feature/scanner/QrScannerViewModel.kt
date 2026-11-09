@@ -11,62 +11,69 @@ software distributed under the License is distributed on an
 "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
-under the License.   
+under the License.
  */
 package org.kapunsdk.sample.verifier.feature.scanner
 
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import org.kapunsdk.sample.verifier.R
-import org.kapunsdk.sample.verifier.extensions.throttleIf
 import ch.ubique.qrscanner.state.DecodingState
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import org.kapunsdk.sample.verifier.R
+import org.kapunsdk.sample.verifier.extensions.throttleIf
 import org.koin.core.module.dsl.viewModelOf
 import org.koin.dsl.module
 
 class QrScannerViewModel : ViewModel() {
-	companion object {
-		val koinModule = module {
-			viewModelOf(::QrScannerViewModel)
-		}
-	}
+    companion object {
+        val koinModule =
+            module {
+                viewModelOf(::QrScannerViewModel)
+            }
+    }
 
-	private val isLightOnMutable = MutableStateFlow(false)
-	val isLightOn = isLightOnMutable.asStateFlow()
+    private val isLightOnMutable = MutableStateFlow(false)
+    val isLightOn = isLightOnMutable.asStateFlow()
 
-	private val errorMutable = MutableSharedFlow<Int?>()
+    private val errorMutable = MutableSharedFlow<Int?>()
 
-	// throttleIf prevents flickering and ensures that the error is shown for at least 1 second
-	val error = errorMutable.throttleIf(1000) { it == null }
+    // throttleIf prevents flickering and ensures that the error is shown for at least 1 second
+    val error = errorMutable.throttleIf(1000) { it == null }
 
-	private var isScanning = true
+    private var isScanning = true
 
-	fun switchLightState() {
-		isLightOnMutable.value = !isLightOn.value
-	}
+    fun switchLightState() {
+        isLightOnMutable.value = !isLightOn.value
+    }
 
-	fun startScanning() {
-		isScanning = true
-	}
+    fun startScanning() {
+        isScanning = true
+    }
 
-	fun evaluateScannerResult(decodingState: DecodingState): DecodingResult {
-		if (!isScanning) return DecodingResult.Nothing
+    fun evaluateScannerResult(decodingState: DecodingState): DecodingResult {
+        if (!isScanning) return DecodingResult.Nothing
 
-		viewModelScope.launch { errorMutable.emit(null) }
-		return when (decodingState) {
-			is DecodingState.Decoded -> {
-				DecodingResult.Valid(decodingState.content.removePrefix("mdoc:"))
-			}
-			else -> DecodingResult.Nothing
-		}
-	}
+        viewModelScope.launch { errorMutable.emit(null) }
+        return when (decodingState) {
+            is DecodingState.Decoded -> {
+                DecodingResult.Valid(decodingState.content.removePrefix("mdoc:"))
+            }
+
+            else -> {
+                DecodingResult.Nothing
+            }
+        }
+    }
 }
 
 sealed interface DecodingResult {
-	data object Nothing : DecodingResult
-	data class Valid(val content: String) : DecodingResult
+    data object Nothing : DecodingResult
+
+    data class Valid(
+        val content: String,
+    ) : DecodingResult
 }

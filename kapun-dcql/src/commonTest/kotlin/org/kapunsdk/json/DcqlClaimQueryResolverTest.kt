@@ -1,9 +1,9 @@
 package org.kapunsdk.json
 
+import kotlinx.serialization.json.Json
+import org.kapunsdk.DcqlClaimQueryResolver
 import org.kapunsdk.credentials.asSelector
 import org.kapunsdk.credentials.get
-import org.kapunsdk.DcqlClaimQueryResolver
-import kotlinx.serialization.json.Json
 import uniffi.kapun_credential_core_rust.PointerPart
 import uniffi.kapun_dcql_rust.ClaimsQuery
 import uniffi.kapun_dcql_rust.CredentialQuery
@@ -14,79 +14,95 @@ import kotlin.test.assertNull
 import kotlin.test.fail
 
 class DcqlClaimQueryResolverTest {
-
-    private val credential: Value = Json.decodeFromString("""
-        {
-            "first_name": "John",
-            "last_name": "Doe",
-            "school": {
-                "name": "Example University",
-                "graduated": false
+    private val credential: Value =
+        Json.decodeFromString(
+            """
+            {
+                "first_name": "John",
+                "last_name": "Doe",
+                "school": {
+                    "name": "Example University",
+                    "graduated": false
+                }
             }
-        }
-    """.trimIndent())
+            """.trimIndent(),
+        )
 
-    private fun hasClaims(path: List<PointerPart>, values: List<Value>?): Boolean {
+    private fun hasClaims(
+        path: List<PointerPart>,
+        values: List<Value>?,
+    ): Boolean {
         val claim = credential[path.asSelector()]
 
-        if (values == null)
+        if (values == null) {
             return claim.isNotEmpty()
+        }
 
-        return values.any { v -> claim.any { c -> c == v  } }
+        return values.any { v -> claim.any { c -> c == v } }
     }
 
     @Test
     fun testAbsentClaimsRequestsNoClaims() {
-        val query = CredentialQuery(
-            id = "test",
-            format = "test",
-            claims = null,
-            claimSets = null,
-        )
+        val query =
+            CredentialQuery(
+                id = "test",
+                format = "test",
+                claims = null,
+                claimSets = null,
+            )
 
-        val neededClaims = DcqlClaimQueryResolver.neededClaims(query) { _, _ ->
-            fail("An absent claims property must not inspect or request credential claims")
-        }
+        val neededClaims =
+            DcqlClaimQueryResolver.neededClaims(query) { _, _ ->
+                fail("An absent claims property must not inspect or request credential claims")
+            }
 
         assertEquals(emptyList(), neededClaims)
     }
 
     @Test
     fun testEmptyClaimsRequestsNoClaims() {
-        val query = CredentialQuery(
-            id = "test",
-            format = "test",
-            claims = emptyList(),
-            claimSets = null,
-        )
+        val query =
+            CredentialQuery(
+                id = "test",
+                format = "test",
+                claims = emptyList(),
+                claimSets = null,
+            )
 
-        val neededClaims = DcqlClaimQueryResolver.neededClaims(query) { _, _ ->
-            fail("An empty claims property must not inspect or request credential claims")
-        }
+        val neededClaims =
+            DcqlClaimQueryResolver.neededClaims(query) { _, _ ->
+                fail("An empty claims property must not inspect or request credential claims")
+            }
 
         assertEquals(emptyList(), neededClaims)
     }
 
     @Test
     fun testSimple_success() {
-        val claims = listOf(
-            ClaimsQuery(path = listOf(
-                PointerPart.String("first_name")
-            )),
-            ClaimsQuery(
-                path = listOf(
-                    PointerPart.String("school"),
-                    PointerPart.String("graduated")
+        val claims =
+            listOf(
+                ClaimsQuery(
+                    path =
+                        listOf(
+                            PointerPart.String("first_name"),
+                        ),
                 ),
-                values = listOf(Value.Boolean(false))
-            ),
-        )
-        val query = CredentialQuery(
-            id = "test",
-            format = "test",
-            claims = claims,
-            claimSets = null,
-        )
+                ClaimsQuery(
+                    path =
+                        listOf(
+                            PointerPart.String("school"),
+                            PointerPart.String("graduated"),
+                        ),
+                    values = listOf(Value.Boolean(false)),
+                ),
+            )
+        val query =
+            CredentialQuery(
+                id = "test",
+                format = "test",
+                claims = claims,
+                claimSets = null,
+            )
 
         val neededClaims = DcqlClaimQueryResolver.neededClaims(query, ::hasClaims)
 
@@ -95,24 +111,30 @@ class DcqlClaimQueryResolverTest {
 
     @Test
     fun testSimple_failure() {
-        val claims = listOf(
-            ClaimsQuery(path = listOf(
-                PointerPart.String("first_name")
-            )),
-            ClaimsQuery(
-                path = listOf(
-                    PointerPart.String("school"),
-                    PointerPart.String("graduated")
+        val claims =
+            listOf(
+                ClaimsQuery(
+                    path =
+                        listOf(
+                            PointerPart.String("first_name"),
+                        ),
                 ),
-                values = listOf(Value.Boolean(true)) // <--- this doesn't exist
-            ),
-        )
-        val query = CredentialQuery(
-            id = "test",
-            format = "test",
-            claims = claims,
-            claimSets = null,
-        )
+                ClaimsQuery(
+                    path =
+                        listOf(
+                            PointerPart.String("school"),
+                            PointerPart.String("graduated"),
+                        ),
+                    values = listOf(Value.Boolean(true)), // <--- this doesn't exist
+                ),
+            )
+        val query =
+            CredentialQuery(
+                id = "test",
+                format = "test",
+                claims = claims,
+                claimSets = null,
+            )
 
         val neededClaims = DcqlClaimQueryResolver.neededClaims(query, ::hasClaims)
 
@@ -121,35 +143,40 @@ class DcqlClaimQueryResolverTest {
 
     @Test
     fun testComplex_success() {
-        val claimsSet1 = listOf(
-            ClaimsQuery(
-                id = "first-name",
-                path = listOf(PointerPart.String("first_name"))
-            ),
-            ClaimsQuery(
-                id = "last-name",
-                path = listOf(PointerPart.String("last_name"))
-            )
-        )
-        val claimsSet2 = listOf(
-            ClaimsQuery(
-                id = "graduated",
-                path = listOf(
-                    PointerPart.String("school"),
-                    PointerPart.String("graduated")
+        val claimsSet1 =
+            listOf(
+                ClaimsQuery(
+                    id = "first-name",
+                    path = listOf(PointerPart.String("first_name")),
                 ),
-                values = listOf(Value.Boolean(true))
+                ClaimsQuery(
+                    id = "last-name",
+                    path = listOf(PointerPart.String("last_name")),
+                ),
             )
-        )
-        val query = CredentialQuery(
-            id = "test",
-            format = "test",
-            claims = claimsSet1 + claimsSet2,
-            claimSets = listOf(
-                listOf("graduated"),
-                listOf("first-name", "last-name")
-            ),
-        )
+        val claimsSet2 =
+            listOf(
+                ClaimsQuery(
+                    id = "graduated",
+                    path =
+                        listOf(
+                            PointerPart.String("school"),
+                            PointerPart.String("graduated"),
+                        ),
+                    values = listOf(Value.Boolean(true)),
+                ),
+            )
+        val query =
+            CredentialQuery(
+                id = "test",
+                format = "test",
+                claims = claimsSet1 + claimsSet2,
+                claimSets =
+                    listOf(
+                        listOf("graduated"),
+                        listOf("first-name", "last-name"),
+                    ),
+            )
 
         val neededClaims = DcqlClaimQueryResolver.neededClaims(query, ::hasClaims)
 
@@ -158,36 +185,41 @@ class DcqlClaimQueryResolverTest {
 
     @Test
     fun testComplex_failure() {
-        val claimsSet1 = listOf(
-            ClaimsQuery(
-                id = "first-name",
-                path = listOf(PointerPart.String("first_name"))
-            ),
-            ClaimsQuery(
-                id = "last-name",
-                path = listOf(PointerPart.String("last_name")),
-                values = listOf(Value.String("Woe"))
-            )
-        )
-        val claimsSet2 = listOf(
-            ClaimsQuery(
-                id = "graduated",
-                path = listOf(
-                    PointerPart.String("school"),
-                    PointerPart.String("graduated")
+        val claimsSet1 =
+            listOf(
+                ClaimsQuery(
+                    id = "first-name",
+                    path = listOf(PointerPart.String("first_name")),
                 ),
-                values = listOf(Value.Boolean(true))
+                ClaimsQuery(
+                    id = "last-name",
+                    path = listOf(PointerPart.String("last_name")),
+                    values = listOf(Value.String("Woe")),
+                ),
             )
-        )
-        val query = CredentialQuery(
-            id = "test",
-            format = "test",
-            claims = claimsSet1 + claimsSet2,
-            claimSets = listOf(
-                listOf("graduated"),
-                listOf("first-name", "last-name")
-            ),
-        )
+        val claimsSet2 =
+            listOf(
+                ClaimsQuery(
+                    id = "graduated",
+                    path =
+                        listOf(
+                            PointerPart.String("school"),
+                            PointerPart.String("graduated"),
+                        ),
+                    values = listOf(Value.Boolean(true)),
+                ),
+            )
+        val query =
+            CredentialQuery(
+                id = "test",
+                format = "test",
+                claims = claimsSet1 + claimsSet2,
+                claimSets =
+                    listOf(
+                        listOf("graduated"),
+                        listOf("first-name", "last-name"),
+                    ),
+            )
 
         val neededClaims = DcqlClaimQueryResolver.neededClaims(query, ::hasClaims)
 

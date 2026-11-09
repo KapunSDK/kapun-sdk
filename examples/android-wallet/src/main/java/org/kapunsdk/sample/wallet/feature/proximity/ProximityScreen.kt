@@ -11,7 +11,7 @@ software distributed under the License is distributed on an
 "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
-under the License.   
+under the License.
  */
 package org.kapunsdk.sample.wallet.feature.proximity
 
@@ -42,90 +42,99 @@ import org.kapunsdk.sample.wallet.feature.scanner.QrScannerViewModel
 
 @Composable
 fun ProximityScreen(
-	proximityState: State<ProximityWalletState>,
-	qrScannerViewModel: QrScannerViewModel,
-	scannerCallbacks: QrScannerScreenCallbacks,
-	onSubmitDocumentClicked: () -> Unit,
-	onStartEngagementClicked: () -> Unit,
-	onResetState: () -> Unit
+    proximityState: State<ProximityWalletState>,
+    qrScannerViewModel: QrScannerViewModel,
+    scannerCallbacks: QrScannerScreenCallbacks,
+    onSubmitDocumentClicked: () -> Unit,
+    onStartEngagementClicked: () -> Unit,
+    onResetState: () -> Unit,
 ) {
-	Scaffold { innerPadding ->
-		AnimatedContent(
-			modifier = Modifier.padding(innerPadding),
-			targetState = proximityState.value,
-			contentKey = { it.javaClass.simpleName },
-		) { state ->
-			var reverseEngagement by remember { mutableStateOf(false) }
+    Scaffold { innerPadding ->
+        AnimatedContent(
+            modifier = Modifier.padding(innerPadding),
+            targetState = proximityState.value,
+            contentKey = { it.javaClass.simpleName },
+        ) { state ->
+            var reverseEngagement by remember { mutableStateOf(false) }
 
-			Column(Modifier.fillMaxSize()) {
-				Row {
-					Button(onClick = {
-						reverseEngagement = !reverseEngagement
-					}) {
-						Text("switch engagement")
-					}
-					Button(onClick = {
-						reverseEngagement = false
-						onResetState()
-					}){
-						Text("Reset")
-					}
-					if(!reverseEngagement) {
-						Button(onClick = {
-							onStartEngagementClicked()
-						}) {
-							Text("Start")
-						}
-					}
+            Column(Modifier.fillMaxSize()) {
+                Row {
+                    Button(onClick = {
+                        reverseEngagement = !reverseEngagement
+                    }) {
+                        Text("switch engagement")
+                    }
+                    Button(onClick = {
+                        reverseEngagement = false
+                        onResetState()
+                    }) {
+                        Text("Reset")
+                    }
+                    if (!reverseEngagement) {
+                        Button(onClick = {
+                            onStartEngagementClicked()
+                        }) {
+                            Text("Start")
+                        }
+                    }
+                }
 
-				}
+                when (state) {
+                    is ProximityWalletState.Initial, ProximityWalletState.Disconnected -> {
+                        if (reverseEngagement) {
+                            QrScannerScreen(
+                                qrScannerViewModel,
+                                scannerCallbacks,
+                            )
+                        } else {
+                            Text("Waiting to start engagement")
+                        }
+                    }
 
-				when (state) {
-					is ProximityWalletState.Initial, ProximityWalletState.Disconnected -> {
-						if(reverseEngagement) {
-							QrScannerScreen(
-								qrScannerViewModel,
-								scannerCallbacks,
-							)
-						} else {
-							Text("Waiting to start engagement")
-						}
-					}
-					is ProximityWalletState.ReadyForEngagement -> {
-						QrCodeImage(
-							state.qrCodeData, modifier = Modifier
-								.fillMaxWidth()
-								.aspectRatio(1f)
-						)
-					}
-					is ProximityWalletState.Connecting -> {
-						Text("Connecting to ${state.verifierName}")
-					}
-					is ProximityWalletState.Connected -> {
-						Text("Connected to ${state.verifierName}")
-					}
-					is ProximityWalletState.RequestingDocuments -> {
-						Column(Modifier.verticalScroll(rememberScrollState())) {
-							Text("Verifier requests documents: ${state.request}", maxLines = 20)
-							Button(onClick = onSubmitDocumentClicked) {
-								Text("Submit document")
-							}
-						}
-					}
-					is ProximityWalletState.SubmittingDocuments -> {
-						Text("Submitting documents to verifier")
-					}
-					is ProximityWalletState.PresentationCompleted -> {
-						Text("Verification completed")
-					}
-					is ProximityWalletState.Disconnected -> {
-						Text("Disconnected")
-					}
-					is ProximityWalletState.Error -> {
-						Text(state.error.message)
-					}
-				}
-			}
-		}
-	}
+                    is ProximityWalletState.ReadyForEngagement -> {
+                        QrCodeImage(
+                            state.qrCodeData,
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .aspectRatio(1f),
+                        )
+                    }
+
+                    is ProximityWalletState.Connecting -> {
+                        Text("Connecting to ${state.verifierName}")
+                    }
+
+                    is ProximityWalletState.Connected -> {
+                        Text("Connected to ${state.verifierName}")
+                    }
+
+                    is ProximityWalletState.RequestingDocuments -> {
+                        Column(Modifier.verticalScroll(rememberScrollState())) {
+                            Text("Verifier requests documents: ${state.request}", maxLines = 20)
+                            Button(onClick = onSubmitDocumentClicked) {
+                                Text("Submit document")
+                            }
+                        }
+                    }
+
+                    is ProximityWalletState.SubmittingDocuments -> {
+                        Text("Submitting documents to verifier")
+                    }
+
+                    is ProximityWalletState.PresentationCompleted -> {
+                        Text("Verification completed")
+                    }
+
+                    is ProximityWalletState.Disconnected -> {
+                        Text("Disconnected")
+                    }
+
+                    is ProximityWalletState.Error -> {
+                        Text(state.error.message)
+                    }
+                }
+            }
+        }
+    }
 }

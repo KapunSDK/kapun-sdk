@@ -11,7 +11,7 @@ software distributed under the License is distributed on an
 "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
-under the License.   
+under the License.
  */
 package org.kapunsdk.proximity.ble.gatt
 
@@ -20,20 +20,22 @@ import platform.CoreBluetooth.CBCharacteristic
 import platform.CoreBluetooth.CBService
 import kotlin.uuid.Uuid
 
-internal actual class BleGattService(val service: CBService) {
+internal actual class BleGattService(
+    val service: CBService,
+) {
+    actual val uuid: Uuid?
+        get() {
+            Logger("BleGattService").debug("serviceUUID: ${service.UUID.UUIDString}")
+            val uuid = service.UUID.UUIDString
+            if (uuid.length == 4) {
+                return runCatching { Uuid.parse("0000$uuid-0000-1000-8000-00805F9B34FB") }.getOrNull()
+            }
+            return runCatching { Uuid.parse(service.UUID.UUIDString) }.getOrNull()
+        }
 
-	actual val uuid: Uuid?
-		get()  {
-			Logger("BleGattService").debug("serviceUUID: ${service.UUID.UUIDString}")
-			val uuid = service.UUID.UUIDString
-			if(uuid.length == 4) {
-				return runCatching { Uuid.parse("0000$uuid-0000-1000-8000-00805F9B34FB") }.getOrNull()
-			}
-			return runCatching { Uuid.parse(service.UUID.UUIDString) }.getOrNull() }
-
-	actual val characteristics: List<BleGattCharacteristic>
-		get() = service.characteristics?.map {
-			BleGattCharacteristic(it as CBCharacteristic)
-		} ?: emptyList()
-
+    actual val characteristics: List<BleGattCharacteristic>
+        get() =
+            service.characteristics?.map {
+                BleGattCharacteristic(it as CBCharacteristic)
+            } ?: emptyList()
 }

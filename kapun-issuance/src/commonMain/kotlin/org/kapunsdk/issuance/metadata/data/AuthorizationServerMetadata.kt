@@ -24,107 +24,79 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class AuthorizationServerMetadata(
-
-	@SerialName("issuer")
-	val issuer: String,
-
-	@SerialName("authorization_endpoint")
-	val authorizationEndpoint: String?,
-
-	@SerialName("token_endpoint")
-	val tokenEndpoint: String?,
-
-	@SerialName("jwks_uri")
-	val jwksUri: String?,
-
-	@SerialName("registration_endpoint")
-	val registrationEndpoint: String?,
-
-	@SerialName("scopes_supported")
-	val scopesSupported: List<String>?,
-
-	@SerialName("response_types_supported")
-	// An Authorization Server that only supports the Pre-Authorized Code grant type MAY omit the response_types_supported parameter in its metadata despite [RFC8414] mandating it.
-	val responseTypesSupported: List<String>?,
-
-	@SerialName("response_modes_supported")
-	val responseModesSupported: List<String>?,
-
-	@SerialName("grant_types_supported")
-	val grantTypesSupported: List<String>?,
-
-	@SerialName("token_endpoint_auth_methods_supported")
-	val tokenEndpointAuthMethodsSupported: List<String>?,
-
-	@SerialName("token_endpoint_auth_signing_alg_values_supported")
-	val tokenEndpointAuthSigningAlgValuesSupported: List<String>?,
-
-	@SerialName("service_documentation")
-	val serviceDocumentation: String?,
-
-	@SerialName("ui_locales_supported")
-	val uiLocalesSupported: List<String>?,
-
-	@SerialName("op_policy_uri")
-	val opPolicyUri: String?,
-
-	@SerialName("op_tos_uri")
-	val opTosUri: String?,
-
-	@SerialName("revocation_endpoint")
-	val revocationEndpoint: String?,
-
-	@SerialName("revocation_endpoint_auth_methods_supported")
-	val revocationEndpointAuthMethodsSupported: List<String>?,
-
-	@SerialName("revocation_endpoint_auth_signing_alg_values_supported")
-	val revocationEndpointAuthSigningAlgValuesSupported: List<String>?,
-
-	@SerialName("introspectionEndpoint")
-	val introspectionEndpoint: String?,
-
-	@SerialName("introspectionEndpointAuthMethodsSupported")
-	val introspectionEndpointAuthMethodsSupported: List<String>?,
-
-	@SerialName("introspectionEndpointAuthSigningAlgValuesSupported")
-	val introspectionEndpointAuthSigningAlgValuesSupported: List<String>?,
-
-	@SerialName("codeChallengeMethodsSupported")
-	val codeChallengeMethodsSupported: List<String>?,
-
-	/**
-	 * Additional field as described in https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#name-oauth-authorization-server-
-	 */
-	@SerialName("pre-authorized_grant_anonymous_access_supported")
-	val preAuthorizedGrandAnonymousAccessSupported: Boolean?,
-
-	/**
-	 * Additional field as described in https://datatracker.ietf.org/doc/html/rfc9126#name-authorization-server-metada
-	 */
-	@SerialName("pushed_authorization_request_endpoint")
-	val pushedAuthorizationRequestEndpoint: String?,
-
-	/**
-	 * Additional field as described in https://datatracker.ietf.org/doc/html/rfc9126#name-authorization-server-metada
-	 */
-	@SerialName("require_pushed_authorization_requests")
-	val requirePushedAuthorizationRequests: Boolean?,
-
-	/**
-	 * Additional field as described in https://datatracker.ietf.org/doc/html/draft-ietf-oauth-dpop-11#name-authorization-server-metada
-	 */
-	@SerialName("dpop_signing_alg_values_supported")
-	val dpopSigningAlgValuesSupported: List<String>?,
-
-	/**
-	 * Additional field as described in https://datatracker.ietf.org/doc/html/draft-ietf-oauth-first-party-apps#name-authorization-server-metada
-	 */
-	@SerialName("authorization_challenge_endpoint")
-	val authorizationChallengeEndpoint: String?,
-
-	/**
-	 * Additional custom field by Ubique. Used to indicate if a credential offer auth type requires presentation first
-	 */
-	@SerialName("first_party_usage")
-	val firstPartyUsage: Boolean?,
+    @SerialName("issuer")
+    val issuer: String,
+    @SerialName("authorization_endpoint")
+    val authorizationEndpoint: String?,
+    @SerialName("token_endpoint")
+    val tokenEndpoint: String?,
+    @SerialName("jwks_uri")
+    val jwksUri: String?,
+    @SerialName("registration_endpoint")
+    val registrationEndpoint: String?,
+    @SerialName("scopes_supported")
+    val scopesSupported: List<String>?,
+    // An Authorization Server that only supports the Pre-Authorized Code grant type MAY omit the response_types_supported parameter in its metadata despite [RFC8414] mandating it.
+    @SerialName("response_types_supported")
+    val responseTypesSupported: List<String>?,
+    @SerialName("response_modes_supported")
+    val responseModesSupported: List<String>?,
+    @SerialName("grant_types_supported")
+    val grantTypesSupported: List<String>?,
+    @SerialName("token_endpoint_auth_methods_supported")
+    val tokenEndpointAuthMethodsSupported: List<String>?,
+    @SerialName("token_endpoint_auth_signing_alg_values_supported")
+    val tokenEndpointAuthSigningAlgValuesSupported: List<String>?,
+    @SerialName("service_documentation")
+    val serviceDocumentation: String?,
+    @SerialName("ui_locales_supported")
+    val uiLocalesSupported: List<String>?,
+    @SerialName("op_policy_uri")
+    val opPolicyUri: String?,
+    @SerialName("op_tos_uri")
+    val opTosUri: String?,
+    @SerialName("revocation_endpoint")
+    val revocationEndpoint: String?,
+    @SerialName("revocation_endpoint_auth_methods_supported")
+    val revocationEndpointAuthMethodsSupported: List<String>?,
+    @SerialName("revocation_endpoint_auth_signing_alg_values_supported")
+    val revocationEndpointAuthSigningAlgValuesSupported: List<String>?,
+    @SerialName("introspectionEndpoint")
+    val introspectionEndpoint: String?,
+    @SerialName("introspectionEndpointAuthMethodsSupported")
+    val introspectionEndpointAuthMethodsSupported: List<String>?,
+    @SerialName("introspectionEndpointAuthSigningAlgValuesSupported")
+    val introspectionEndpointAuthSigningAlgValuesSupported: List<String>?,
+    @SerialName("codeChallengeMethodsSupported")
+    val codeChallengeMethodsSupported: List<String>?,
+    /**
+     * Additional field as described in https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#name-oauth-authorization-server-
+     */
+    @SerialName("pre-authorized_grant_anonymous_access_supported")
+    val preAuthorizedGrandAnonymousAccessSupported: Boolean?,
+    /**
+     * Additional field as described in https://datatracker.ietf.org/doc/html/rfc9126#name-authorization-server-metada
+     */
+    @SerialName("pushed_authorization_request_endpoint")
+    val pushedAuthorizationRequestEndpoint: String?,
+    /**
+     * Additional field as described in https://datatracker.ietf.org/doc/html/rfc9126#name-authorization-server-metada
+     */
+    @SerialName("require_pushed_authorization_requests")
+    val requirePushedAuthorizationRequests: Boolean?,
+    /**
+     * Additional field as described in https://datatracker.ietf.org/doc/html/draft-ietf-oauth-dpop-11#name-authorization-server-metada
+     */
+    @SerialName("dpop_signing_alg_values_supported")
+    val dpopSigningAlgValuesSupported: List<String>?,
+    /**
+     * Additional field as described in https://datatracker.ietf.org/doc/html/draft-ietf-oauth-first-party-apps#name-authorization-server-metada
+     */
+    @SerialName("authorization_challenge_endpoint")
+    val authorizationChallengeEndpoint: String?,
+    /**
+     * Additional custom field by Ubique. Used to indicate if a credential offer auth type requires presentation first
+     */
+    @SerialName("first_party_usage")
+    val firstPartyUsage: Boolean?,
 )

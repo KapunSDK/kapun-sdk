@@ -19,23 +19,21 @@ package org.kapunsdk.wallet.process.vc2pdf
 import org.kapunsdk.wallet.process.ProcessStep
 
 sealed interface Vc2PdfProcessStep : ProcessStep {
+    data class Error(
+        val errorMessage: String,
+        val errorCode: String? = null,
+        val cause: Exception? = null,
+        val retry: (() -> Unit)? = null,
+    ) : Vc2PdfProcessStep
 
-	data class Error(
-		val errorMessage: String,
-		val errorCode: String? = null,
-		val cause: Exception? = null,
-		val retry: (() -> Unit)? = null,
-	) : Vc2PdfProcessStep
+    data object InitiatingVc2Pdf : Vc2PdfProcessStep
 
-	data object InitiatingVc2Pdf : Vc2PdfProcessStep
+    data class PresentationRequired(
+        val openId4VpString: String,
+    ) : Vc2PdfProcessStep
 
-	data class PresentationRequired(
-		val openId4VpString: String,
-	) : Vc2PdfProcessStep
-
-	data class Success(
-		val pdfData: ByteArray,
-		val transactionId: String,
-	) : Vc2PdfProcessStep
-
+    data class Success(
+        val pdfData: ByteArray,
+        val transactionId: String,
+    ) : Vc2PdfProcessStep
 }

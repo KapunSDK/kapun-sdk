@@ -28,34 +28,46 @@ import org.kapunsdk.credentials.models.metadata.KeyMaterial
  * Note: Do NOT run migrations in a transaction, since the NativeSqliteDriver runs them in a transaction anyway and causes the migration to fail.
  * See: https://github.com/sqldelight/sqldelight/issues/3812 and https://sqldelight.github.io/sqldelight/2.0.2/multiplatform_sqlite/migrations/
  */
-internal val V1To2RenameKeyMaterialClassDiscriminator = AfterVersion(1) { driver ->
-	val readQuery = """
-		SELECT id, metadata FROM credentialEntity
-	""".trimIndent()
+internal val V1To2RenameKeyMaterialClassDiscriminator =
+    AfterVersion(1) { driver ->
+        val readQuery =
+            """
+            SELECT id, metadata FROM credentialEntity
+            """.trimIndent()
 
-	data class Credential(val id: Long, val metadata: String)
+        data class Credential(
+            val id: Long,
+            val metadata: String,
+        )
 
-	val credentials = Query(0, driver, readQuery) { cursor ->
-		val id = requireNotNull(cursor.getLong(0))
-		val metadata = requireNotNull(cursor.getString(1))
-		Credential(id, metadata)
-	}.executeAsList()
+        val credentials =
+            Query(0, driver, readQuery) { cursor ->
+                val id = requireNotNull(cursor.getLong(0))
+                val metadata = requireNotNull(cursor.getString(1))
+                Credential(id, metadata)
+            }.executeAsList()
 
-	val credentialsWithRenamedKeyMaterial = credentials.map { credential ->
-		credential.copy(
-			metadata = credential.metadata.replace("org.kapunsdk.wallet.credentials.metadata.KeyMaterial", "KeyMaterial")
-		)
-	}
+        val credentialsWithRenamedKeyMaterial =
+            credentials.map { credential ->
+                credential.copy(
+                    metadata =
+                        credential.metadata.replace(
+                            "org.kapunsdk.wallet.credentials.metadata.KeyMaterial",
+                            "KeyMaterial",
+                        ),
+                )
+            }
 
-	credentialsWithRenamedKeyMaterial.forEach { credential ->
-		val updateQuery = """
-			UPDATE credentialEntity
-			SET metadata = ?
-			WHERE id = ?
-		""".trimIndent()
-		driver.execute(null, updateQuery, 2) {
-			bindString(0, credential.metadata)
-			bindLong(1, credential.id)
-		}
-	}
-}
+        credentialsWithRenamedKeyMaterial.forEach { credential ->
+            val updateQuery =
+                """
+                UPDATE credentialEntity
+                SET metadata = ?
+                WHERE id = ?
+                """.trimIndent()
+            driver.execute(null, updateQuery, 2) {
+                bindString(0, credential.metadata)
+                bindLong(1, credential.id)
+            }
+        }
+    }

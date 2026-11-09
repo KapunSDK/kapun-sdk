@@ -19,25 +19,36 @@ import kotlin.uuid.Uuid
 
 /** Platform-neutral stream socket used by the ISO BLE L2CAP transport. */
 internal interface BleL2capConnection {
-	val isConnected: Boolean
-	fun writeMessage(data: ByteArray)
-	fun close()
+    val isConnected: Boolean
+
+    fun writeMessage(data: ByteArray)
+
+    fun close()
 }
 
 internal interface BleL2capListener {
-	fun onConnected()
-	fun onMessageReceived(data: ByteArray)
-	fun onDisconnected()
-	fun onError(message: String)
+    fun onConnected()
+
+    fun onMessageReceived(data: ByteArray)
+
+    fun onDisconnected()
+
+    fun onError(message: String)
 }
 
 internal interface BleL2capServer : BleL2capConnection {
-	/** Opens the listener and returns the dynamically assigned PSM for DeviceEngagement. */
-	suspend fun listen(): Int
-	fun accept(listener: BleL2capListener)
+    /** Opens the listener and returns the dynamically assigned PSM for DeviceEngagement. */
+    suspend fun listen(): Int
+
+    fun accept(listener: BleL2capListener)
 }
 
 internal interface BleL2capClient : BleL2capConnection {
-	/** Scans for the existing advertised BLE service UUID, then opens CoC without GATT. */
-	fun connect(serviceUuid: Uuid, psm: Int, deviceMacAddress: String?, listener: BleL2capListener)
+    /** Scans for the existing advertised BLE service UUID, then opens CoC without GATT. */
+    fun connect(
+        serviceUuid: Uuid,
+        psm: Int,
+        deviceMacAddress: String?,
+        listener: BleL2capListener,
+    )
 }

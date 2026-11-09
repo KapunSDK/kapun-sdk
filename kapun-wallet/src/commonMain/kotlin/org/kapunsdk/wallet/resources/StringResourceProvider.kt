@@ -17,5 +17,5 @@ under the License.
 package org.kapunsdk.wallet.resources
 
 interface StringResourceProvider {
-	fun getString(stringName: String): String
+    fun getString(stringName: String): String
 }

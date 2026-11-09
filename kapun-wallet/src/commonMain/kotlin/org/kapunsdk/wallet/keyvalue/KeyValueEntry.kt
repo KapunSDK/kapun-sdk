@@ -16,18 +16,19 @@ under the License.
 
 package org.kapunsdk.wallet.keyvalue
 
-enum class KeyValueEntry(val value: String) {
-	BACKUP_EMAIL_USED("BACKUP_EMAIL_USED"),
-	BACKUP_TOKEN("BACKUP_TOKEN"),
-	BACKUP_LAST_BACKUP_TIMESTAMP("BACKUP_LAST_BACKUP_TIMESTAMP"),
-	FAKER_LAST_TIMESTAMPS("FAKER_LAST_TIMESTAMPS"),
-	MAX_CREDENTIALS("MAX_CREDENTIALS");
+enum class KeyValueEntry(
+    val value: String,
+) {
+    BACKUP_EMAIL_USED("BACKUP_EMAIL_USED"),
+    BACKUP_TOKEN("BACKUP_TOKEN"),
+    BACKUP_LAST_BACKUP_TIMESTAMP("BACKUP_LAST_BACKUP_TIMESTAMP"),
+    FAKER_LAST_TIMESTAMPS("FAKER_LAST_TIMESTAMPS"),
+    MAX_CREDENTIALS("MAX_CREDENTIALS"),
+    ;
 
-	override fun toString() = value
+    override fun toString() = value
 
-	companion object {
-		fun fromString(value: String): KeyValueEntry? {
-			return entries.find { it.value == value }
-		}
-	}
+    companion object {
+        fun fromString(value: String): KeyValueEntry? = entries.find { it.value == value }
+    }
 }

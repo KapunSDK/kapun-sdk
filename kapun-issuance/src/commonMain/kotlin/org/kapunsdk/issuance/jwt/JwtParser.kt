@@ -19,19 +19,14 @@ package org.kapunsdk.issuance.jwt
 import uniffi.kapun_crypto_rust.parseEncodedJwtPayload
 import uniffi.kapun_crypto_rust.validateJwtSignature
 
-
 class JwtParser(
-	private val encodedJwt: String,
+    private val encodedJwt: String,
 ) {
+    fun getPayload(): String? = parseEncodedJwtPayload(encodedJwt)
 
-	fun getPayload(): String? {
-		return parseEncodedJwtPayload(encodedJwt)
-	}
+    fun isSignatureValid(jwtTyp: String): Boolean {
+        // TODO: Make sure this is the correct typ
 
-	fun isSignatureValid(jwtTyp: String): Boolean {
-		// TODO: Make sure this is the correct typ
-
-		return validateJwtSignature(encodedJwt, jwtTyp)
-	}
-
+        return validateJwtSignature(encodedJwt, jwtTyp)
+    }
 }

@@ -16,26 +16,31 @@ under the License.
 
 package org.kapunsdk.visualization.oca.model.overlay.semantic
 
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonNames
 import org.kapunsdk.visualization.oca.model.SAID_HASH_PLACEHOLDER
 import org.kapunsdk.visualization.oca.model.content.AttributeName
 import org.kapunsdk.visualization.oca.model.content.Encoding
 import org.kapunsdk.visualization.oca.model.content.SAID
 import org.kapunsdk.visualization.oca.model.overlay.Overlay
-import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonNames
 
 @OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class CharacterEncodingOverlay(
-	@SerialName("default_character_encoding") val defaultCharacterEncoding: Encoding,
-	@JsonNames("attribute_character_encoding", "attr_character_encoding") val attributeCharacterEncoding: Map<AttributeName, Encoding> = emptyMap(),
-	@SerialName("capture_base") override val captureBase: SAID,
-	@SerialName("type") override val type: String = "spec/overlays/character_encoding/1.0",
-	@SerialName("digest") override val digest: SAID = SAID_HASH_PLACEHOLDER,
+    @SerialName("default_character_encoding") val defaultCharacterEncoding: Encoding,
+    @JsonNames("attribute_character_encoding", "attr_character_encoding") val attributeCharacterEncoding:
+        Map<AttributeName, Encoding> = emptyMap(),
+    @SerialName("capture_base") override val captureBase: SAID,
+    @SerialName("type") override val type: String = "spec/overlays/character_encoding/1.0",
+    @SerialName("digest") override val digest: SAID = SAID_HASH_PLACEHOLDER,
 ) : SemanticOverlay {
+    fun getEncoding(attributeName: AttributeName) =
+        attributeCharacterEncoding[attributeName] ?: defaultCharacterEncoding
 
-	fun getEncoding(attributeName: AttributeName) = attributeCharacterEncoding[attributeName] ?: defaultCharacterEncoding
-	override fun updateDigest(digest: SAID, captureBase: SAID): Overlay = copy(digest = digest, captureBase = captureBase)
+    override fun updateDigest(
+        digest: SAID,
+        captureBase: SAID,
+    ): Overlay = copy(digest = digest, captureBase = captureBase)
 }

@@ -16,14 +16,6 @@ under the License.
 
 package org.kapunsdk.wallet.credentials.credential
 
-import org.kapunsdk.credentials.models.credential.CredentialType
-import org.kapunsdk.trust.revocation.RevocationCheck
-import org.kapunsdk.wallet.credentials.ViewModelFactory
-import org.kapunsdk.wallet.credentials.activity.ActivityRepository
-import org.kapunsdk.wallet.credentials.identity.IdentityRepository
-import org.kapunsdk.wallet.credentials.identity.IdentityUiModel
-import org.kapunsdk.wallet.keyvalue.KeyValueEntry
-import org.kapunsdk.wallet.keyvalue.KeyValueRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
@@ -46,166 +38,226 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import org.kapunsdk.credentials.models.credential.CredentialType
+import org.kapunsdk.trust.revocation.RevocationCheck
+import org.kapunsdk.wallet.credentials.ViewModelFactory
+import org.kapunsdk.wallet.credentials.activity.ActivityRepository
+import org.kapunsdk.wallet.credentials.identity.IdentityRepository
+import org.kapunsdk.wallet.credentials.identity.IdentityUiModel
+import org.kapunsdk.wallet.keyvalue.KeyValueEntry
+import org.kapunsdk.wallet.keyvalue.KeyValueRepository
 import org.koin.dsl.module
 import kotlin.math.min
 
 class CredentialsController private constructor(
-	private val credentialsRepository: CredentialsRepository,
+    private val credentialsRepository: CredentialsRepository,
     private val deferredCredentialsRepository: DeferredCredentialsRepository,
-	private val identityRepository: IdentityRepository,
-	private val activityRepository: ActivityRepository,
-	private val viewModelFactory: ViewModelFactory,
-	private val keyValueRepository: KeyValueRepository,
-	private val scope: CoroutineScope,
+    private val identityRepository: IdentityRepository,
+    private val activityRepository: ActivityRepository,
+    private val viewModelFactory: ViewModelFactory,
+    private val keyValueRepository: KeyValueRepository,
+    private val scope: CoroutineScope,
 ) {
-	companion object {
-		val koinModule = module {
-			factory { (scope: CoroutineScope) ->
-				CredentialsController(
-					get(), get(), get(), get(), get(), get(), scope
-				)
-			}
-		}
-	}
+    companion object {
+        val koinModule =
+            module {
+                factory { (scope: CoroutineScope) ->
+                    CredentialsController(
+                        get(),
+                        get(),
+                        get(),
+                        get(),
+                        get(),
+                        get(),
+                        scope,
+                    )
+                }
+            }
+    }
 
-	private val asyncJobs = mutableMapOf<String, Job>()
-	fun resetState() {
-		asyncJobs.values.forEach { it.cancel() }
-	}
+    private val asyncJobs = mutableMapOf<String, Job>()
 
-	private fun launchSingleJob(label: String, block: suspend () -> Unit) {
-		asyncJobs[label]?.cancel()
-		asyncJobs[label] = scope.launch(Dispatchers.IO) {
-			block()
-		}
-	}
+    fun resetState() {
+        asyncJobs.values.forEach { it.cancel() }
+    }
+
+    private fun launchSingleJob(
+        label: String,
+        block: suspend () -> Unit,
+    ) {
+        asyncJobs[label]?.cancel()
+        asyncJobs[label] =
+            scope.launch(Dispatchers.IO) {
+                block()
+            }
+    }
 
     fun getPids() = identityRepository.getPids()
+
     fun getNonPids(withIssuerData: Boolean = true) = identityRepository.getNonPids(withIssuerData)
+
     fun getNonPidCount() = identityRepository.getNonPidCount()
+
     fun getDeferred() = deferredCredentialsRepository.getAll()
-    fun getIdentityForTransactionId(transactionId: String) = deferredCredentialsRepository.getIdentityForTransactionId(transactionId)
-    fun getDeferredForTransactionId(transactionId: String) = deferredCredentialsRepository.getForTransactionId(transactionId)
+
+    fun getIdentityForTransactionId(transactionId: String) =
+        deferredCredentialsRepository.getIdentityForTransactionId(transactionId)
+
+    fun getDeferredForTransactionId(transactionId: String) =
+        deferredCredentialsRepository.getForTransactionId(transactionId)
+
     val revocationCheck = RevocationCheck()
+
     fun getIdentityByName(identityName: String) =
-        identityRepository.getByName(identityName).map { it?.let { viewModelFactory.getIdentityUiModel(it, revocationCheck) } }
+        identityRepository
+            .getByName(
+                identityName,
+            ).map { it?.let { viewModelFactory.getIdentityUiModel(it, revocationCheck) } }
 
-	fun getIdentityByActivityId(activityId: Long) =
-		identityRepository.getByActivityId(activityId)?.let { viewModelFactory.getIdentityUiModel(it, revocationCheck) }
+    fun getIdentityByActivityId(activityId: Long) =
+        identityRepository.getByActivityId(activityId)?.let { viewModelFactory.getIdentityUiModel(it, revocationCheck) }
 
-	fun getAllIdentityUiModels() = identityRepository.getAllAsFlow().map {
-		viewModelFactory.pruneIdentityCache(it.map { identity -> identity.name }.toSet())
-		it.mapNotNull { identity ->
-			viewModelFactory.getIdentityUiModel(identity, revocationCheck)
-		}
-	}
-	fun getAllIdentityAndDeferredUiModels() = combine(deferredCredentialsRepository.getAllAsFlow().map { def ->
-		def.map { defId ->
-			viewModelFactory.getIdentityUiModel(defId)
-		}
-	}, identityRepository.getAllAsFlow().map{
-		viewModelFactory.pruneIdentityCache(it.map { identity -> identity.name }.toSet())
-		it.mapNotNull { identity ->
-			viewModelFactory.getIdentityUiModel(identity, revocationCheck)
-		}
-	}) { deferredIds, issuedIds ->
-		deferredIds + issuedIds
-	}
+    fun getAllIdentityUiModels() =
+        identityRepository.getAllAsFlow().map {
+            viewModelFactory.pruneIdentityCache(it.map { identity -> identity.name }.toSet())
+            it.mapNotNull { identity ->
+                viewModelFactory.getIdentityUiModel(identity, revocationCheck)
+            }
+        }
 
-	fun getAllCredentialsFlow() = credentialsRepository.getAllUnusedFlow()
+    fun getAllIdentityAndDeferredUiModels() =
+        combine(
+            deferredCredentialsRepository.getAllAsFlow().map { def ->
+                def.map { defId ->
+                    viewModelFactory.getIdentityUiModel(defId)
+                }
+            },
+            identityRepository.getAllAsFlow().map {
+                viewModelFactory.pruneIdentityCache(it.map { identity -> identity.name }.toSet())
+                it.mapNotNull { identity ->
+                    viewModelFactory.getIdentityUiModel(identity, revocationCheck)
+                }
+            },
+        ) { deferredIds, issuedIds ->
+            deferredIds + issuedIds
+        }
 
-	fun removeIdentityById(identityId: Long) {
-		identityRepository.removeById(identityId)
-	}
+    fun getAllCredentialsFlow() = credentialsRepository.getAllUnusedFlow()
 
-	fun removeIdentityByName(identityName: String) {
-		identityRepository.removeByName(identityName)
-	}
+    fun removeIdentityById(identityId: Long) {
+        identityRepository.removeById(identityId)
+    }
 
-	fun getAllActivities() = activityRepository.getAllAsFlow()
+    fun removeIdentityByName(identityName: String) {
+        identityRepository.removeByName(identityName)
+    }
 
-	fun getActivityById(id: Long) = activityRepository.getById(id)
+    fun getAllActivities() = activityRepository.getAllAsFlow()
 
-	fun setCredentialsLimit(number: Int?) {
-		keyValueRepository.setFor(KeyValueEntry.MAX_CREDENTIALS, number?.toString())
-	}
+    fun getActivityById(id: Long) = activityRepository.getById(id)
 
-    fun anonymizeElement(element: JsonElement) : JsonElement {
-        return when(element) {
+    fun setCredentialsLimit(number: Int?) {
+        keyValueRepository.setFor(KeyValueEntry.MAX_CREDENTIALS, number?.toString())
+    }
+
+    fun anonymizeElement(element: JsonElement): JsonElement {
+        return when (element) {
             is JsonArray -> {
-                return JsonArray(element.jsonArray.subList(fromIndex = 0, toIndex = min(element.jsonArray.size, 10)).map {
-                    anonymizeElement(it)
-                })
+                return JsonArray(
+                    element.jsonArray.subList(fromIndex = 0, toIndex = min(element.jsonArray.size, 10)).map {
+                        anonymizeElement(it)
+                    },
+                )
             }
+
             is JsonObject -> {
-                return JsonObject(element.jsonObject.mapValues {
-                    anonymizeElement(it.value)
-                })
+                return JsonObject(
+                    element.jsonObject.mapValues {
+                        anonymizeElement(it.value)
+                    },
+                )
             }
-            JsonNull -> JsonNull
+
+            JsonNull -> {
+                JsonNull
+            }
+
             else -> {
                 val primitive = element.jsonPrimitive
                 val value = element.jsonPrimitive.contentOrNull ?: primitive.toString()
                 val first = value.firstOrNull()
                 val last = value.lastOrNull()
-                return if(value.count() <= 1) {
+                return if (value.count() <= 1) {
                     JsonPrimitive("$first")
                 } else {
                     JsonPrimitive("$first****$last")
                 }
-
             }
         }
     }
-    suspend fun publishToDCApi() : List<JsonElement> {
-//		return emptyList()
-		val models =
-			getAllIdentityUiModels().first()
-		// Can add more here
-		val keysToRemove = setOf("vct")
-		val myCredentialList = mutableListOf<JsonElement>()
-		for (model in models) {
-			if (model !is IdentityUiModel.IdentityUiCredentialModel) {
-				continue
-			}
-			val insertedFormats = mutableListOf<CredentialType>()
-			for (cred in model.credentials) {
-				if(insertedFormats.contains(cred.credentialType)) {
-					continue
-				}
-				val credential = model.getCredentialUiModelForSingle(cred, viewModelFactory)
-				insertedFormats.add(cred.credentialType)
-				val credentialJson: JsonObject =
-					parseToJsonElement(credential.jsonPayload.orEmpty()).jsonObject
-				val myCred =
-					buildJsonObject {
-						// Copy over entries except those in keysToRemove
-						put("paths", buildJsonObject {
-							credentialJson.forEach { (key, value) ->
-								if (key !in keysToRemove) {
-									put(key, anonymizeElement(value))
-								}
-							}
-						})
-						put("credential_format", if (credential.type == CredentialType.SdJwt) {"dc+sd-jwt"} else {"mso_mdoc"})
-						put("document_type", model.docType)
-						// Add new fields
-						put(
-							"id",
-							JsonPrimitive(credential.id.toString())
-						)
-						put("title", JsonPrimitive(model.title))
-						put("subtitle", JsonPrimitive(model.subtitle))
-					}                // Add to our list
-				myCredentialList.add(myCred)
-			}
-		}
-		// Now we can filter out duplicate entries if we want to.
-		// And then the thingy should be ready to insert into the dc-api wasm thingy.
-		//  wasm_insert(myCredentialList, somethingSmartHere)
-		return myCredentialList
-    }
-	fun getCredentialsLimit() = keyValueRepository.getForFlow(KeyValueEntry.MAX_CREDENTIALS).map { it?.toIntOrNull() }
-		.stateIn(scope, SharingStarted.WhileSubscribed(), null)
 
+    suspend fun publishToDCApi(): List<JsonElement> {
+// 		return emptyList()
+        val models =
+            getAllIdentityUiModels().first()
+        // Can add more here
+        val keysToRemove = setOf("vct")
+        val myCredentialList = mutableListOf<JsonElement>()
+        for (model in models) {
+            if (model !is IdentityUiModel.IdentityUiCredentialModel) {
+                continue
+            }
+            val insertedFormats = mutableListOf<CredentialType>()
+            for (cred in model.credentials) {
+                if (insertedFormats.contains(cred.credentialType)) {
+                    continue
+                }
+                val credential = model.getCredentialUiModelForSingle(cred, viewModelFactory)
+                insertedFormats.add(cred.credentialType)
+                val credentialJson: JsonObject =
+                    parseToJsonElement(credential.jsonPayload.orEmpty()).jsonObject
+                val myCred =
+                    buildJsonObject {
+                        // Copy over entries except those in keysToRemove
+                        put(
+                            "paths",
+                            buildJsonObject {
+                                credentialJson.forEach { (key, value) ->
+                                    if (key !in keysToRemove) {
+                                        put(key, anonymizeElement(value))
+                                    }
+                                }
+                            },
+                        )
+                        put(
+                            "credential_format",
+                            if (credential.type == CredentialType.SdJwt) {
+                                "dc+sd-jwt"
+                            } else {
+                                "mso_mdoc"
+                            },
+                        )
+                        put("document_type", model.docType)
+                        // Add new fields
+                        put(
+                            "id",
+                            JsonPrimitive(credential.id.toString()),
+                        )
+                        put("title", JsonPrimitive(model.title))
+                        put("subtitle", JsonPrimitive(model.subtitle))
+                    } // Add to our list
+                myCredentialList.add(myCred)
+            }
+        }
+        // Now we can filter out duplicate entries if we want to.
+        // And then the thingy should be ready to insert into the dc-api wasm thingy.
+        //  wasm_insert(myCredentialList, somethingSmartHere)
+        return myCredentialList
+    }
+
+    fun getCredentialsLimit() =
+        keyValueRepository
+            .getForFlow(KeyValueEntry.MAX_CREDENTIALS)
+            .map { it?.toIntOrNull() }
+            .stateIn(scope, SharingStarted.WhileSubscribed(), null)
 }

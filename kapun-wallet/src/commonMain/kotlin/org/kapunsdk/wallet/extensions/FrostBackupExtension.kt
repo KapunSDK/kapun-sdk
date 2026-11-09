@@ -20,10 +20,6 @@ import uniffi.kapun_wallet_rust.FrostBackup
 import uniffi.kapun_wallet_rust.deserializeFrostBackup
 import uniffi.kapun_wallet_rust.serializeFrostBackup
 
-fun FrostBackup.serialize() : String? {
-    return serializeFrostBackup(this)
-}
+fun FrostBackup.serialize(): String? = serializeFrostBackup(this)
 
-fun String.toFrostBackup() : FrostBackup? {
-    return deserializeFrostBackup(this)
-}
+fun String.toFrostBackup(): FrostBackup? = deserializeFrostBackup(this)

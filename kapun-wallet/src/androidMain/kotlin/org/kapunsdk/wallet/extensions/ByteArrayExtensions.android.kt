@@ -21,21 +21,21 @@ import java.math.BigInteger
 import java.util.Arrays
 
 fun ByteArray.extractRawSignature(): ByteArray {
-	fun extractR(signature: ByteArray): BigInteger {
-		val startR = if ((signature[1].toInt() and 0x80) != 0) 3 else 2
-		val lengthR = signature[startR + 1].toInt()
-		return BigInteger(Arrays.copyOfRange(signature, startR + 2, startR + 2 + lengthR))
-	}
+    fun extractR(signature: ByteArray): BigInteger {
+        val startR = if ((signature[1].toInt() and 0x80) != 0) 3 else 2
+        val lengthR = signature[startR + 1].toInt()
+        return BigInteger(Arrays.copyOfRange(signature, startR + 2, startR + 2 + lengthR))
+    }
 
-	fun extractS(signature: ByteArray): BigInteger {
-		val startR = if ((signature[1].toInt() and 0x80) != 0) 3 else 2
-		val lengthR = signature[startR + 1].toInt()
-		val startS = startR + 2 + lengthR
-		val lengthS = signature[startS + 1].toInt()
-		return BigInteger(Arrays.copyOfRange(signature, startS + 2, startS + 2 + lengthS))
-	}
+    fun extractS(signature: ByteArray): BigInteger {
+        val startR = if ((signature[1].toInt() and 0x80) != 0) 3 else 2
+        val lengthR = signature[startR + 1].toInt()
+        val startS = startR + 2 + lengthR
+        val lengthS = signature[startS + 1].toInt()
+        return BigInteger(Arrays.copyOfRange(signature, startS + 2, startS + 2 + lengthS))
+    }
 
-	val r = extractR(this).toByteArray().toFixedLength(32)
-	val s = extractS(this).toByteArray().toFixedLength(32)
-	return r + s
+    val r = extractR(this).toByteArray().toFixedLength(32)
+    val s = extractS(this).toByteArray().toFixedLength(32)
+    return r + s
 }

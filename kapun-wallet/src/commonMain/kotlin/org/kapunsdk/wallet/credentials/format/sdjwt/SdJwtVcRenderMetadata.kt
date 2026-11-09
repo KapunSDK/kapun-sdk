@@ -16,19 +16,19 @@ under the License.
 
 package org.kapunsdk.wallet.credentials.format.sdjwt
 
-import org.kapunsdk.credentials.sdjwt.SdJwtVcMetadata
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import org.kapunsdk.credentials.sdjwt.SdJwtVcMetadata
 
 /**
  * An extension to the IETF standard SD-JWT VC Metadata (see [SdJwtVcMetadata]) with the OCA reference from the Swiss OCA spec (see https://datatracker.ietf.org/doc/draft-ietf-oauth-sd-jwt-vc/)
  */
 data class SdJwtVcRenderMetadata(
-	@SerialName("render") val render: SdJwtVcRender? = null,
+    @SerialName("render") val render: SdJwtVcRender? = null,
 )
 
 @Serializable
 data class SdJwtVcRender(
-	@SerialName("type") val type: String,
-	@SerialName("oca") val oca: String,
+    @SerialName("type") val type: String,
+    @SerialName("oca") val oca: String,
 )

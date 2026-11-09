@@ -16,6 +16,7 @@ under the License.
 
 package org.kapunsdk.wallet.credentials.mapping
 
+import kotlinx.serialization.json.*
 import org.kapunsdk.credentials.models.credential.CredentialModel
 import org.kapunsdk.credentials.models.credential.CredentialType
 import org.kapunsdk.credentials.models.identity.IdentityModel
@@ -35,7 +36,6 @@ import org.kapunsdk.wallet.credentials.issuer.getDisplayName
 import org.kapunsdk.wallet.credentials.signature.Signature
 import org.kapunsdk.wallet.credentials.signature.SignatureValidationState
 import org.kapunsdk.wallet.resources.StringResourceProvider
-import kotlinx.serialization.json.*
 import org.koin.core.module.dsl.factoryOf
 import org.koin.dsl.module
 import kotlin.time.Clock
@@ -44,134 +44,166 @@ import kotlin.time.Instant
 
 @OptIn(ExperimentalTime::class)
 class FallbackIdentityMapper(
-	private val stringResourceProvider: StringResourceProvider,
+    private val stringResourceProvider: StringResourceProvider,
 ) {
+    companion object {
+        val koinModule =
+            module {
+                factoryOf(::FallbackIdentityMapper)
+            }
 
-	companion object {
-		val koinModule = module {
-			factoryOf(::FallbackIdentityMapper)
-		}
+        /** Standard properties from the SD-JWT spec that should not be displayed */
+        private val filteredProperties = setOf("_sd", "_sd_alg", "cnf", "exp", "iat", "iss", "nbf", "sub")
+    }
 
-		/** Standard properties from the SD-JWT spec that should not be displayed */
-		private val filteredProperties = setOf("_sd", "_sd_alg", "cnf", "exp", "iat", "iss", "nbf", "sub")
-	}
+    private val json = Json { ignoreUnknownKeys = true }
 
-	private val json = Json { ignoreUnknownKeys = true }
+    fun mapIdentity(
+        credentialType: CredentialType,
+        identity: IdentityModel,
+        payload: String,
+        activities: List<ActivityUiModel>,
+        credentials: List<CredentialModel>,
+    ): IdentityUiModel.IdentityUiCredentialModel? {
+        val hasEmergencyPass = identity.emergencyTokens != null
+        val hasOnlyEmergencyPass =
+            hasEmergencyPass &&
+                identity.credentials.all {
+                    it.metadata.keyMaterial is KeyMaterial.Frost || it.metadata.keyMaterial is KeyMaterial.Unusable
+                }
 
-	fun mapIdentity(
-		credentialType: CredentialType,
-		identity: IdentityModel,
-		payload: String,
-		activities: List<ActivityUiModel>,
-		credentials: List<CredentialModel>,
-	): IdentityUiModel.IdentityUiCredentialModel? {
-		val hasEmergencyPass = identity.emergencyTokens != null
-		val hasOnlyEmergencyPass = hasEmergencyPass && identity.credentials.all {
-			it.metadata.keyMaterial is KeyMaterial.Frost || it.metadata.keyMaterial is KeyMaterial.Unusable
-		}
+        val root = json.parseToJsonElement(payload).jsonObjectOrNull() ?: return null
+        val credentialJson =
+            when (credentialType) {
+                CredentialType.SdJwt -> {
+                    root["verified_claims"]
+                        ?.jsonObjectOrNull()
+                        ?.get("claims")
+                        ?.jsonObjectOrNull()
+                        ?.let { it.values.singleOrNull()?.jsonObjectOrNull() ?: it }
+                        ?: root
+                }
 
-		val root = json.parseToJsonElement(payload).jsonObjectOrNull() ?: return null
-		val credentialJson = when (credentialType) {
-			CredentialType.SdJwt -> {
-				root["verified_claims"]?.jsonObjectOrNull()
-					?.get("claims")?.jsonObjectOrNull()
-					?.let { it.values.singleOrNull()?.jsonObjectOrNull() ?: it }
-					?: root
-			}
-			CredentialType.Mdoc -> {
-				root.entries.firstOrNull { it.key.contains(".") }
-					?.let { root[it.key] as? JsonObject } ?: root
-			}
-			CredentialType.BbsTermwise -> root
-			CredentialType.W3C_VCDM -> root
-            CredentialType.OpenBadge303 -> root
-            CredentialType.Unknown -> root
-		}
+                CredentialType.Mdoc -> {
+                    root.entries
+                        .firstOrNull { it.key.contains(".") }
+                        ?.let { root[it.key] as? JsonObject } ?: root
+                }
 
-		val firstName = credentialJson["given_name"]?.jsonPrimitive?.content
-		val lastName = credentialJson["last_name"]?.jsonPrimitive?.content
-		val iss = credentialJson["iss"]?.jsonPrimitiveOrNull()?.contentOrNull ?: root["iss"]?.jsonPrimitiveOrNull()?.contentOrNull ?: ""
-		val exp = credentialJson["exp"]?.jsonPrimitiveOrNull()?.longOrNull ?: root["exp"]?.jsonPrimitiveOrNull()?.longOrNull
+                CredentialType.BbsTermwise -> {
+                    root
+                }
 
-		val expiresAt = exp?.let {
-			// TODO According to RFC 7519 this should be in seconds
-			Instant.fromSecondsOrMillis(it)
-		}
+                CredentialType.W3C_VCDM -> {
+                    root
+                }
 
-		val validationState = expiresAt?.let {
-			if (it < Clock.System.now()) SignatureValidationState.EXPIRED else SignatureValidationState.VALID
-		} ?: SignatureValidationState.INVALID
+                CredentialType.OpenBadge303 -> {
+                    root
+                }
 
-		val userLocale = stringResourceProvider.getString("language_key")
-		val issuerName = identity.issuer.getDisplayName(userLocale)
+                CredentialType.Unknown -> {
+                    root
+                }
+            }
 
-		val title = if (firstName != null || lastName != null) {
-			listOfNotNull(firstName, lastName).joinToString(" ")
-		} else {
-			issuerName
-		}
-		val subtitle = if (identity.isPid) {
-			stringResourceProvider.getString("id_title")
-		} else {
-			stringResourceProvider.getString("wallet_documents_placeholder_title")
-		}
+        val firstName = credentialJson["given_name"]?.jsonPrimitive?.content
+        val lastName = credentialJson["last_name"]?.jsonPrimitive?.content
+        val iss =
+            credentialJson["iss"]?.jsonPrimitiveOrNull()?.contentOrNull
+                ?: root["iss"]?.jsonPrimitiveOrNull()?.contentOrNull
+                ?: ""
+        val exp =
+            credentialJson["exp"]?.jsonPrimitiveOrNull()?.longOrNull ?: root["exp"]?.jsonPrimitiveOrNull()?.longOrNull
 
+        val expiresAt =
+            exp?.let {
+                // TODO According to RFC 7519 this should be in seconds
+                Instant.fromSecondsOrMillis(it)
+            }
 
-		return IdentityUiModel.IdentityUiCredentialModel(
-			id = identity.id,
-			name = identity.name,
-			card = LayoutData.Card(
-				credentialName = identity.name,
-				issuerName = issuerName,
-				title = title,
-				subtitle = subtitle,
-				textColor = TextShade.DARK,
-				cardColor = 0xFFEFEFEF,
-				backgroundImage = null,
-				overlays = null,
-			),
-			title = title,
-			subtitle = subtitle,
-			signature = Signature(validationState, iss),
-			detailList = LayoutData.DetailList(
-				sections = listOfNotNull(
-					LayoutSection(
-						sectionTitle = null,
-						sectionContent = credentialJson.jsonObject.entries.filter { it.key !in filteredProperties }.map { (key, element) ->
-							val value = (element as? JsonPrimitive)?.contentOrNull ?: element.toString()
-							LayoutSectionProperty(
-								value = AttributeValue.Raw(value),
-								label = stringResourceProvider.getString(key),
-								information = null,
-							)
-						}
-					),
-					expiresAt?.let {
-						LayoutSection(
-							sectionTitle = null,
-							sectionContent = listOf(
-								LayoutSectionProperty(
-									value = AttributeValue.Timestamp(it),
-									label = stringResourceProvider.getString("id_valid_until"),
-									information = null,
-								)
-							)
-						)
-					}
-				)
-			),
-			hasEmergencyPass,
-			hasOnlyEmergencyPass,
-			credentials = credentials,
-			activities = activities,
-			isPid = identity.isPid,
-			isUsable = credentials.any { it.keyMaterialType != KeyMaterialType.UNUSABLE },
-			isRefreshable = identity.tokens.refreshToken != null,
-			isRevoked = false,
-			docType = identity.credentials.firstOrNull()?.docType ?: "",
-			frostBlob = identity.frostBlob,
-			credentialUiModel = emptyList()
-		)
-	}
+        val validationState =
+            expiresAt?.let {
+                if (it < Clock.System.now()) SignatureValidationState.EXPIRED else SignatureValidationState.VALID
+            } ?: SignatureValidationState.INVALID
 
+        val userLocale = stringResourceProvider.getString("language_key")
+        val issuerName = identity.issuer.getDisplayName(userLocale)
+
+        val title =
+            if (firstName != null || lastName != null) {
+                listOfNotNull(firstName, lastName).joinToString(" ")
+            } else {
+                issuerName
+            }
+        val subtitle =
+            if (identity.isPid) {
+                stringResourceProvider.getString("id_title")
+            } else {
+                stringResourceProvider.getString("wallet_documents_placeholder_title")
+            }
+
+        return IdentityUiModel.IdentityUiCredentialModel(
+            id = identity.id,
+            name = identity.name,
+            card =
+                LayoutData.Card(
+                    credentialName = identity.name,
+                    issuerName = issuerName,
+                    title = title,
+                    subtitle = subtitle,
+                    textColor = TextShade.DARK,
+                    cardColor = 0xFFEFEFEF,
+                    backgroundImage = null,
+                    overlays = null,
+                ),
+            title = title,
+            subtitle = subtitle,
+            signature = Signature(validationState, iss),
+            detailList =
+                LayoutData.DetailList(
+                    sections =
+                        listOfNotNull(
+                            LayoutSection(
+                                sectionTitle = null,
+                                sectionContent =
+                                    credentialJson.jsonObject.entries
+                                        .filter { it.key !in filteredProperties }
+                                        .map { (key, element) ->
+                                            val value = (element as? JsonPrimitive)?.contentOrNull ?: element.toString()
+                                            LayoutSectionProperty(
+                                                value = AttributeValue.Raw(value),
+                                                label = stringResourceProvider.getString(key),
+                                                information = null,
+                                            )
+                                        },
+                            ),
+                            expiresAt?.let {
+                                LayoutSection(
+                                    sectionTitle = null,
+                                    sectionContent =
+                                        listOf(
+                                            LayoutSectionProperty(
+                                                value = AttributeValue.Timestamp(it),
+                                                label = stringResourceProvider.getString("id_valid_until"),
+                                                information = null,
+                                            ),
+                                        ),
+                                )
+                            },
+                        ),
+                ),
+            hasEmergencyPass,
+            hasOnlyEmergencyPass,
+            credentials = credentials,
+            activities = activities,
+            isPid = identity.isPid,
+            isUsable = credentials.any { it.keyMaterialType != KeyMaterialType.UNUSABLE },
+            isRefreshable = identity.tokens.refreshToken != null,
+            isRevoked = false,
+            docType = identity.credentials.firstOrNull()?.docType ?: "",
+            frostBlob = identity.frostBlob,
+            credentialUiModel = emptyList(),
+        )
+    }
 }

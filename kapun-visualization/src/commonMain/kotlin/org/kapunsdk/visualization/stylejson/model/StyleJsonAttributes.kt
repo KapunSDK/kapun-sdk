@@ -20,5 +20,5 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class StyleJsonAttributes(
-	val attributes: Map<String, StyleJsonAttributeDetails>,
+    val attributes: Map<String, StyleJsonAttributeDetails>,
 )

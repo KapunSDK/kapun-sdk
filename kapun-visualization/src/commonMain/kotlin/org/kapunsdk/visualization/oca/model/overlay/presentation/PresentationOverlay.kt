@@ -23,7 +23,5 @@ import org.kapunsdk.visualization.oca.model.overlay.Overlay
  * Defines the way a data set should be presented
  **/
 interface PresentationOverlay : Overlay {
-
-	fun presentsAttributes(): List<AttributeName>
-
+    fun presentsAttributes(): List<AttributeName>
 }

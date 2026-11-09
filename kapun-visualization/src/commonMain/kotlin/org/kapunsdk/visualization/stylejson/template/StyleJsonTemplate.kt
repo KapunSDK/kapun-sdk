@@ -18,23 +18,21 @@ package org.kapunsdk.visualization.stylejson.template
 
 import org.kapunsdk.visualization.oca.model.content.AttributeName
 
-internal class StyleJsonTemplate(private val template: String) {
+internal class StyleJsonTemplate(
+    private val template: String,
+) {
+    companion object {
+        private val regex = "\\{\\{\\s*(\\S+)\\s*\\}\\}".toRegex()
+    }
 
-	companion object {
-		private val regex = "\\{\\{\\s*(\\S+)\\s*\\}\\}".toRegex()
-	}
-
-	fun interpolate(
-		valueProvider: (AttributeName) -> String?,
-	): String {
-		return template.replace(regex) { matchResult ->
-			val matchGroup = matchResult.groups[1]
-			val key = matchGroup?.value
-			if (key == null) {
-				matchResult.value
-			} else {
-				valueProvider.invoke(key) ?: matchResult.value
-			}
-		}
-	}
+    fun interpolate(valueProvider: (AttributeName) -> String?): String =
+        template.replace(regex) { matchResult ->
+            val matchGroup = matchResult.groups[1]
+            val key = matchGroup?.value
+            if (key == null) {
+                matchResult.value
+            } else {
+                valueProvider.invoke(key) ?: matchResult.value
+            }
+        }
 }

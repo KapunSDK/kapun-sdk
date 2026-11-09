@@ -26,12 +26,12 @@ import org.kapunsdk.util.network.KapunNetworkConfiguration
 import org.koin.core.KoinApplication
 
 internal fun KoinApplication.trustModules(networkConfiguration: KapunNetworkConfiguration) {
-	modules(
-		jsonModule(),
-		networkModule(networkConfiguration),
-		SwissTrustService.koinModule,
-		SwissTrustRepository.koinModule,
-		RevocationCache.koinModule,
-		RevocationCheck.koinModule
-	)
+    modules(
+        jsonModule(),
+        networkModule(networkConfiguration),
+        SwissTrustService.koinModule,
+        SwissTrustRepository.koinModule,
+        RevocationCache.koinModule,
+        RevocationCheck.koinModule,
+    )
 }

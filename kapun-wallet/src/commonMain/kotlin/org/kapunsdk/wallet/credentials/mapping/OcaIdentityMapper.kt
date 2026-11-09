@@ -16,126 +16,137 @@ under the License.
 
 package org.kapunsdk.wallet.credentials.mapping
 
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.json.Json
 import org.kapunsdk.credentials.models.credential.CredentialModel
 import org.kapunsdk.credentials.models.identity.IdentityModel
+import org.kapunsdk.credentials.models.metadata.KeyMaterial
+import org.kapunsdk.credentials.models.metadata.KeyMaterialType
 import org.kapunsdk.visualization.layout.LayoutData
 import org.kapunsdk.visualization.layout.LayoutType
 import org.kapunsdk.visualization.oca.OcaType
 import org.kapunsdk.visualization.oca.model.OcaBundleJson
+import org.kapunsdk.visualization.oca.processing.AttributeValue
 import org.kapunsdk.visualization.oca.processing.OcaProcessor
 import org.kapunsdk.wallet.credentials.activity.ActivityUiModel
 import org.kapunsdk.wallet.credentials.identity.IdentityUiModel
 import org.kapunsdk.wallet.credentials.issuer.getDisplayName
 import org.kapunsdk.wallet.credentials.mapping.defaults.OcaBundleFactory
-import org.kapunsdk.credentials.models.metadata.KeyMaterial
-import org.kapunsdk.credentials.models.metadata.KeyMaterialType
-import org.kapunsdk.visualization.oca.processing.AttributeValue
 import org.kapunsdk.wallet.credentials.oca.OcaRepository
 import org.kapunsdk.wallet.credentials.signature.Signature
 import org.kapunsdk.wallet.credentials.signature.SignatureValidationState
 import org.kapunsdk.wallet.resources.StringResourceProvider
-import kotlinx.serialization.SerializationException
-import kotlinx.serialization.json.Json
 import org.koin.core.module.dsl.factoryOf
 import org.koin.dsl.module
 
 class OcaIdentityMapper(
-	private val stringResourceProvider: StringResourceProvider,
+    private val stringResourceProvider: StringResourceProvider,
 ) {
+    companion object {
+        val koinModule =
+            module {
+                factoryOf(::OcaIdentityMapper)
+            }
+    }
 
-	companion object {
-		val koinModule = module {
-			factoryOf(::OcaIdentityMapper)
-		}
-	}
+    private val json = Json { ignoreUnknownKeys = true }
 
-	private val json = Json { ignoreUnknownKeys = true }
+    fun mapIdentity(
+        ocaRepository: OcaRepository,
+        ocaType: OcaType,
+        identity: IdentityModel,
+        payload: String,
+        activities: List<ActivityUiModel>,
+        credentials: List<CredentialModel>,
+        attributeValueOverrides: Map<String, AttributeValue<*>> = mapOf(),
+    ): IdentityUiModel.IdentityUiCredentialModel? {
+        val languageKey = stringResourceProvider.getString("language_key")
 
-	fun mapIdentity(
-		ocaRepository: OcaRepository,
-		ocaType: OcaType,
-		identity: IdentityModel,
-		payload: String,
-		activities: List<ActivityUiModel>,
-		credentials: List<CredentialModel>,
-		attributeValueOverrides: Map<String, AttributeValue<*>> = mapOf()
-	): IdentityUiModel.IdentityUiCredentialModel? {
-		val languageKey = stringResourceProvider.getString("language_key")
+        val hasEmergencyPass = identity.emergencyTokens != null
+        val hasOnlyEmergencyPass =
+            hasEmergencyPass &&
+                identity.credentials.all {
+                    it.metadata.keyMaterial is KeyMaterial.Frost || it.metadata.keyMaterial is KeyMaterial.Unusable
+                }
 
-		val hasEmergencyPass = identity.emergencyTokens != null
-		val hasOnlyEmergencyPass = hasEmergencyPass && identity.credentials.all {
-			it.metadata.keyMaterial is KeyMaterial.Frost || it.metadata.keyMaterial is KeyMaterial.Unusable
-		}
+        val ocaBundle =
+            when (ocaType) {
+                is OcaType.Reference -> {
+                    val ocaJson = ocaRepository.getForUrl(ocaType.url)
+                    if (ocaJson != null) {
+                        try {
+                            json.decodeFromString<OcaBundleJson>(ocaJson.content)
+                        } catch (e: SerializationException) {
+                            return null
+                        }
+                    } else {
+                        // TODO Should schedule it for download or something
+                        return null
+                    }
+                }
 
-		val ocaBundle = when (ocaType) {
-			is OcaType.Reference -> {
-				val ocaJson = ocaRepository.getForUrl(ocaType.url)
-				if (ocaJson != null) {
-					try {
-						json.decodeFromString<OcaBundleJson>(ocaJson.content)
-					} catch (e: SerializationException) {
-						return null
-					}
-				} else {
-					// TODO Should schedule it for download or something
-					return null
-				}
-			}
-			is OcaType.BuiltIn.EuPid -> OcaBundleFactory.createEuidPidBundle(
-				languageKey,
-				stringResourceProvider,
-				hasOnlyEmergencyPass
-			)
-			is OcaType.BuiltIn.SwissBetaId -> OcaBundleFactory.createSwissBetaIdBundle(
-				languageKey,
-				stringResourceProvider
-			)
-			is OcaType.BuiltIn.FromMetadata -> {
-				val ocaJson = ocaRepository.getForUrl(ocaType.url)
-				if (ocaJson != null) {
-					try {
-						json.decodeFromString<OcaBundleJson>(ocaJson.content)
-					} catch (e: SerializationException) {
-						return null
-					}
-				} else {
-					// TODO Should schedule it for download or something
-					return null
-				}
-			}
-        }
+                is OcaType.BuiltIn.EuPid -> {
+                    OcaBundleFactory.createEuidPidBundle(
+                        languageKey,
+                        stringResourceProvider,
+                        hasOnlyEmergencyPass,
+                    )
+                }
 
-		val processor = OcaProcessor(
-			languageKey,
-			payload,
-			ocaBundle,
-			attributeValueOverrides = attributeValueOverrides
-		)
-		val cardData = processor.process(LayoutType.CARD) as LayoutData.Card
-		val listData = processor.process(LayoutType.DETAIL_LIST) as LayoutData.DetailList
+                is OcaType.BuiltIn.SwissBetaId -> {
+                    OcaBundleFactory.createSwissBetaIdBundle(
+                        languageKey,
+                        stringResourceProvider,
+                    )
+                }
 
-		val userLocale = stringResourceProvider.getString("language_key")
-		val issuerName = identity.issuer.getDisplayName(userLocale)
+                is OcaType.BuiltIn.FromMetadata -> {
+                    val ocaJson = ocaRepository.getForUrl(ocaType.url)
+                    if (ocaJson != null) {
+                        try {
+                            json.decodeFromString<OcaBundleJson>(ocaJson.content)
+                        } catch (e: SerializationException) {
+                            return null
+                        }
+                    } else {
+                        // TODO Should schedule it for download or something
+                        return null
+                    }
+                }
+            }
 
-		return IdentityUiModel.IdentityUiCredentialModel(
-			id = identity.id,
-			name = identity.name,
-			card = cardData,
-			title = cardData.title ?: "title",
-			subtitle = cardData.subtitle ?: "subtitle",
-			signature = Signature(SignatureValidationState.VALID, issuerName),
-			detailList = listData,
-			hasEmergencyPass = hasEmergencyPass,
-			hasOnlyEmergencyPass = hasOnlyEmergencyPass,
-			credentials = credentials,
-			activities = activities,
-			isPid = identity.isPid,
-			isUsable = credentials.any { it.keyMaterialType != KeyMaterialType.UNUSABLE },
-			isRefreshable = identity.tokens.refreshToken != null,
-			isRevoked = false,
-			docType = identity.credentials.firstOrNull()?.docType ?: "",
-			frostBlob = identity.frostBlob,
-			credentialUiModel = emptyList()
-		)
-	}
+        val processor =
+            OcaProcessor(
+                languageKey,
+                payload,
+                ocaBundle,
+                attributeValueOverrides = attributeValueOverrides,
+            )
+        val cardData = processor.process(LayoutType.CARD) as LayoutData.Card
+        val listData = processor.process(LayoutType.DETAIL_LIST) as LayoutData.DetailList
+
+        val userLocale = stringResourceProvider.getString("language_key")
+        val issuerName = identity.issuer.getDisplayName(userLocale)
+
+        return IdentityUiModel.IdentityUiCredentialModel(
+            id = identity.id,
+            name = identity.name,
+            card = cardData,
+            title = cardData.title ?: "title",
+            subtitle = cardData.subtitle ?: "subtitle",
+            signature = Signature(SignatureValidationState.VALID, issuerName),
+            detailList = listData,
+            hasEmergencyPass = hasEmergencyPass,
+            hasOnlyEmergencyPass = hasOnlyEmergencyPass,
+            credentials = credentials,
+            activities = activities,
+            isPid = identity.isPid,
+            isUsable = credentials.any { it.keyMaterialType != KeyMaterialType.UNUSABLE },
+            isRefreshable = identity.tokens.refreshToken != null,
+            isRevoked = false,
+            docType = identity.credentials.firstOrNull()?.docType ?: "",
+            frostBlob = identity.frostBlob,
+            credentialUiModel = emptyList(),
+        )
+    }
 }

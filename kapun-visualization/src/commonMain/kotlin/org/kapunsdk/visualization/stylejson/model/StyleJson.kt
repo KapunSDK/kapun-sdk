@@ -20,40 +20,40 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class StyleJson(
-	val title: String,
-	val subtitle: String,
-	val textColor: StyleJsonTextShade = StyleJsonTextShade.DARK,
-	val cardColor: Long = Int.MIN_VALUE.toLong(),
-	val backgroundCard: String? = null,
-	val orderedProperties: List<String>,
-	val frontOverlays: List<StyleOverlay>? = null
+    val title: String,
+    val subtitle: String,
+    val textColor: StyleJsonTextShade = StyleJsonTextShade.DARK,
+    val cardColor: Long = Int.MIN_VALUE.toLong(),
+    val backgroundCard: String? = null,
+    val orderedProperties: List<String>,
+    val frontOverlays: List<StyleOverlay>? = null,
 ) {
-	@Serializable
-	data class StyleOverlay(
-		val content: String,
-		val contentType: OverlayContentType,
-		val position: OverlayPosition,
-		val showLabel: Boolean = true
-	) {
-		@Serializable
-		enum class OverlayContentType {
-			Text,
-			Image,
-			ImageLogo,
-			ImageIcon
-		}
+    @Serializable
+    data class StyleOverlay(
+        val content: String,
+        val contentType: OverlayContentType,
+        val position: OverlayPosition,
+        val showLabel: Boolean = true,
+    ) {
+        @Serializable
+        enum class OverlayContentType {
+            Text,
+            Image,
+            ImageLogo,
+            ImageIcon,
+        }
 
-		@Serializable
-		enum class OverlayPosition {
-			TopLeft,
-			Top,
-			TopRight,
-			Left,
-			Center,
-			Right,
-			BottomLeft,
-			Bottom,
-			BottomRight
-		}
-	}
+        @Serializable
+        enum class OverlayPosition {
+            TopLeft,
+            Top,
+            TopRight,
+            Left,
+            Center,
+            Right,
+            BottomLeft,
+            Bottom,
+            BottomRight,
+        }
+    }
 }

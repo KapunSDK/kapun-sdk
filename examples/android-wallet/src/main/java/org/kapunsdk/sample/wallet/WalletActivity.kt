@@ -11,7 +11,7 @@ software distributed under the License is distributed on an
 "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
-under the License.   
+under the License.
  */
 package org.kapunsdk.sample.wallet
 
@@ -22,15 +22,15 @@ import androidx.fragment.app.commit
 import org.kapunsdk.sample.wallet.feature.proximity.ProximityFragment
 
 class MainActivity : AppCompatActivity() {
-	override fun onCreate(savedInstanceState: Bundle?) {
-		super.onCreate(savedInstanceState)
-		enableEdgeToEdge()
-		setContentView(R.layout.activity_wallet)
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        setContentView(R.layout.activity_wallet)
 
-		if (savedInstanceState == null) {
-			supportFragmentManager.commit {
-				replace(R.id.fragmentContainerView, ProximityFragment.newInstance())
-			}
-		}
-	}
+        if (savedInstanceState == null) {
+            supportFragmentManager.commit {
+                replace(R.id.fragmentContainerView, ProximityFragment.newInstance())
+            }
+        }
+    }
 }

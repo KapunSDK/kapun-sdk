@@ -24,76 +24,78 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-
 class TestPossum {
     @Test
     fun testPossum() {
-        val expression = """  
-            /* TEST COMMENT */
-        if ( 
-            /* OTHER */
-            payload.v.0.tg === external.acceptance-criterias.diseases.hytu ?? "test"
-            && 
-            payload.v.0.dn >= payload.v.0.sd 
-            && payload.v.0.sd >= 2
-            && payload.v.0.dn == 2
-        )
-        {
-             /* OTHER */
-            true
-        } else
-        { 
-             /* OTHER */
-            false
-        }
-        """.trimIndent()
-        val data = """  
+        val expression =
+            """
+                /* TEST COMMENT */
+            if (
+                /* OTHER */
+                payload.v.0.tg === external.acceptance-criterias.diseases.hytu ?? "test"
+                &&
+                payload.v.0.dn >= payload.v.0.sd
+                && payload.v.0.sd >= 2
+                && payload.v.0.dn == 2
+            )
             {
-            "external": {
-                "acceptance-criterias" : {
-                    "diseases" : {
-                        "hytu" : "8539006"
-                    }
+                 /* OTHER */
+                true
+            } else
+            {
+                 /* OTHER */
+                false
+            }
+            """.trimIndent()
+        val data =
+            """
+                    {
+                    "external": {
+                        "acceptance-criterias" : {
+                            "diseases" : {
+                                "hytu" : "8539006"
+                            }
+                        }
+                    },
+                    "payload" : {
+                    "nam": {
+                        "fn": "Müller",
+                        "fnt": "MUELLER",
+                        "gn": "Céline",
+                        "gnt": "CELINE"
+                    },
+                    "dob": "1943-02-01",
+                    "ver": "1.0.0",
+                    "v": [
+                        {
+                            "tg": "8539006",
+                            "vp": "1119007",
+                            "mp": "EU/10/1507",
+                            "ma": "ORG-100084",
+                            "dn": 2,
+                            "sd": 2,
+                            "dt": "2021-04-30",
+                            "co": "CH",
+                            "is": "Musteramt",
+                            "ci": "11111"
+                        }
+                    ]
                 }
-            },
-            "payload" : {
-            "nam": {
-                "fn": "Müller",
-                "fnt": "MUELLER",
-                "gn": "Céline",
-                "gnt": "CELINE"
-            },
-            "dob": "1943-02-01",
-            "ver": "1.0.0",
-            "v": [
-                {
-                    "tg": "8539006",
-                    "vp": "1119007",
-                    "mp": "EU/10/1507",
-                    "ma": "ORG-100084",
-                    "dn": 2,
-                    "sd": 2,
-                    "dt": "2021-04-30",
-                    "co": "CH",
-                    "is": "Musteramt",
-                    "ci": "11111"
-                }
-            ]
-        }
-    }
-        """.trimIndent()
+            }
+            """.trimIndent()
 
         val pe = PossumExpression.fromStr(expression)
         val result = pe.evaluate(data)
         assertTrue { result.isTruthy() }
     }
 
-    private val data = """
+    private val data =
+        """
         {
             "external": {"validationClock": "2026-10-27T10:15:00Z"},
             "claims": {"dateOfExpiration": "2031-10-27", "categories": [{"code": "B"}, {"code": "C"}]}
         }
-    """.trimIndent()
+        """.trimIndent()
 
     @Test
     fun parseReportsInvalidSource() {
@@ -115,6 +117,11 @@ class TestPossum {
 
     @Test
     fun evaluateBoolRejectsNonBooleans() {
-        assertFailsWith<PossumException.Evaluation> { PossumExpression.parse("claims.dateOfExpiration").evaluateBool(data) }
+        assertFailsWith<PossumException.Evaluation> {
+            PossumExpression
+                .parse(
+                    "claims.dateOfExpiration",
+                ).evaluateBool(data)
+        }
     }
 }

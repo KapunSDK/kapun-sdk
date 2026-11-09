@@ -11,7 +11,7 @@ software distributed under the License is distributed on an
 "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
-under the License.   
+under the License.
  */
 package org.kapunsdk.wallet.database
 
@@ -19,15 +19,16 @@ import app.cash.sqldelight.db.SqlDriver
 import org.kapunsdk.wallet.database.migrations.V1To2RenameKeyMaterialClassDiscriminator
 
 internal interface SqliteDriverFactory {
+    companion object {
+        val DATABASE_NAME = "kapun_database.sqlite"
 
-	companion object {
-		val DATABASE_NAME = "kapun_database.sqlite"
+        val migrations =
+            arrayOf(
+                V1To2RenameKeyMaterialClassDiscriminator,
+            )
+    }
 
-		val migrations = arrayOf(
-			V1To2RenameKeyMaterialClassDiscriminator,
-		)
-	}
-	var databaseNameOverride : String?
+    var databaseNameOverride: String?
 
-	fun createDriver(): SqlDriver
+    fun createDriver(): SqlDriver
 }

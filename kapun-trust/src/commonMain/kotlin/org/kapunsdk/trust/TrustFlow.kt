@@ -23,24 +23,20 @@ import org.kapunsdk.trust.framework.ValidationInfo
 import org.kapunsdk.trust.model.AgentInformation
 
 class TrustFlow(
-	val agentInformation: AgentInformation,
-	private val framework: org.kapunsdk.trust.framework.TrustFramework?,
+    val agentInformation: AgentInformation,
+    private val framework: org.kapunsdk.trust.framework.TrustFramework?,
 ) {
+    suspend fun validatePresentationRequest(
+        presentationRequest: PresentationRequest,
+    ): org.kapunsdk.trust.framework.ValidationInfo =
+        framework?.validatePresentationRequest(presentationRequest) ?: org.kapunsdk.trust.framework.ValidationInfo(
+            isValid = false,
+            errorInfo = "invalid_request",
+        )
 
-	suspend fun validatePresentationRequest(
-		presentationRequest: PresentationRequest,
-	): org.kapunsdk.trust.framework.ValidationInfo {
-		return framework?.validatePresentationRequest(presentationRequest) ?: org.kapunsdk.trust.framework.ValidationInfo(
-			isValid = false,
-			errorInfo = "invalid_request"
-		)
-	}
-
-	suspend fun getAllowedDocuments(
-		presentationRequest: PresentationRequest,
-		includeUsedCredentials: Boolean,
-	): List<CredentialModel> {
-		return framework?.getAllowedDocuments(presentationRequest, includeUsedCredentials) ?: emptyList()
-	}
-
+    suspend fun getAllowedDocuments(
+        presentationRequest: PresentationRequest,
+        includeUsedCredentials: Boolean,
+    ): List<CredentialModel> =
+        framework?.getAllowedDocuments(presentationRequest, includeUsedCredentials) ?: emptyList()
 }

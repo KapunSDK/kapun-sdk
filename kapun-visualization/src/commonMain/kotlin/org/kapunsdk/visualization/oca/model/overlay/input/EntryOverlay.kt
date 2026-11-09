@@ -16,31 +16,37 @@ under the License.
 
 package org.kapunsdk.visualization.oca.model.overlay.input
 
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import org.kapunsdk.visualization.oca.model.SAID_HASH_PLACEHOLDER
 import org.kapunsdk.visualization.oca.model.content.AttributeName
 import org.kapunsdk.visualization.oca.model.content.EntryValue
 import org.kapunsdk.visualization.oca.model.content.SAID
 import org.kapunsdk.visualization.oca.model.overlay.Localized
 import org.kapunsdk.visualization.oca.model.overlay.Overlay
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
 
 @Serializable
 data class EntryOverlay(
-	@SerialName("attribute_entries") val attributeEntries: Map<AttributeName, EntryValue>,
-	@SerialName("capture_base") override val captureBase: SAID,
-	@SerialName("type") override val type: String = "spec/overlays/entry/1.0",
-	@SerialName("language") override val language: String,
-	@SerialName("digest") override val digest: SAID = SAID_HASH_PLACEHOLDER,
-) : InputOverlay, Localized {
+    @SerialName("attribute_entries") val attributeEntries: Map<AttributeName, EntryValue>,
+    @SerialName("capture_base") override val captureBase: SAID,
+    @SerialName("type") override val type: String = "spec/overlays/entry/1.0",
+    @SerialName("language") override val language: String,
+    @SerialName("digest") override val digest: SAID = SAID_HASH_PLACEHOLDER,
+) : InputOverlay,
+    Localized {
+    fun getEntry(
+        attributeName: AttributeName,
+        code: String,
+    ): String? {
+        val entryValue = attributeEntries[attributeName] ?: return null
+        return when (entryValue) {
+            is EntryValue.Predefined -> entryValue.mapping[code]
+            is EntryValue.Reference -> null // TODO Resolve reference
+        }
+    }
 
-	fun getEntry(attributeName: AttributeName, code: String): String? {
-		val entryValue = attributeEntries[attributeName] ?: return null
-		return when (entryValue) {
-			is EntryValue.Predefined -> entryValue.mapping[code]
-			is EntryValue.Reference -> null // TODO Resolve reference
-		}
-	}
-	override fun updateDigest(digest: SAID, captureBase: SAID): Overlay = copy(digest = digest, captureBase = captureBase)
-
+    override fun updateDigest(
+        digest: SAID,
+        captureBase: SAID,
+    ): Overlay = copy(digest = digest, captureBase = captureBase)
 }

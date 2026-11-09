@@ -1,0 +1,76 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{kt,kts}]
+indent_style = space
+indent_size = 4
+max_line_length = 120
+ij_kotlin_allow_trailing_comma = true
+ij_kotlin_allow_trailing_comma_on_call_site = true
+# Wildcard imports are common in the existing sources; don't require a mass import rewrite.
+ktlint_standard_no-wildcard-imports = disabled
+# @Composable functions follow the Compose convention and may use PascalCase.
+ktlint_function_naming_ignore_when_annotated_with = Composable
+
+# Ignore generated UniFFI Kotlin files.
+[**/uniffi/**/*]
+ktlint = disabled
+
+# Keep legacy source files unchanged while still linting the rest of the project.
+[**/iso180135Module*.kt]
+ktlint_standard_filename = disabled
+
+[**/ProximityFragment.kt]
+ktlint_standard_backing-property-naming = disabled
+
+[**/WalletActivity.kt]
+ktlint_standard_filename = disabled
+
+[**/ProximityVerifierFragment.kt]
+ktlint_standard_backing-property-naming = disabled
+
+[**/BluetoothFragment.kt]
+ktlint_standard_backing-property-naming = disabled
+
+[**/PeripheralManagerDelegate.kt]
+ktlint_standard_filename = disabled
+
+# Keep long encoded or specification-provided test fixtures intact.
+[**/TestDcql.kt]
+ktlint_standard_max-line-length = disabled
+
+[**/SdJwtTests.kt]
+ktlint_standard_max-line-length = disabled
+ktlint_standard_no-consecutive-comments = disabled
+
+[**/OcaProcessorTest.kt]
+ktlint_standard_max-line-length = disabled
+
+[kapun-credentials/src/commonTest/kotlin/org/kapunsdk/util/json/Mdoc.kt]
+ktlint_standard_max-line-length = disabled
+
+# This file includes an inline base64 PNG as test fixture data.
+[**/OcaBundleFactory.kt]
+ktlint_standard_max-line-length = disabled
+
+# These files retain established source names or are intentionally empty.
+[**/W3C.jvm.kt]
+ktlint_standard_filename = disabled
+
+[**/ValueExtensions.kt]
+ktlint_standard_no-empty-file = disabled
+
+[**/MdlCentralClientModeTransportProtocol.kt]
+ktlint_standard_function-signature = disabled
+
+[*.swift]
+indent_style = space
+indent_size = 4
+
+[*.{json,yml,yaml}]
+indent_size = 2

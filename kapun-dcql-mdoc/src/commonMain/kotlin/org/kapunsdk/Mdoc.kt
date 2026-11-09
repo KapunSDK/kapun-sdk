@@ -16,6 +16,7 @@ under the License.
 
 package org.kapunsdk
 
+import kotlinx.serialization.json.Json
 import org.kapunsdk.credentials.Mdoc
 import org.kapunsdk.credentials.Mdoc.Companion.MDOC_FORMATS
 import org.kapunsdk.credentials.SdJwtErrors
@@ -30,13 +31,12 @@ import org.kapunsdk.util.extensions.asTag
 import org.kapunsdk.util.extensions.get
 import org.kapunsdk.util.extensions.isSame
 import org.kapunsdk.util.extensions.toCbor
-import kotlinx.serialization.json.Json
-import uniffi.kapun_dcql_mdoc_rust.MdocRust
 import uniffi.kapun_credential_core_rust.PointerPart
 import uniffi.kapun_credential_core_rust.Selector
 import uniffi.kapun_credential_core_rust.SignatureCreator
-import uniffi.kapun_dcql_mdoc_rust.decodeMdoc
 import uniffi.kapun_crypto_rust.base64UrlEncode
+import uniffi.kapun_dcql_mdoc_rust.MdocRust
+import uniffi.kapun_dcql_mdoc_rust.decodeMdoc
 import uniffi.kapun_dcql_rust.CombinedMdocMetaMismatch
 import uniffi.kapun_dcql_rust.Credential
 import uniffi.kapun_dcql_rust.CredentialLike
@@ -51,54 +51,54 @@ import uniffi.kapun_util_rust.encodeCbor
 import kotlin.collections.iterator
 import kotlin.text.iterator
 
-object MdocParser: CredentialParser {
+object MdocParser : CredentialParser {
     init {
         register()
     }
-    fun register() = registerParser(this)
-    override fun id(): String {
-        return "mdoc-parser"
-    }
 
-    override fun fromStr(credential: String): Credential? {
-        return runCatching { decodeMdoc(credential) }.getOrNull()?.let {
+    fun register() = registerParser(this)
+
+    override fun id(): String = "mdoc-parser"
+
+    override fun fromStr(credential: String): Credential? =
+        runCatching { decodeMdoc(credential) }.getOrNull()?.let {
             Credential.MdocCredential(MdocCredential(it))
         }
-    }
 }
 
-class MdocCredential(val mdoc: MdocRust) : CredentialLike {
-    override fun getBody(): Value {
-        return mdoc.namespaceMap
-    }
+class MdocCredential(
+    val mdoc: MdocRust,
+) : CredentialLike {
+    override fun getBody(): Value = mdoc.namespaceMap
 
-    override fun serialize(): String {
-        return mdoc.originalMdoc
-    }
+    override fun serialize(): String = mdoc.originalMdoc
 
-    override fun formatSpecifiers(): List<String> {
-       return listOf("mso_mdoc")
-    }
+    override fun formatSpecifiers(): List<String> = listOf("mso_mdoc")
 
     override fun matchesMeta(meta: Meta?): MetaMismatch? {
-       return when(meta){
-		   is Meta.IsoMdoc -> {
-               val docType = docType() ?: return MetaMismatch.MdocMetaMismatch(CombinedMdocMetaMismatch.WRONG_DOC_TYPE)
-               return if(docType != meta.doctypeValue) {
-                   MetaMismatch.MdocMetaMismatch(CombinedMdocMetaMismatch.WRONG_DOC_TYPE)
-               } else {
-                   null
-               }
-           }
-		   null -> null
-           else -> MetaMismatch.MdocMetaMismatch(CombinedMdocMetaMismatch.INVALID_META)
-	   }
+        return when (meta) {
+            is Meta.IsoMdoc -> {
+                val docType = docType() ?: return MetaMismatch.MdocMetaMismatch(CombinedMdocMetaMismatch.WRONG_DOC_TYPE)
+                return if (docType != meta.doctypeValue) {
+                    MetaMismatch.MdocMetaMismatch(CombinedMdocMetaMismatch.WRONG_DOC_TYPE)
+                } else {
+                    null
+                }
+            }
+
+            null -> {
+                null
+            }
+
+            else -> {
+                MetaMismatch.MdocMetaMismatch(CombinedMdocMetaMismatch.INVALID_META)
+            }
+        }
     }
 
-    override fun get(selector: Selector): List<Value>? {
-		return runCatching { mdoc.namespaceMap[selector] }.getOrNull()
-    }
-    fun docType() : String? {
+    override fun get(selector: Selector): List<Value>? = runCatching { mdoc.namespaceMap[selector] }.getOrNull()
+
+    fun docType(): String? {
         val result = this.mdoc.issuerAuth[listOf("docType").toClaimsPointer()!!]
         if (result.size != 1) {
             return null
@@ -106,7 +106,6 @@ class MdocCredential(val mdoc: MdocRust) : CredentialLike {
         return result[0].asString()
     }
 }
-
 
 fun Mdoc.getVpToken(
     query: CredentialQuery,
@@ -119,12 +118,13 @@ fun Mdoc.getVpToken(
     if (!MDOC_FORMATS.contains(query.format)) {
         return Result.failure(SdJwtErrors.InvalidFormat(query.format))
     }
-    val sessionTranscript = this.getSessionTranscript(
-        clientId = clientId,
-        nonce = nonce,
-        jwkThumbprint = jwkThumbprint,
-        responseUri = responseUri,
-    )
+    val sessionTranscript =
+        this.getSessionTranscript(
+            clientId = clientId,
+            nonce = nonce,
+            jwkThumbprint = jwkThumbprint,
+            responseUri = responseUri,
+        )
     var issuerSigned = this.mdoc.originalDecoded
     val originalIssuerAuth = issuerSigned.get("issuerAuth")
 
@@ -132,14 +132,15 @@ fun Mdoc.getVpToken(
     // value the same way so that invalid input fails closed instead of disclosing data.
     // https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-selecting-claims
     if (query.claims.isNullOrEmpty()) {
-        issuerSigned = mapOf(
-            "issuerAuth" to originalIssuerAuth,
-            "nameSpaces" to emptyMap<String, Value>()
-        ).toCbor()
+        issuerSigned =
+            mapOf(
+                "issuerAuth" to originalIssuerAuth,
+                "nameSpaces" to emptyMap<String, Value>(),
+            ).toCbor()
         return Result.success(
             base64UrlEncode(
-                encodeCbor(this.buildToken(signer, issuerSigned, sessionTranscript))
-            )
+                encodeCbor(this.buildToken(signer, issuerSigned, sessionTranscript)),
+            ),
         )
     }
     val namespaces = mutableMapOf<String, MutableList<Value>>()
@@ -155,10 +156,12 @@ fun Mdoc.getVpToken(
             if (theNamespace == Value.Null) {
                 return Result.failure(InvalidClaimsQuery(claim))
             }
-            val pair = theNamespace.asArray()!!
-                .map{ value ->
-                    Pair(value, decodeCbor(value.asTag()!!.value[0].asBytes()!!))
-                }.first { it.second["elementIdentifier"].asString()!! == claimName }
+            val pair =
+                theNamespace
+                    .asArray()!!
+                    .map { value ->
+                        Pair(value, decodeCbor(value.asTag()!!.value[0].asBytes()!!))
+                    }.first { it.second["elementIdentifier"].asString()!! == claimName }
             val element = pair.second
             if (element.isSame(Value.Null)) {
                 return Result.failure(InvalidClaimsQuery(claim))
@@ -181,9 +184,10 @@ fun Mdoc.getVpToken(
         setLoop@ for (option in requestedClaimSets) {
             var disclosurePtrs = mutableMapOf<String, MutableList<Value>>()
             for (claim in option) {
-                val claimQuery = requestedClaims.firstOrNull {
-                    it.id == claim
-                } ?: continue
+                val claimQuery =
+                    requestedClaims.firstOrNull {
+                        it.id == claim
+                    } ?: continue
 
                 val namespace = (claimQuery.path[0] as PointerPart.String).v1
                 val claimName = (claimQuery.path[1] as PointerPart.String).v1
@@ -192,12 +196,13 @@ fun Mdoc.getVpToken(
                 if (theNamespace == Value.Null) {
                     continue@setLoop
                 }
-                val element = theNamespace.asArray()!!
-                    .map {
-                        decodeCbor(it.asTag()!!.value[0].asBytes()!!)
-                    }
-                    .firstOrNull() { it["elementIdentifier"].asString()!! == claimName }
-                    ?: Value.Null
+                val element =
+                    theNamespace
+                        .asArray()!!
+                        .map {
+                            decodeCbor(it.asTag()!!.value[0].asBytes()!!)
+                        }.firstOrNull { it["elementIdentifier"].asString()!! == claimName }
+                        ?: Value.Null
                 if (element.isSame(Value.Null)) {
                     continue@setLoop
                 }
@@ -216,47 +221,53 @@ fun Mdoc.getVpToken(
                 var entry = namespaces.getOrPut(ptr.key) { mutableListOf() }
                 entry.addAll(ptr.value)
             }
-            issuerSigned = mapOf(
-                "issuerAuth" to originalIssuerAuth,
-                "nameSpaces" to namespaces
-            ).toCbor()
+            issuerSigned =
+                mapOf(
+                    "issuerAuth" to originalIssuerAuth,
+                    "nameSpaces" to namespaces,
+                ).toCbor()
 
-            val token = this.buildToken(
+            val token =
+                this.buildToken(
+                    signer,
+                    issuerSigned,
+                    sessionTranscript,
+                )
+
+            return Result.success(
+                base64UrlEncode(encodeCbor(token)),
+            )
+        }
+
+        issuerSigned =
+            mapOf(
+                "issuerAuth" to originalIssuerAuth,
+                "nameSpaces" to listOf<String>(),
+            ).toCbor()
+        val token =
+            this.buildToken(
                 signer,
                 issuerSigned,
                 sessionTranscript,
             )
 
-            return Result.success(
-                base64UrlEncode(encodeCbor(token))
-            )
-        }
-
-        issuerSigned = mapOf(
+        return Result.success(
+            base64UrlEncode(encodeCbor(token)),
+        )
+    }
+    issuerSigned =
+        mapOf(
             "issuerAuth" to originalIssuerAuth,
-            "nameSpaces" to listOf<String>()
+            "nameSpaces" to namespaces,
         ).toCbor()
-        val token = this.buildToken(
+    val token =
+        this.buildToken(
             signer,
             issuerSigned,
             sessionTranscript,
         )
 
-        return Result.success(
-            base64UrlEncode(encodeCbor(token))
-        )
-    }
-    issuerSigned = mapOf(
-        "issuerAuth" to originalIssuerAuth,
-        "nameSpaces" to namespaces
-    ).toCbor()
-    val token = this.buildToken(
-        signer,
-        issuerSigned,
-        sessionTranscript,
-    )
-
     return Result.success(
-        base64UrlEncode(encodeCbor(token))
+        base64UrlEncode(encodeCbor(token)),
     )
 }

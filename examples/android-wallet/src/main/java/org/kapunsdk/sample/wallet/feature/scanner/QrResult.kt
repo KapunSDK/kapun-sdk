@@ -11,7 +11,7 @@ software distributed under the License is distributed on an
 "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
-under the License.   
+under the License.
  */
 package org.kapunsdk.sample.wallet.feature.scanner
 
@@ -20,9 +20,11 @@ import kotlinx.parcelize.Parcelize
 
 @Parcelize
 sealed interface QrResult : Parcelable {
-	@Parcelize
-	data class Decoded(val data: String) : QrResult
+    @Parcelize
+    data class Decoded(
+        val data: String,
+    ) : QrResult
 
-	@Parcelize
-	data object Cancelled : QrResult
+    @Parcelize
+    data object Cancelled : QrResult
 }

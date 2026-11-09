@@ -17,15 +17,16 @@ under the License.
 package org.kapunsdk.wallet.process
 
 interface ProcessHandler {
+    /**
+     * Ask this process handler to handle a specific [inputEvent] taken at the [current] step (which may be null if this is a new process)
+     */
+    suspend fun handleProcessStep(
+        current: org.kapunsdk.wallet.process.ProcessStep?,
+        inputEvent: org.kapunsdk.wallet.process.ProcessEvent,
+    ): org.kapunsdk.wallet.process.ProcessStep?
 
-	/**
-	 * Ask this process handler to handle a specific [inputEvent] taken at the [current] step (which may be null if this is a new process)
-	 */
-	suspend fun handleProcessStep(current: org.kapunsdk.wallet.process.ProcessStep?, inputEvent: org.kapunsdk.wallet.process.ProcessEvent): org.kapunsdk.wallet.process.ProcessStep?
-
-	/**
-	 * Cleanup any resources that were allocated by this process handler
-	 */
-	suspend fun cleanupHandler()
-
+    /**
+     * Cleanup any resources that were allocated by this process handler
+     */
+    suspend fun cleanupHandler()
 }

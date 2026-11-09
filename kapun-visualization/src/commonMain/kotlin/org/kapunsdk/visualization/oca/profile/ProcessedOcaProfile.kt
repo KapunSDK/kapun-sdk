@@ -21,43 +21,46 @@ import org.kapunsdk.visualization.oca.processing.ProcessedAttribute
 
 /** A credential processed with an [OcaProfileBundleJson], in display order and localized. */
 data class ProcessedOcaProfile(
-	/** From the root's meta overlay. */
-	val name: String?,
-	val description: String?,
-	val issuerName: String?,
-	/** From the root's branding overlay. */
-	val logo: String?,
-	val primaryBackgroundColor: String?,
-	/** The root capture base's attributes. */
-	val root: ProcessedOcaNode.Group,
+    /** From the root's meta overlay. */
+    val name: String?,
+    val description: String?,
+    val issuerName: String?,
+    /** From the root's branding overlay. */
+    val logo: String?,
+    val primaryBackgroundColor: String?,
+    /** The root capture base's attributes. */
+    val root: ProcessedOcaNode.Group,
 )
 
 sealed interface ProcessedOcaNode {
-	val attributeName: AttributeName
-	val label: String
+    val attributeName: AttributeName
+    val label: String
 
-	/** A plain attribute. */
-	data class Attribute(val attribute: ProcessedAttribute) : ProcessedOcaNode {
-		override val attributeName get() = attribute.attributeName
-		override val label get() = attribute.label ?: attribute.attributeName
-	}
+    /** A plain attribute. */
+    data class Attribute(
+        val attribute: ProcessedAttribute,
+    ) : ProcessedOcaNode {
+        override val attributeName get() = attribute.attributeName
+        override val label get() = attribute.label ?: attribute.attributeName
+    }
 
-	/** A referenced capture base (`refs:<digest>`), or one element of a [GroupList]. */
-	data class Group(
-		override val attributeName: AttributeName,
-		override val label: String,
-		val captureBase: SAID,
-		val children: List<ProcessedOcaNode>,
-	) : ProcessedOcaNode {
-		/** The direct child attribute named [name], if any. */
-		fun attribute(name: AttributeName) = children.filterIsInstance<Attribute>().firstOrNull { it.attributeName == name }?.attribute
-	}
+    /** A referenced capture base (`refs:<digest>`), or one element of a [GroupList]. */
+    data class Group(
+        override val attributeName: AttributeName,
+        override val label: String,
+        val captureBase: SAID,
+        val children: List<ProcessedOcaNode>,
+    ) : ProcessedOcaNode {
+        /** The direct child attribute named [name], if any. */
+        fun attribute(name: AttributeName) =
+            children.filterIsInstance<Attribute>().firstOrNull { it.attributeName == name }?.attribute
+    }
 
-	/** A list of referenced capture bases (`Array[refs:<digest>]`), one [Group] per element of the credential's array. */
-	data class GroupList(
-		override val attributeName: AttributeName,
-		override val label: String,
-		val captureBase: SAID,
-		val items: List<Group>,
-	) : ProcessedOcaNode
+    /** A list of referenced capture bases (`Array[refs:<digest>]`), one [Group] per element of the credential's array. */
+    data class GroupList(
+        override val attributeName: AttributeName,
+        override val label: String,
+        val captureBase: SAID,
+        val items: List<Group>,
+    ) : ProcessedOcaNode
 }

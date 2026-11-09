@@ -18,5 +18,8 @@ package org.kapunsdk.trust.framework
 
 import uniffi.kapun_dcql_rust.ClaimsQuery
 
-data class ValidationInfo(val isValid: Boolean, val errorInfo: String? = null, val disallowedProperties: List<ClaimsQuery> = emptyList()) {
-}
+data class ValidationInfo(
+    val isValid: Boolean,
+    val errorInfo: String? = null,
+    val disallowedProperties: List<ClaimsQuery> = emptyList(),
+)

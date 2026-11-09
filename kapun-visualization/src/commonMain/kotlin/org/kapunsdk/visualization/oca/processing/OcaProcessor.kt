@@ -16,13 +16,26 @@ under the License.
 
 package org.kapunsdk.visualization.oca.processing
 
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.format.FormatStringsInDatetimeFormats
+import kotlinx.datetime.format.byUnicodePattern
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 import org.kapunsdk.util.extensions.fromSecondsOrMillis
 import org.kapunsdk.util.extensions.jsonObjectOrNull
 import org.kapunsdk.util.extensions.jsonPrimitiveOrNull
 import org.kapunsdk.util.json.JsonPointer
+import org.kapunsdk.util.locale.LocaleMatcher
+import org.kapunsdk.util.log.Logger
 import org.kapunsdk.visualization.extensions.isPng
 import org.kapunsdk.visualization.extensions.tryDecodeBase64
-import org.kapunsdk.util.log.Logger
 import org.kapunsdk.visualization.extensions.verifyIntegrity
 import org.kapunsdk.visualization.layout.LayoutData
 import org.kapunsdk.visualization.layout.LayoutType
@@ -43,200 +56,195 @@ import org.kapunsdk.visualization.oca.model.overlay.transformation.AttributeMapp
 import org.kapunsdk.visualization.oca.model.overlay.transformation.SubsetOverlay
 import org.kapunsdk.visualization.oca.model.overlay.transformation.TemplateOverlay
 import org.kapunsdk.visualization.stylejson.template.StyleJsonTemplate
-import kotlinx.datetime.LocalDate
-import kotlinx.datetime.LocalDateTime
-import kotlinx.datetime.format.FormatStringsInDatetimeFormats
-import kotlinx.datetime.format.byUnicodePattern
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.ExperimentalTime
-import org.kapunsdk.util.locale.LocaleMatcher
 import kotlin.time.Instant
 
 @OptIn(ExperimentalTime::class)
 class OcaProcessor(
-	userLanguage: String,
-	private val payload: String,
-	private val ocaBundle: OcaBundleJson,
-	val isBundleValid : Boolean = ocaBundle.verifyIntegrity(),
-	private val attributeValueOverrides: Map<AttributeName, AttributeValue<*>> = mapOf()
+    userLanguage: String,
+    private val payload: String,
+    private val ocaBundle: OcaBundleJson,
+    val isBundleValid: Boolean = ocaBundle.verifyIntegrity(),
+    private val attributeValueOverrides: Map<AttributeName, AttributeValue<*>> = mapOf(),
 ) {
-	private val payloadJson = Json.parseToJsonElement(payload)
+    private val payloadJson = Json.parseToJsonElement(payload)
 
-	// Overlays that are either non-localized or match the users device language
-	private val matchingOverlays = ocaBundle.overlays.filter { it !is Localized || it.matches(userLanguage) }
+    // Overlays that are either non-localized or match the users device language
+    private val matchingOverlays = ocaBundle.overlays.filter { it !is Localized || it.matches(userLanguage) }
 
-	// Overlays whose language matches regardless of the region (e.g. "en-US" for the user language "en")
-	private val languageMatchingOverlays = ocaBundle.overlays.filter {
-		it is Localized && LocaleMatcher.matches(it.language, userLanguage, allowLanguageOnlyMatch = true)
-	}
+    // Overlays whose language matches regardless of the region (e.g. "en-US" for the user language "en")
+    private val languageMatchingOverlays =
+        ocaBundle.overlays.filter {
+            it is Localized && LocaleMatcher.matches(it.language, userLanguage, allowLanguageOnlyMatch = true)
+        }
 
-	fun process(layoutType: LayoutType): LayoutData {
-		val metaOverlay = getOverlay<MetaOverlay>()
-		return when (layoutType) {
-			LayoutType.CARD -> {
-				val styleJsonOverlay = getOverlay<UbiqueStyleJsonOverlay>()
-				val ariesBrandingOverlay = getOverlay<AriesBrandingOverlay>()
+    fun process(layoutType: LayoutType): LayoutData {
+        val metaOverlay = getOverlay<MetaOverlay>()
+        return when (layoutType) {
+            LayoutType.CARD -> {
+                val styleJsonOverlay = getOverlay<UbiqueStyleJsonOverlay>()
+                val ariesBrandingOverlay = getOverlay<AriesBrandingOverlay>()
 
-				styleJsonOverlay?.process(layoutType, metaOverlay) { processAttribute(it) }
-					?: ariesBrandingOverlay?.process(layoutType, metaOverlay) { processAttribute(it) }
-					?: LayoutData.Raw(payload)
-			}
-			LayoutType.DETAIL_LIST -> {
-				val clusterOrderingOverlay = getOverlay<ClusterOrderingOverlay>()
-				val styleJsonOverlay = getOverlay<UbiqueStyleJsonOverlay>()
+                styleJsonOverlay?.process(layoutType, metaOverlay) { processAttribute(it) }
+                    ?: ariesBrandingOverlay?.process(layoutType, metaOverlay) { processAttribute(it) }
+                    ?: LayoutData.Raw(payload)
+            }
 
-				clusterOrderingOverlay?.process(layoutType) { processAttribute(it) }
-					?: styleJsonOverlay?.process(layoutType, metaOverlay) { processAttribute(it) }
-					?: LayoutData.Raw(payload)
-			}
-		}
-	}
+            LayoutType.DETAIL_LIST -> {
+                val clusterOrderingOverlay = getOverlay<ClusterOrderingOverlay>()
+                val styleJsonOverlay = getOverlay<UbiqueStyleJsonOverlay>()
 
-	fun processAttribute(
-		originalAttributeName: AttributeName,
-	): ProcessedAttribute? {
-		val capturedAttributes = ocaBundle.captureBase.attributes
-		val flaggedAttributes = ocaBundle.captureBase.flaggedAttributes
+                clusterOrderingOverlay?.process(layoutType) { processAttribute(it) }
+                    ?: styleJsonOverlay?.process(layoutType, metaOverlay) { processAttribute(it) }
+                    ?: LayoutData.Raw(payload)
+            }
+        }
+    }
 
-		// Map the attribute name
-		val attributeMappingOverlay = getOverlay<AttributeMappingOverlay>()
-		val attributeName = attributeMappingOverlay?.mapAttributeName(originalAttributeName) ?: originalAttributeName
+    fun processAttribute(originalAttributeName: AttributeName): ProcessedAttribute? {
+        val capturedAttributes = ocaBundle.captureBase.attributes
+        val flaggedAttributes = ocaBundle.captureBase.flaggedAttributes
 
-		// Filter attribute if it isn't in the subset
-		val subsetOverlay = getOverlay<SubsetOverlay>()
-		if (subsetOverlay != null && !subsetOverlay.isContained(attributeName)) {
-			return null
-		}
+        // Map the attribute name
+        val attributeMappingOverlay = getOverlay<AttributeMappingOverlay>()
+        val attributeName = attributeMappingOverlay?.mapAttributeName(originalAttributeName) ?: originalAttributeName
 
-		val attributeType = capturedAttributes[attributeName] ?: return null
-		val isFlagged = flaggedAttributes.contains(attributeName)
+        // Filter attribute if it isn't in the subset
+        val subsetOverlay = getOverlay<SubsetOverlay>()
+        if (subsetOverlay != null && !subsetOverlay.isContained(attributeName)) {
+            return null
+        }
 
-		// Encode and format the attribute
-		val templateOverlay = getOverlay<TemplateOverlay>()
-		val encodingOverlay = getOverlay<CharacterEncodingOverlay>()
-		val formatOverlay = getOverlay<FormatOverlay>()
-		val attributeValue = attributeValueOverrides[attributeName]
-			?: resolveAttributeValue(
-				attributeName,
-				attributeType,
-				encodingOverlay?.getEncoding(attributeName) ?: Encoding.UTF_8,
-				formatOverlay?.getFormat(attributeName),
-				templateOverlay?.getTemplate(attributeName),
-			)
+        val attributeType = capturedAttributes[attributeName] ?: return null
+        val isFlagged = flaggedAttributes.contains(attributeName)
 
-		// Annotate attribute
-		val unitOverlay = getOverlay<UnitOverlay>()
-		val labelOverlay = getOverlay<LabelOverlay>()
-		val informationOverlay = getOverlay<InformationOverlay>()
-		val standardOverlay = getOverlay<StandardOverlay>()
-		val conformanceOverlay = getOverlay<ConformanceOverlay>()
+        // Encode and format the attribute
+        val templateOverlay = getOverlay<TemplateOverlay>()
+        val encodingOverlay = getOverlay<CharacterEncodingOverlay>()
+        val formatOverlay = getOverlay<FormatOverlay>()
+        val attributeValue =
+            attributeValueOverrides[attributeName]
+                ?: resolveAttributeValue(
+                    attributeName,
+                    attributeType,
+                    encodingOverlay?.getEncoding(attributeName) ?: Encoding.UTF_8,
+                    formatOverlay?.getFormat(attributeName),
+                    templateOverlay?.getTemplate(attributeName),
+                )
 
-		val processedAttribute = ProcessedAttribute(
-			attributeName = attributeName,
-			attributeType = attributeType,
-			attributeValue = attributeValue,
-			label = labelOverlay?.getLabel(attributeName) ?: attributeName,
-			information = informationOverlay?.getInformation(attributeName),
-			standard = standardOverlay?.getStandard(attributeName),
-			unit = unitOverlay?.getUnit(attributeName),
-			isFlagged = isFlagged,
-			isMandatory = conformanceOverlay?.isMandatory(attributeName) ?: false,
-		)
+        // Annotate attribute
+        val unitOverlay = getOverlay<UnitOverlay>()
+        val labelOverlay = getOverlay<LabelOverlay>()
+        val informationOverlay = getOverlay<InformationOverlay>()
+        val standardOverlay = getOverlay<StandardOverlay>()
+        val conformanceOverlay = getOverlay<ConformanceOverlay>()
 
-		return processedAttribute
-	}
+        val processedAttribute =
+            ProcessedAttribute(
+                attributeName = attributeName,
+                attributeType = attributeType,
+                attributeValue = attributeValue,
+                label = labelOverlay?.getLabel(attributeName) ?: attributeName,
+                information = informationOverlay?.getInformation(attributeName),
+                standard = standardOverlay?.getStandard(attributeName),
+                unit = unitOverlay?.getUnit(attributeName),
+                isFlagged = isFlagged,
+                isMandatory = conformanceOverlay?.isMandatory(attributeName) ?: false,
+            )
 
-	@OptIn(ExperimentalEncodingApi::class)
-	private fun resolveAttributeValue(
-		attributeName: String,
-		attributeType: AttributeType,
-		encoding: Encoding,
-		format: String?,
-		template: String?,
-	): AttributeValue<*>? {
-		val rawValue = if (template != null) {
-			StyleJsonTemplate(template).interpolate { resolveRawAttributeValue(it) }
-		} else {
-			// Resolve attribute value by its attribute name (which may or may not be a JSON Pointer)
-			resolveRawAttributeValue(attributeName) ?: return null
-		}
+        return processedAttribute
+    }
 
-		// Check if the raw attribute value resolves to a value in an entry overlay
-		val entryValue = resolveEntryValue(attributeName, rawValue)
-		if (entryValue != null) {
-			return AttributeValue.Text(entryValue)
-		}
+    @OptIn(ExperimentalEncodingApi::class)
+    private fun resolveAttributeValue(
+        attributeName: String,
+        attributeType: AttributeType,
+        encoding: Encoding,
+        format: String?,
+        template: String?,
+    ): AttributeValue<*>? {
+        val rawValue =
+            if (template != null) {
+                StyleJsonTemplate(template).interpolate { resolveRawAttributeValue(it) }
+            } else {
+                // Resolve attribute value by its attribute name (which may or may not be a JSON Pointer)
+                resolveRawAttributeValue(attributeName) ?: return null
+            }
 
-		return AttributeValueParser.parse(rawValue, attributeType, format)
-	}
+        // Check if the raw attribute value resolves to a value in an entry overlay
+        val entryValue = resolveEntryValue(attributeName, rawValue)
+        if (entryValue != null) {
+            return AttributeValue.Text(entryValue)
+        }
 
-	private fun tryResolveW3CProperty(path: String): String? =
-		JsonPointer("credentialSubject/${path.trim('/')}").resolveString(payloadJson)
+        return AttributeValueParser.parse(rawValue, attributeType, format)
+    }
 
-	private fun tryResolveBbsProperty(normalizedPath: String) : String? {
-		val np = normalizedPath.trim('/')
-		val parts = np.split("/")
-		if(parts.isEmpty()) {
-			return null
-		}
-		var currentElement = payloadJson
-		if(parts.size > 1) {
-			for (part in parts.subList(0, parts.size - 2)) {
-				currentElement = when (currentElement) {
-					is JsonObject -> currentElement.jsonObject["http://schema.org/$part"] as JsonElement
-					is JsonArray -> currentElement.jsonArray[part.toInt()]
-					else -> return null
-				}
-			}
-		}
-		val finalElement = parts.last()
-		currentElement = when (currentElement) {
-			is JsonObject -> currentElement.jsonObject["http://schema.org/$finalElement"] as JsonElement
-			is JsonArray -> currentElement.jsonArray[finalElement.toInt()]
-			else -> return null
-		}
-		return when(currentElement) {
-			is JsonObject -> currentElement["@value"]?.jsonPrimitiveOrNull()?.contentOrNull
-			is JsonPrimitive -> currentElement.contentOrNull
-			else -> null
-		}
-	}
+    private fun tryResolveW3CProperty(path: String): String? =
+        JsonPointer("credentialSubject/${path.trim('/')}").resolveString(payloadJson)
 
-	/**
-	 * Resolves an attribute from the payload JSON by its JSON pointer.
-	 */
-	private fun resolveRawAttributeValue(path: String): String? {
-		val p = if(path.startsWith("/")) {
-			path
-		} else {
-			"/${path.replace(".", "/")}"
-		}
-		val jsonObj = payloadJson.jsonObjectOrNull()
-		val value = jsonObj?.get(p.trim('/'))?.jsonPrimitiveOrNull()?.contentOrNull
-			?: runCatching { tryResolveBbsProperty(p) }.getOrNull()
-			?: runCatching { tryResolveW3CProperty(p) }.getOrNull()
+    private fun tryResolveBbsProperty(normalizedPath: String): String? {
+        val np = normalizedPath.trim('/')
+        val parts = np.split("/")
+        if (parts.isEmpty()) {
+            return null
+        }
+        var currentElement = payloadJson
+        if (parts.size > 1) {
+            for (part in parts.subList(0, parts.size - 2)) {
+                currentElement =
+                    when (currentElement) {
+                        is JsonObject -> currentElement.jsonObject["http://schema.org/$part"] as JsonElement
+                        is JsonArray -> currentElement.jsonArray[part.toInt()]
+                        else -> return null
+                    }
+            }
+        }
+        val finalElement = parts.last()
+        currentElement =
+            when (currentElement) {
+                is JsonObject -> currentElement.jsonObject["http://schema.org/$finalElement"] as JsonElement
+                is JsonArray -> currentElement.jsonArray[finalElement.toInt()]
+                else -> return null
+            }
+        return when (currentElement) {
+            is JsonObject -> currentElement["@value"]?.jsonPrimitiveOrNull()?.contentOrNull
+            is JsonPrimitive -> currentElement.contentOrNull
+            else -> null
+        }
+    }
 
-		return value
-			?: JsonPointer(p).resolveString(payloadJson)
-	}
+    /**
+     * Resolves an attribute from the payload JSON by its JSON pointer.
+     */
+    private fun resolveRawAttributeValue(path: String): String? {
+        val p =
+            if (path.startsWith("/")) {
+                path
+            } else {
+                "/${path.replace(".", "/")}"
+            }
+        val jsonObj = payloadJson.jsonObjectOrNull()
+        val value =
+            jsonObj?.get(p.trim('/'))?.jsonPrimitiveOrNull()?.contentOrNull
+                ?: runCatching { tryResolveBbsProperty(p) }.getOrNull()
+                ?: runCatching { tryResolveW3CProperty(p) }.getOrNull()
 
-	private fun resolveEntryValue(attributeName: AttributeName, rawValue: String): String? {
-		val entryOverlay = getOverlay<EntryOverlay>() ?: return null
-		return entryOverlay.getEntry(attributeName, rawValue)
-	}
+        return value
+            ?: JsonPointer(p).resolveString(payloadJson)
+    }
 
-	private inline fun <reified T : Overlay> getOverlay(): T? {
-		return matchingOverlays.filterIsInstance<T>().firstOrNull()
-			?: languageMatchingOverlays.filterIsInstance<T>().firstOrNull()
-			?: ocaBundle.overlays.filterIsInstance<T>().firstOrNull()
-	}
+    private fun resolveEntryValue(
+        attributeName: AttributeName,
+        rawValue: String,
+    ): String? {
+        val entryOverlay = getOverlay<EntryOverlay>() ?: return null
+        return entryOverlay.getEntry(attributeName, rawValue)
+    }
 
+    private inline fun <reified T : Overlay> getOverlay(): T? =
+        matchingOverlays.filterIsInstance<T>().firstOrNull()
+            ?: languageMatchingOverlays.filterIsInstance<T>().firstOrNull()
+            ?: ocaBundle.overlays.filterIsInstance<T>().firstOrNull()
 }

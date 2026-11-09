@@ -17,6 +17,6 @@ under the License.
 package org.kapunsdk.visualization.layout
 
 data class LayoutSection(
-	val sectionTitle: String?,
-	val sectionContent: List<LayoutSectionProperty>,
+    val sectionTitle: String?,
+    val sectionContent: List<LayoutSectionProperty>,
 )

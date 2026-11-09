@@ -20,7 +20,6 @@ import org.kapunsdk.wallet.resources.StringResourceProvider
 import platform.Foundation.NSBundle
 
 class IosStringResourceProvider : StringResourceProvider {
-	override fun getString(stringName: String): String {
-		return NSBundle.mainBundle.localizedStringForKey(stringName, stringName, null)
-	}
+    override fun getString(stringName: String): String =
+        NSBundle.mainBundle.localizedStringForKey(stringName, stringName, null)
 }

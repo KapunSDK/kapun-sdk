@@ -26,43 +26,47 @@ import platform.Foundation.CFBridgingRelease
 import platform.Foundation.NSNumber
 
 actual fun HttpClientEngineConfig.configureSystemProxy() {
-	getSystemProxy()?.let {
-		if(this is DarwinClientEngineConfig) {
-			this.configureSession {
-				setConnectionProxyDictionary(mapOf(
-					"HTTPEnable" to 1,
-					"HTTPSProxy" to it.first,
-					"HTTPSPort" to it.second,
-					"HTTPProxy" to it.first,
-					"HTTPPort" to it.first
-				))
-			}
-		}
-	}
+    getSystemProxy()?.let {
+        if (this is DarwinClientEngineConfig) {
+            this.configureSession {
+                setConnectionProxyDictionary(
+                    mapOf(
+                        "HTTPEnable" to 1,
+                        "HTTPSProxy" to it.first,
+                        "HTTPSPort" to it.second,
+                        "HTTPProxy" to it.first,
+                        "HTTPPort" to it.first,
+                    ),
+                )
+            }
+        }
+    }
 }
 
 @OptIn(ExperimentalForeignApi::class)
-private fun getSystemProxy() : Pair<String, UShort>? {
-	return CFNetworkCopySystemProxySettings()?.let {
-		val cfUrl = CFStringCreateWithCString(null, "http://example.com", 0U)
-		val url = CFURLCreateWithString(null, cfUrl, null)
-		val proxiesNullable : List<Map<String, Any>>? = CFNetworkCopyProxiesForURL(url, it)?.let {
-			CFBridgingRelease(it) as List<Map<String, Any>>?
-		}  ?: return null
-		val proxies = proxiesNullable ?: return null
-		val kCFProxyTypeKeyKotlin = CFBridgingRelease(kCFProxyTypeKey) as String
-		val kCFProxyHostNameKeyKotlin = CFBridgingRelease(kCFProxyHostNameKey) as String
-		val kCFProxyPortNumberKeyKotlin = CFBridgingRelease(kCFProxyPortNumberKey) as String
+private fun getSystemProxy(): Pair<String, UShort>? {
+    return CFNetworkCopySystemProxySettings()?.let {
+        val cfUrl = CFStringCreateWithCString(null, "http://example.com", 0U)
+        val url = CFURLCreateWithString(null, cfUrl, null)
+        val proxiesNullable: List<Map<String, Any>>? =
+            CFNetworkCopyProxiesForURL(url, it)?.let {
+                CFBridgingRelease(it) as List<Map<String, Any>>?
+            } ?: return null
+        val proxies = proxiesNullable ?: return null
+        val kCFProxyTypeKeyKotlin = CFBridgingRelease(kCFProxyTypeKey) as String
+        val kCFProxyHostNameKeyKotlin = CFBridgingRelease(kCFProxyHostNameKey) as String
+        val kCFProxyPortNumberKeyKotlin = CFBridgingRelease(kCFProxyPortNumberKey) as String
 
-		val kCFProxyTypeValueKotlin = CFBridgingRelease(kCFProxyTypeHTTP) as String
-		val proxyType = proxies.firstOrNull()?.let { proxy -> proxy[kCFProxyTypeKeyKotlin] } as String? ?: return null
-		if(proxyType != kCFProxyTypeValueKotlin) {
-			return null
-		}
-		val host = proxies.firstOrNull()?.let { proxy -> proxy[kCFProxyHostNameKeyKotlin]  } as String? ?: return null
-		val port = proxies.firstOrNull()?.let { proxy -> proxy[kCFProxyPortNumberKeyKotlin] } as NSNumber? ?: return null
-		print("http://${host}:${port}")
+        val kCFProxyTypeValueKotlin = CFBridgingRelease(kCFProxyTypeHTTP) as String
+        val proxyType = proxies.firstOrNull()?.let { proxy -> proxy[kCFProxyTypeKeyKotlin] } as String? ?: return null
+        if (proxyType != kCFProxyTypeValueKotlin) {
+            return null
+        }
+        val host = proxies.firstOrNull()?.let { proxy -> proxy[kCFProxyHostNameKeyKotlin] } as String? ?: return null
+        val port =
+            proxies.firstOrNull()?.let { proxy -> proxy[kCFProxyPortNumberKeyKotlin] } as NSNumber? ?: return null
+        print("http://$host:$port")
 
-		Pair(host, port.unsignedShortValue)
-	}
+        Pair(host, port.unsignedShortValue)
+    }
 }

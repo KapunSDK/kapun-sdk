@@ -28,7 +28,12 @@ enum class LogSeverity { DEBUG, INFO, WARN, ERROR }
  * sink that restores the SDK's previous unconditional console-logging behavior.
  */
 interface LogSink {
-	fun log(severity: LogSeverity, tag: String, message: String, throwable: Throwable? = null)
+    fun log(
+        severity: LogSeverity,
+        tag: String,
+        message: String,
+        throwable: Throwable? = null,
+    )
 }
 
 /**

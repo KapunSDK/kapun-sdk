@@ -16,10 +16,7 @@ under the License.
 
 package org.kapunsdk.json
 
-import org.kapunsdk.credentials.Mdoc
-import org.kapunsdk.credentials.mdoc.VerificationStep
-import org.kapunsdk.credentials.mdoc.parseAndVerify
-import org.kapunsdk.credentials.models.credential.CredentialType
+import kotlinx.serialization.json.Json
 import org.kapunsdk.ClaimHasNoValueException
 import org.kapunsdk.ClaimValueNotAllowed
 import org.kapunsdk.DcqlPresentation
@@ -28,13 +25,16 @@ import org.kapunsdk.NoClaimSetQueryOptionSatisfiedException
 import org.kapunsdk.NoCredentialSetQueryOptionSatisfiedException
 import org.kapunsdk.UnexpectedClaimsProvidedException
 import org.kapunsdk.checkDcqlPresentation
+import org.kapunsdk.credentials.Mdoc
+import org.kapunsdk.credentials.mdoc.VerificationStep
+import org.kapunsdk.credentials.mdoc.parseAndVerify
+import org.kapunsdk.credentials.models.credential.CredentialType
 import org.kapunsdk.getVpToken
 import org.kapunsdk.parseDcqlQuery
 import org.kapunsdk.util.extensions.asObject
 import org.kapunsdk.util.extensions.asString
 import org.kapunsdk.util.extensions.get
 import org.kapunsdk.util.extensions.toCbor
-import kotlinx.serialization.json.Json
 import uniffi.kapun_crypto_rust.CertificateData
 import uniffi.kapun_crypto_rust.SoftwareKeyPair
 import uniffi.kapun_crypto_rust.SubjectIdentifier
@@ -67,515 +67,565 @@ class TestMdocVerification {
     private val deviceKeyJwk = Json.decodeFromString<Value>(keyBindingKeyPair.jwkString())
     private val keyBindingKey = TestDcql.TestSigner(keyBindingKeyPair)
 
-    private fun verify(query: DcqlQuery, vpTokens: DcqlPresentation) = checkDcqlPresentation(
+    private fun verify(
+        query: DcqlQuery,
+        vpTokens: DcqlPresentation,
+    ) = checkDcqlPresentation(
         query,
         vpTokens,
         { type, vpToken, _ ->
-            if (type != CredentialType.Mdoc)
+            if (type != CredentialType.Mdoc) {
                 throw Exception("This Test only supports MDOC")
+            }
 
             val doc = decodeCbor(base64UrlDecode(vpToken))["documents"][0]
-            val parsed = Mdoc.parseAndVerify(
-                doc,
-                setOf(
-                    VerificationStep.Validity,
-                    VerificationStep.DocType,
-                    VerificationStep.IssuerSigned,
-                    VerificationStep.IssuerSignature,
-                    VerificationStep.DeviceSignature(
-                        clientId = audience,
-                        nonce = nonce,
-                        jwkThumbprint = null,
-                        responseUri = responseUri,
-                    )
-                )
-            ).getOrThrow()
+            val parsed =
+                Mdoc
+                    .parseAndVerify(
+                        doc,
+                        setOf(
+                            VerificationStep.Validity,
+                            VerificationStep.DocType,
+                            VerificationStep.IssuerSigned,
+                            VerificationStep.IssuerSignature,
+                            VerificationStep.DeviceSignature(
+                                clientId = audience,
+                                nonce = nonce,
+                                jwkThumbprint = null,
+                                responseUri = responseUri,
+                            ),
+                        ),
+                    ).getOrThrow()
 
             parsed.mdoc.namespaceMap.asObject()!!
-        })
+        },
+    )
 
     @OptIn(ExperimentalTime::class)
-	private fun createMDoc(
+    private fun createMDoc(
         data: Value,
         docType: String,
     ): Mdoc {
         val jwkPublic = Json.decodeFromString<Value>(issuerKey.jwkString())
 
-        return Mdoc.create(
-            properties = data,
-            signer = issuerSigner,
-            docType = docType,
-            certificateChain = listOf(
-                createCert(
-                    CertificateData(
-                        // This fixture contains a single certificate, so it must be a self-signed
-                        // trust anchor for CertChain verification to succeed.
-                        issuer = SubjectIdentifier(commonName = "Test Issuer"),
-                        subject = SubjectIdentifier(commonName = "Test Issuer"),
-                        notBefore = Clock.System.now().toEpochMilliseconds() / 1000 - 1,
-                        notAfter = Clock.System.now().toEpochMilliseconds() / 1000
-                                + 86400 * 365,
+        return Mdoc
+            .create(
+                properties = data,
+                signer = issuerSigner,
+                docType = docType,
+                certificateChain =
+                    listOf(
+                        createCert(
+                            CertificateData(
+                                // This fixture contains a single certificate, so it must be a self-signed
+                                // trust anchor for CertChain verification to succeed.
+                                issuer = SubjectIdentifier(commonName = "Test Issuer"),
+                                subject = SubjectIdentifier(commonName = "Test Issuer"),
+                                notBefore = Clock.System.now().toEpochMilliseconds() / 1000 - 1,
+                                notAfter =
+                                    Clock.System.now().toEpochMilliseconds() / 1000 +
+                                        86400 * 365,
+                            ),
+                            X509PublicKey.P256(
+                                jwkPublic["x"].asString()!!,
+                                jwkPublic["y"].asString()!!,
+                            ),
+                            issuerKey.asSignatureCreator(),
+                        )!!,
                     ),
-                    X509PublicKey.P256(
-                        jwkPublic["x"].asString()!!,
-                        jwkPublic["y"].asString()!!,
-                    ),
-                    issuerKey.asSignatureCreator()
-                )!!
-            ),
-            deviceKey = deviceKeyJwk
-        ).getOrNull()!!
+                deviceKey = deviceKeyJwk,
+            ).getOrNull()!!
     }
 
     private fun createPresentation(
         query: CredentialQuery,
         credential: Mdoc,
-    ): DcqlPresentation = mapOf(
-        query.id to credential
-            .getVpToken(
-                query = query,
-                clientId = audience,
-                responseUri = responseUri,
-                nonce = nonce,
-                jwkThumbprint = null,
-                signer = keyBindingKey,
-            ).getOrNull()!!
-    )
+    ): DcqlPresentation =
+        mapOf(
+            query.id to
+                credential
+                    .getVpToken(
+                        query = query,
+                        clientId = audience,
+                        responseUri = responseUri,
+                        nonce = nonce,
+                        jwkThumbprint = null,
+                        signer = keyBindingKey,
+                    ).getOrNull()!!,
+        )
 
     @Test
     fun testVerifyMDocQueryWithClaims() {
-        val mdoc = createMDoc(
-            mapOf(
-                "org.iso.18013.5.1" to mapOf(
-                    "family_name" to "Jones",
-                    "given_name" to "Ava",
-                    "birth_date" to "2007-03-25",
-                )
-            ).toCbor(),
-            "test"
-        )
+        val mdoc =
+            createMDoc(
+                mapOf(
+                    "org.iso.18013.5.1" to
+                        mapOf(
+                            "family_name" to "Jones",
+                            "given_name" to "Ava",
+                            "birth_date" to "2007-03-25",
+                        ),
+                ).toCbor(),
+                "test",
+            )
 
-        val query = parseDcqlQuery(
-            """
-            {
-                "credentials": [
-                    {
-                        "id": "pid",
-                        "format": "mso_mdoc",
-                        "claims": [
-                            {"path": ["org.iso.18013.5.1", "family_name"]},
-                            {"path": ["org.iso.18013.5.1", "given_name"]},
-                            {"path": ["org.iso.18013.5.1", "birth_date"]}
-                        ]
-                    }
-                ]
-            }
-            """.trimIndent()
-        )
+        val query =
+            parseDcqlQuery(
+                """
+                {
+                    "credentials": [
+                        {
+                            "id": "pid",
+                            "format": "mso_mdoc",
+                            "claims": [
+                                {"path": ["org.iso.18013.5.1", "family_name"]},
+                                {"path": ["org.iso.18013.5.1", "given_name"]},
+                                {"path": ["org.iso.18013.5.1", "birth_date"]}
+                            ]
+                        }
+                    ]
+                }
+                """.trimIndent(),
+            )
 
-        val dcqlPresentation = createPresentation(
-            query.credentials!![0],
-            mdoc
-        )
+        val dcqlPresentation =
+            createPresentation(
+                query.credentials!![0],
+                mdoc,
+            )
 
         assertTrue(
-            verify(query, dcqlPresentation).isSuccess
+            verify(query, dcqlPresentation).isSuccess,
         )
     }
 
     @Test
     fun testVerifyMDocQueryWithClaims_ClaimHasNoValueException() {
-        val mdoc = createMDoc(
-            mapOf(
-                "org.iso.18013.5.1" to mapOf(
-                    "family_name" to "Jones",
-                    "given_name" to "Ava",
-                    "birth_date" to "2007-03-25",
-                )
-            ).toCbor(),
-            "test"
-        )
+        val mdoc =
+            createMDoc(
+                mapOf(
+                    "org.iso.18013.5.1" to
+                        mapOf(
+                            "family_name" to "Jones",
+                            "given_name" to "Ava",
+                            "birth_date" to "2007-03-25",
+                        ),
+                ).toCbor(),
+                "test",
+            )
 
-        val query = parseDcqlQuery(
-            """
-            {
-                "credentials": [
-                    {
-                        "id": "pid",
-                        "format": "mso_mdoc",
-                        "claims": [
-                            {"path": ["org.iso.18013.5.1", "given_name"]},
-                            {"path": ["org.iso.18013.5.1", "birth_date"]}
-                        ]
-                    }
-                ]
-            }
-            """.trimIndent()
-        )
+        val query =
+            parseDcqlQuery(
+                """
+                {
+                    "credentials": [
+                        {
+                            "id": "pid",
+                            "format": "mso_mdoc",
+                            "claims": [
+                                {"path": ["org.iso.18013.5.1", "given_name"]},
+                                {"path": ["org.iso.18013.5.1", "birth_date"]}
+                            ]
+                        }
+                    ]
+                }
+                """.trimIndent(),
+            )
 
-        val dcqlPresentation = createPresentation(
-            query.credentials!![0],
-            mdoc
-        )
+        val dcqlPresentation =
+            createPresentation(
+                query.credentials!![0],
+                mdoc,
+            )
 
-        val query_with_more_claims = parseDcqlQuery(
-            """
-            {
-                "credentials": [
-                    {
-                        "id": "pid",
-                        "format": "mso_mdoc",
-                        "claims": [
-                            {"path": ["org.iso.18013.5.1", "family_name"]},
-                            {"path": ["org.iso.18013.5.1", "given_name"]},
-                            {"path": ["org.iso.18013.5.1", "birth_date"]}
-                        ]
-                    }
-                ]
-            }
-            """.trimIndent()
-        )
+        val queryWithMoreClaims =
+            parseDcqlQuery(
+                """
+                {
+                    "credentials": [
+                        {
+                            "id": "pid",
+                            "format": "mso_mdoc",
+                            "claims": [
+                                {"path": ["org.iso.18013.5.1", "family_name"]},
+                                {"path": ["org.iso.18013.5.1", "given_name"]},
+                                {"path": ["org.iso.18013.5.1", "birth_date"]}
+                            ]
+                        }
+                    ]
+                }
+                """.trimIndent(),
+            )
 
         assertFailsWith<ClaimHasNoValueException> {
-            verify(query_with_more_claims, dcqlPresentation).getOrThrow()
+            verify(queryWithMoreClaims, dcqlPresentation).getOrThrow()
         }
     }
 
     @Test
     fun testVerifyMDocQueryWithClaims_ClaimValueNotAllowed() {
-        val mdoc = createMDoc(
-            mapOf(
-                "org.iso.18013.5.1" to mapOf(
-                    "family_name" to "Jones",
-                    "given_name" to "Ava",
-                    "birth_date" to "2007-03-25",
-                )
-            ).toCbor(),
-            "test"
-        )
+        val mdoc =
+            createMDoc(
+                mapOf(
+                    "org.iso.18013.5.1" to
+                        mapOf(
+                            "family_name" to "Jones",
+                            "given_name" to "Ava",
+                            "birth_date" to "2007-03-25",
+                        ),
+                ).toCbor(),
+                "test",
+            )
 
-        val query = parseDcqlQuery(
-            """
-            {
-                "credentials": [
-                    {
-                        "id": "pid",
-                        "format": "mso_mdoc",
-                        "claims": [
-                            {"path": ["org.iso.18013.5.1", "family_name" ]},
-                            {"path": ["org.iso.18013.5.1", "given_name"]},
-                            {"path": ["org.iso.18013.5.1", "birth_date"]}
-                        ]
-                    }
-                ]
-            }
-            """.trimIndent()
-        )
+        val query =
+            parseDcqlQuery(
+                """
+                {
+                    "credentials": [
+                        {
+                            "id": "pid",
+                            "format": "mso_mdoc",
+                            "claims": [
+                                {"path": ["org.iso.18013.5.1", "family_name" ]},
+                                {"path": ["org.iso.18013.5.1", "given_name"]},
+                                {"path": ["org.iso.18013.5.1", "birth_date"]}
+                            ]
+                        }
+                    ]
+                }
+                """.trimIndent(),
+            )
 
-        val dcqlPresentation = createPresentation(
-            query.credentials!![0],
-            mdoc
-        )
+        val dcqlPresentation =
+            createPresentation(
+                query.credentials!![0],
+                mdoc,
+            )
 
-        val query_limiting_values = parseDcqlQuery(
-            """
-            {
-                "credentials": [
-                    {
-                        "id": "pid",
-                        "format": "mso_mdoc",
-                        "claims": [
-                            {"path": ["org.iso.18013.5.1", "family_name"], "values": ["test"] },
-                            {"path": ["org.iso.18013.5.1", "given_name"]},
-                            {"path": ["org.iso.18013.5.1", "birth_date"]}
-                        ]
-                    }
-                ]
-            }
-            """.trimIndent()
-        )
+        val queryLimitingValues =
+            parseDcqlQuery(
+                """
+                {
+                    "credentials": [
+                        {
+                            "id": "pid",
+                            "format": "mso_mdoc",
+                            "claims": [
+                                {"path": ["org.iso.18013.5.1", "family_name"], "values": ["test"] },
+                                {"path": ["org.iso.18013.5.1", "given_name"]},
+                                {"path": ["org.iso.18013.5.1", "birth_date"]}
+                            ]
+                        }
+                    ]
+                }
+                """.trimIndent(),
+            )
 
         assertFailsWith<ClaimValueNotAllowed> {
-            verify(query_limiting_values, dcqlPresentation).getOrThrow()
+            verify(queryLimitingValues, dcqlPresentation).getOrThrow()
         }
     }
 
     @Test
     fun testVerifyMDocQueryWithClaimSet() {
-        val mdoc = createMDoc(
-            mapOf(
-                "org.iso.18013.5.1" to mapOf(
-                    "family_name" to "Jones",
-                    "given_name" to "Ava",
-                    "birth_date" to "2007-03-25",
-                )
-            ).toCbor(),
-            "test"
-        )
+        val mdoc =
+            createMDoc(
+                mapOf(
+                    "org.iso.18013.5.1" to
+                        mapOf(
+                            "family_name" to "Jones",
+                            "given_name" to "Ava",
+                            "birth_date" to "2007-03-25",
+                        ),
+                ).toCbor(),
+                "test",
+            )
 
-        val query = parseDcqlQuery(
-            """
-            {
-                "credentials": [
-                    {
-                        "id": "pid",
-                        "format": "mso_mdoc",
-                        "claims": [
-                            {"id": "a", "path": ["org.iso.18013.5.1", "family_name"]},
-                            {"id": "b", "path": ["org.iso.18013.5.1", "given_name"]},
-                            {"id": "c", "path": ["org.iso.18013.5.1", "not_here"]},
-                            {"id": "d", "path": ["com.example.wrong.namespace", "also_not_here"]},
-                            {"id": "e", "path": ["org.iso.18013.5.1", "birth_date"]}
-                        ],
-                        "claim_sets": [
-                            ["a", "c", "d", "e"],
-                            ["a", "b", "e"]
-                        ]
-                    }
-                ]
-            }
-            """.trimIndent()
-        )
+        val query =
+            parseDcqlQuery(
+                """
+                {
+                    "credentials": [
+                        {
+                            "id": "pid",
+                            "format": "mso_mdoc",
+                            "claims": [
+                                {"id": "a", "path": ["org.iso.18013.5.1", "family_name"]},
+                                {"id": "b", "path": ["org.iso.18013.5.1", "given_name"]},
+                                {"id": "c", "path": ["org.iso.18013.5.1", "not_here"]},
+                                {"id": "d", "path": ["com.example.wrong.namespace", "also_not_here"]},
+                                {"id": "e", "path": ["org.iso.18013.5.1", "birth_date"]}
+                            ],
+                            "claim_sets": [
+                                ["a", "c", "d", "e"],
+                                ["a", "b", "e"]
+                            ]
+                        }
+                    ]
+                }
+                """.trimIndent(),
+            )
 
         val dcqlPresentation = createPresentation(query.credentials!![0], mdoc)
 
         assertTrue(
-            verify(query, dcqlPresentation).isSuccess
+            verify(query, dcqlPresentation).isSuccess,
         )
     }
 
     @Test
     fun testVerifyMDocQueryWithClaimSet_NoClaimSetQueryOptionSatisfiedException() {
-        val mdoc = createMDoc(
-            mapOf(
-                "org.iso.18013.5.1" to mapOf(
-                    "family_name" to "Jones",
-                    "given_name" to "Ava",
-                    "birth_date" to "2007-03-25",
-                )
-            ).toCbor(),
-            "test"
-        )
+        val mdoc =
+            createMDoc(
+                mapOf(
+                    "org.iso.18013.5.1" to
+                        mapOf(
+                            "family_name" to "Jones",
+                            "given_name" to "Ava",
+                            "birth_date" to "2007-03-25",
+                        ),
+                ).toCbor(),
+                "test",
+            )
 
-        val query = parseDcqlQuery(
-            """
-            {
-                "credentials": [
-                    {
-                        "id": "pid",
-                        "format": "mso_mdoc",
-                        "claims": [
-                            {"id": "a", "path": ["org.iso.18013.5.1", "family_name"]},
-                            {"id": "b", "path": ["org.iso.18013.5.1", "given_name"]}
-                        ],
-                        "claim_sets": [
-                            ["a"],
-                            ["b"]
-                        ]
-                    }
-                ]
-            }
-            """.trimIndent()
-        )
+        val query =
+            parseDcqlQuery(
+                """
+                {
+                    "credentials": [
+                        {
+                            "id": "pid",
+                            "format": "mso_mdoc",
+                            "claims": [
+                                {"id": "a", "path": ["org.iso.18013.5.1", "family_name"]},
+                                {"id": "b", "path": ["org.iso.18013.5.1", "given_name"]}
+                            ],
+                            "claim_sets": [
+                                ["a"],
+                                ["b"]
+                            ]
+                        }
+                    ]
+                }
+                """.trimIndent(),
+            )
 
-        val dcqlPresentation = createPresentation(
-            query.credentials!![0],
-            mdoc
-        )
+        val dcqlPresentation =
+            createPresentation(
+                query.credentials!![0],
+                mdoc,
+            )
 
-        val query_with_different_set_option = parseDcqlQuery(
-            """
-            {
-                "credentials": [
-                    {
-                        "id": "pid",
-                        "format": "mso_mdoc",
-                        "claims": [
-                            {"id": "a", "path": ["org.iso.18013.5.1", "family_name"]},
-                            {"id": "b", "path": ["org.iso.18013.5.1", "given_name"]}
-                        ],
-                        "claim_sets": [
-                            ["a", "b"]
-                        ]
-                    }
-                ]
-            }
-            """.trimIndent()
-        )
+        val queryWithDifferentSetOption =
+            parseDcqlQuery(
+                """
+                {
+                    "credentials": [
+                        {
+                            "id": "pid",
+                            "format": "mso_mdoc",
+                            "claims": [
+                                {"id": "a", "path": ["org.iso.18013.5.1", "family_name"]},
+                                {"id": "b", "path": ["org.iso.18013.5.1", "given_name"]}
+                            ],
+                            "claim_sets": [
+                                ["a", "b"]
+                            ]
+                        }
+                    ]
+                }
+                """.trimIndent(),
+            )
 
         assertFailsWith<NoClaimSetQueryOptionSatisfiedException> {
-            verify(query_with_different_set_option, dcqlPresentation).getOrThrow()
+            verify(queryWithDifferentSetOption, dcqlPresentation).getOrThrow()
         }
     }
 
     @Test
     fun testVerifyMDocQueryWithoutClaims() {
-        val mdoc = createMDoc(
-            mapOf(
-                "org.iso.18013.5.1" to mapOf(
-                    "family_name" to "Jones",
-                    "given_name" to "Ava",
-                    "birth_date" to "2007-03-25",
-                )
-            ).toCbor(),
-            "test"
-        )
+        val mdoc =
+            createMDoc(
+                mapOf(
+                    "org.iso.18013.5.1" to
+                        mapOf(
+                            "family_name" to "Jones",
+                            "given_name" to "Ava",
+                            "birth_date" to "2007-03-25",
+                        ),
+                ).toCbor(),
+                "test",
+            )
 
-        val query = parseDcqlQuery(
-            """
-            {
-                "credentials": [
-                    {
-                        "id": "pid",
-                        "format": "mso_mdoc"
-                    }
-                ]
-            }
-            """.trimIndent()
-        )
+        val query =
+            parseDcqlQuery(
+                """
+                {
+                    "credentials": [
+                        {
+                            "id": "pid",
+                            "format": "mso_mdoc"
+                        }
+                    ]
+                }
+                """.trimIndent(),
+            )
 
         val dcqlPresentation = createPresentation(query.credentials!![0], mdoc)
 
         assertTrue(
-            verify(query, dcqlPresentation).isSuccess
+            verify(query, dcqlPresentation).isSuccess,
         )
     }
 
     @Test
     fun testVerifyMDocQueryWithoutClaims_UnexpectedClaimsProvidedException() {
-        val mdoc = createMDoc(
-            mapOf(
-                "org.iso.18013.5.1" to mapOf(
-                    "family_name" to "Jones",
-                    "given_name" to "Ava",
-                    "birth_date" to "2007-03-25",
-                )
-            ).toCbor(),
-            "test"
-        )
+        val mdoc =
+            createMDoc(
+                mapOf(
+                    "org.iso.18013.5.1" to
+                        mapOf(
+                            "family_name" to "Jones",
+                            "given_name" to "Ava",
+                            "birth_date" to "2007-03-25",
+                        ),
+                ).toCbor(),
+                "test",
+            )
 
-        val query = parseDcqlQuery(
-            """
-            {
-                "credentials": [
-                    {
-                        "id": "pid",
-                        "format": "mso_mdoc",
-                        "claims": [
-                            {"path": ["org.iso.18013.5.1", "family_name"]},
-                            {"path": ["org.iso.18013.5.1", "given_name"]}
-                        ]
-                    }
-                ]
-            }
-            """.trimIndent()
-        )
+        val query =
+            parseDcqlQuery(
+                """
+                {
+                    "credentials": [
+                        {
+                            "id": "pid",
+                            "format": "mso_mdoc",
+                            "claims": [
+                                {"path": ["org.iso.18013.5.1", "family_name"]},
+                                {"path": ["org.iso.18013.5.1", "given_name"]}
+                            ]
+                        }
+                    ]
+                }
+                """.trimIndent(),
+            )
 
-        val dcqlPresentation = createPresentation(
-            query.credentials!![0],
-            mdoc,
-        )
+        val dcqlPresentation =
+            createPresentation(
+                query.credentials!![0],
+                mdoc,
+            )
 
-        val query_without_claims = parseDcqlQuery(
-            """
-            {
-                "credentials": [
-                    {
-                        "id": "pid",
-                        "format": "mso_mdoc"
-                    }
-                ]
-            }
-            """.trimIndent()
-        )
+        val queryWithoutClaims =
+            parseDcqlQuery(
+                """
+                {
+                    "credentials": [
+                        {
+                            "id": "pid",
+                            "format": "mso_mdoc"
+                        }
+                    ]
+                }
+                """.trimIndent(),
+            )
 
         assertFailsWith<UnexpectedClaimsProvidedException> {
-            verify(query_without_claims, dcqlPresentation).getOrThrow()
+            verify(queryWithoutClaims, dcqlPresentation).getOrThrow()
         }
     }
 
     @Test
     fun testVerifyMDocQueryWithMeta() {
-        val mdoc = createMDoc(
-            mapOf(
-                "org.iso.18013.5.1" to mapOf(
-                    "family_name" to "Jones",
-                    "given_name" to "Ava",
-                    "birth_date" to "2007-03-25",
-                )
-            ).toCbor(),
-            "com.example.doctype.test"
-        )
+        val mdoc =
+            createMDoc(
+                mapOf(
+                    "org.iso.18013.5.1" to
+                        mapOf(
+                            "family_name" to "Jones",
+                            "given_name" to "Ava",
+                            "birth_date" to "2007-03-25",
+                        ),
+                ).toCbor(),
+                "com.example.doctype.test",
+            )
 
-        val query = parseDcqlQuery(
-            """
-            {
-                "credentials": [
-                    {
-                        "id": "pid",
-                        "format": "mso_mdoc",
-                        "meta": {
-                            "doctype_value": "com.example.doctype.test"
-                        },
-                        "claims": [
-                            {"path": ["org.iso.18013.5.1", "family_name"]},
-                            {"path": ["org.iso.18013.5.1", "given_name"]},
-                            {"path": ["org.iso.18013.5.1", "birth_date"]}
-                        ]
-                    }
-                ]
-            }
-            """.trimIndent()
-        )
+        val query =
+            parseDcqlQuery(
+                """
+                {
+                    "credentials": [
+                        {
+                            "id": "pid",
+                            "format": "mso_mdoc",
+                            "meta": {
+                                "doctype_value": "com.example.doctype.test"
+                            },
+                            "claims": [
+                                {"path": ["org.iso.18013.5.1", "family_name"]},
+                                {"path": ["org.iso.18013.5.1", "given_name"]},
+                                {"path": ["org.iso.18013.5.1", "birth_date"]}
+                            ]
+                        }
+                    ]
+                }
+                """.trimIndent(),
+            )
 
-        val dcqlPresentation = createPresentation(
-            query.credentials!![0],
-            mdoc
-        )
+        val dcqlPresentation =
+            createPresentation(
+                query.credentials!![0],
+                mdoc,
+            )
 
         assertTrue(
-            verify(query, dcqlPresentation).isSuccess
+            verify(query, dcqlPresentation).isSuccess,
         )
     }
 
     @Test
     fun testVerifyMDocQueryWithMeta_InvalidDocTypeException() {
-        val mdoc = createMDoc(
-            mapOf(
-                "org.iso.18013.5.1" to mapOf(
-                    "family_name" to "Jones",
-                    "given_name" to "Ava",
-                    "birth_date" to "2007-03-25",
-                )
-            ).toCbor(),
-            "com.example.doctype.test"
-        )
+        val mdoc =
+            createMDoc(
+                mapOf(
+                    "org.iso.18013.5.1" to
+                        mapOf(
+                            "family_name" to "Jones",
+                            "given_name" to "Ava",
+                            "birth_date" to "2007-03-25",
+                        ),
+                ).toCbor(),
+                "com.example.doctype.test",
+            )
 
-        val query = parseDcqlQuery(
-            """
-            {
-                "credentials": [
-                    {
-                        "id": "pid",
-                        "format": "mso_mdoc",
-                        "meta": {
-                            "doctype_value": "com.example.doctype.another-test"
-                        },
-                        "claims": [
-                            {"path": ["org.iso.18013.5.1", "family_name"]},
-                            {"path": ["org.iso.18013.5.1", "given_name"]},
-                            {"path": ["org.iso.18013.5.1", "birth_date"]}
-                        ]
-                    }
-                ]
-            }
-            """.trimIndent()
-        )
+        val query =
+            parseDcqlQuery(
+                """
+                {
+                    "credentials": [
+                        {
+                            "id": "pid",
+                            "format": "mso_mdoc",
+                            "meta": {
+                                "doctype_value": "com.example.doctype.another-test"
+                            },
+                            "claims": [
+                                {"path": ["org.iso.18013.5.1", "family_name"]},
+                                {"path": ["org.iso.18013.5.1", "given_name"]},
+                                {"path": ["org.iso.18013.5.1", "birth_date"]}
+                            ]
+                        }
+                    ]
+                }
+                """.trimIndent(),
+            )
 
-        val dcqlPresentation = createPresentation(
-            query.credentials!![0],
-            mdoc
-        )
+        val dcqlPresentation =
+            createPresentation(
+                query.credentials!![0],
+                mdoc,
+            )
 
         assertFailsWith<InvalidDocTypeException> {
             verify(query, dcqlPresentation).getOrThrow()
@@ -584,215 +634,225 @@ class TestMdocVerification {
 
     @Test
     fun testVerifyMDocSetQuery() {
-        val mdoc1 = createMDoc(
-            mapOf(
-                "org.iso.18013.5.1" to mapOf(
-                    "family_name" to "Jones",
-                    "given_name" to "Ava",
-                    "birth_date" to "2007-03-25",
-                )
-            ).toCbor(),
-            "com.example.doctype.test"
-        )
+        val mdoc1 =
+            createMDoc(
+                mapOf(
+                    "org.iso.18013.5.1" to
+                        mapOf(
+                            "family_name" to "Jones",
+                            "given_name" to "Ava",
+                            "birth_date" to "2007-03-25",
+                        ),
+                ).toCbor(),
+                "com.example.doctype.test",
+            )
 
-        val mdoc2 = createMDoc(
-            mapOf(
-                "org.iso.18013.5.1" to mapOf(
-                    "postal_code" to "1234",
-                    "locality" to "here",
-                    "region" to "Zurich",
-                )
-            ).toCbor(),
-            "com.example.doctype.test"
-        )
+        val mdoc2 =
+            createMDoc(
+                mapOf(
+                    "org.iso.18013.5.1" to
+                        mapOf(
+                            "postal_code" to "1234",
+                            "locality" to "here",
+                            "region" to "Zurich",
+                        ),
+                ).toCbor(),
+                "com.example.doctype.test",
+            )
 
-        val query = parseDcqlQuery(
-            """
-            {
-                "credentials": [
-                    {
-                        "id": "pid",
-                        "format": "dc+sd-jwt",
-                        "meta": {
-                            "vct_values": ["https://credentials.example.com/identity_credential"]
+        val query =
+            parseDcqlQuery(
+                """
+                {
+                    "credentials": [
+                        {
+                            "id": "pid",
+                            "format": "dc+sd-jwt",
+                            "meta": {
+                                "vct_values": ["https://credentials.example.com/identity_credential"]
+                            },
+                            "claims": [
+                                {"path": ["given_name"]},
+                                {"path": ["family_name"]},
+                                {"path": ["address", "street_address"]}
+                            ]
                         },
-                        "claims": [
-                            {"path": ["given_name"]},
-                            {"path": ["family_name"]},
-                            {"path": ["address", "street_address"]}
-                        ]
-                    },
-                    {
-                        "id": "other_pid",
-                        "format": "dc+sd-jwt",
-                        "meta": {
-                            "vct_values": ["https://othercredentials.example/pid"]
+                        {
+                            "id": "other_pid",
+                            "format": "dc+sd-jwt",
+                            "meta": {
+                                "vct_values": ["https://othercredentials.example/pid"]
+                            },
+                            "claims": [
+                                {"path": ["given_name"]},
+                                {"path": ["family_name"]},
+                                {"path": ["address", "street_address"]}
+                            ]
                         },
-                        "claims": [
-                            {"path": ["given_name"]},
-                            {"path": ["family_name"]},
-                            {"path": ["address", "street_address"]}
-                        ]
-                    },
-                    {
-                        "id": "pid_reduced_cred_1",
-                        "format": "mso_mdoc",
-                        "claims": [
-                            {"path": ["org.iso.18013.5.1", "family_name"]},
-                            {"path": ["org.iso.18013.5.1", "given_name"]},
-                            {"path": ["org.iso.18013.5.1", "birth_date"]}
-                        ]
-                    },
-                    {
-                        "id": "pid_reduced_cred_2",
-                        "format": "mso_mdoc",
-                        "claims": [
-                            {"path": ["org.iso.18013.5.1", "postal_code"]},
-                            {"path": ["org.iso.18013.5.1", "locality"]},
-                            {"path": ["org.iso.18013.5.1", "region"]}
-                        ]
-                    },
-                    {
-                        "id": "nice_to_have",
-                        "format": "dc+sd-jwt",
-                        "meta": {
-                            "vct_values": ["https://company.example/company_rewards"]
+                        {
+                            "id": "pid_reduced_cred_1",
+                            "format": "mso_mdoc",
+                            "claims": [
+                                {"path": ["org.iso.18013.5.1", "family_name"]},
+                                {"path": ["org.iso.18013.5.1", "given_name"]},
+                                {"path": ["org.iso.18013.5.1", "birth_date"]}
+                            ]
                         },
-                        "claims": [
-                            {"path": ["rewards_number"]}
-                        ]
-                    }
-                ],
-                "credential_sets": [
-                    {
-                        "purpose": "Identification",
-                        "options": [
-                            [ "pid" ],
-                            [ "other_pid" ],
-                            [ "pid_reduced_cred_1", "pid_reduced_cred_2" ]
-                        ]
-                    },
-                    {
-                        "purpose": "Show your rewards card",
-                        "required": false,
-                        "options": [
-                            [ "nice_to_have" ]
-                        ]
-                    }
-                ]
-            }
-            """.trimIndent()
-        )
+                        {
+                            "id": "pid_reduced_cred_2",
+                            "format": "mso_mdoc",
+                            "claims": [
+                                {"path": ["org.iso.18013.5.1", "postal_code"]},
+                                {"path": ["org.iso.18013.5.1", "locality"]},
+                                {"path": ["org.iso.18013.5.1", "region"]}
+                            ]
+                        },
+                        {
+                            "id": "nice_to_have",
+                            "format": "dc+sd-jwt",
+                            "meta": {
+                                "vct_values": ["https://company.example/company_rewards"]
+                            },
+                            "claims": [
+                                {"path": ["rewards_number"]}
+                            ]
+                        }
+                    ],
+                    "credential_sets": [
+                        {
+                            "purpose": "Identification",
+                            "options": [
+                                [ "pid" ],
+                                [ "other_pid" ],
+                                [ "pid_reduced_cred_1", "pid_reduced_cred_2" ]
+                            ]
+                        },
+                        {
+                            "purpose": "Show your rewards card",
+                            "required": false,
+                            "options": [
+                                [ "nice_to_have" ]
+                            ]
+                        }
+                    ]
+                }
+                """.trimIndent(),
+            )
 
         val dcqlPresentation =
             createPresentation(
                 query.credentials!![2],
-                mdoc1
-            ) + createPresentation(
-                query.credentials!![3],
-                mdoc2
-            )
+                mdoc1,
+            ) +
+                createPresentation(
+                    query.credentials!![3],
+                    mdoc2,
+                )
 
         assertTrue(
-            verify(query, dcqlPresentation).isSuccess
+            verify(query, dcqlPresentation).isSuccess,
         )
     }
 
     @Test
     fun testVerifyMDocSetQuery_NoCredentialSetQueryOptionSatisfiedException() {
-        val mdoc = createMDoc(
-            mapOf(
-                "org.iso.18013.5.1" to mapOf(
-                    "rewards_number" to "123-123-123"
-                )
-            ).toCbor(),
-            "com.example.doctype.test"
-        )
+        val mdoc =
+            createMDoc(
+                mapOf(
+                    "org.iso.18013.5.1" to
+                        mapOf(
+                            "rewards_number" to "123-123-123",
+                        ),
+                ).toCbor(),
+                "com.example.doctype.test",
+            )
 
-        val query = parseDcqlQuery(
-            """
-            {
-                "credentials": [
-                    {
-                        "id": "pid",
-                        "format": "dc+sd-jwt",
-                        "meta": {
-                            "vct_values": ["https://credentials.example.com/identity_credential"]
+        val query =
+            parseDcqlQuery(
+                """
+                {
+                    "credentials": [
+                        {
+                            "id": "pid",
+                            "format": "dc+sd-jwt",
+                            "meta": {
+                                "vct_values": ["https://credentials.example.com/identity_credential"]
+                            },
+                            "claims": [
+                                {"path": ["given_name"]},
+                                {"path": ["family_name"]},
+                                {"path": ["address", "street_address"]}
+                            ]
                         },
-                        "claims": [
-                            {"path": ["given_name"]},
-                            {"path": ["family_name"]},
-                            {"path": ["address", "street_address"]}
-                        ]
-                    },
-                    {
-                        "id": "other_pid",
-                        "format": "dc+sd-jwt",
-                        "meta": {
-                            "vct_values": ["https://othercredentials.example/pid"]
+                        {
+                            "id": "other_pid",
+                            "format": "dc+sd-jwt",
+                            "meta": {
+                                "vct_values": ["https://othercredentials.example/pid"]
+                            },
+                            "claims": [
+                                {"path": ["given_name"]},
+                                {"path": ["family_name"]},
+                                {"path": ["address", "street_address"]}
+                            ]
                         },
-                        "claims": [
-                            {"path": ["given_name"]},
-                            {"path": ["family_name"]},
-                            {"path": ["address", "street_address"]}
-                        ]
-                    },
-                    {
-                        "id": "pid_reduced_cred_1",
-                        "format": "dc+sd-jwt",
-                        "meta": {
-                            "vct_values": ["https://credentials.example.com/reduced_identity_credential"]
+                        {
+                            "id": "pid_reduced_cred_1",
+                            "format": "dc+sd-jwt",
+                            "meta": {
+                                "vct_values": ["https://credentials.example.com/reduced_identity_credential"]
+                            },
+                            "claims": [
+                                {"path": ["family_name"]},
+                                {"path": ["given_name"]}
+                            ]
                         },
-                        "claims": [
-                            {"path": ["family_name"]},
-                            {"path": ["given_name"]}
-                        ]
-                    },
-                    {
-                        "id": "pid_reduced_cred_2",
-                        "format": "dc+sd-jwt",
-                        "meta": {
-                            "vct_values": ["https://cred.example/residence_credential"]
+                        {
+                            "id": "pid_reduced_cred_2",
+                            "format": "dc+sd-jwt",
+                            "meta": {
+                                "vct_values": ["https://cred.example/residence_credential"]
+                            },
+                            "claims": [
+                                {"path": ["postal_code"]},
+                                {"path": ["locality"]},
+                                {"path": ["region"]}
+                            ]
                         },
-                        "claims": [
-                            {"path": ["postal_code"]},
-                            {"path": ["locality"]},
-                            {"path": ["region"]}
-                        ]
-                    },
-                    {
-                        "id": "nice_to_have",
-                        "format": "mso_mdoc",
-                        "claims": [
-                            {"path": ["org.iso.18013.5.1", "rewards_number"]}
-                        ]
-                    }
-                ],
-                "credential_sets": [
-                    {
-                        "purpose": "Identification",
-                        "options": [
-                            [ "pid" ],
-                            [ "other_pid" ],
-                            [ "pid_reduced_cred_1", "pid_reduced_cred_2" ]
-                        ]
-                    },
-                    {
-                        "purpose": "Show your rewards card",
-                        "required": false,
-                        "options": [
-                            [ "nice_to_have" ]
-                        ]
-                    }
-                ]
-            }
-            """.trimIndent()
-        )
+                        {
+                            "id": "nice_to_have",
+                            "format": "mso_mdoc",
+                            "claims": [
+                                {"path": ["org.iso.18013.5.1", "rewards_number"]}
+                            ]
+                        }
+                    ],
+                    "credential_sets": [
+                        {
+                            "purpose": "Identification",
+                            "options": [
+                                [ "pid" ],
+                                [ "other_pid" ],
+                                [ "pid_reduced_cred_1", "pid_reduced_cred_2" ]
+                            ]
+                        },
+                        {
+                            "purpose": "Show your rewards card",
+                            "required": false,
+                            "options": [
+                                [ "nice_to_have" ]
+                            ]
+                        }
+                    ]
+                }
+                """.trimIndent(),
+            )
 
-        val dcqlPresentation = createPresentation(
-            query.credentials!![4],
-            mdoc
-        )
+        val dcqlPresentation =
+            createPresentation(
+                query.credentials!![4],
+                mdoc,
+            )
 
         assertFailsWith<NoCredentialSetQueryOptionSatisfiedException> {
             verify(query, dcqlPresentation).getOrThrow()

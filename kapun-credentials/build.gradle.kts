@@ -13,8 +13,14 @@ kotlin {
     jvmToolchain(17)
     android {
         namespace = "org.kapunsdk.credentials.umbrella"
-        compileSdk = libs.versions.android.compileSdk.get().toInt()
-        minSdk = libs.versions.android.minSdk.get().toInt()
+        compileSdk =
+            libs.versions.android.compileSdk
+                .get()
+                .toInt()
+        minSdk =
+            libs.versions.android.minSdk
+                .get()
+                .toInt()
         withHostTest {}
     }
     jvm()
@@ -42,7 +48,12 @@ kotlin {
     }
 }
 
-skie { analytics { enabled = false; disableUpload = true } }
+skie {
+    analytics {
+        enabled = false
+        disableUpload = true
+    }
+}
 mavenPublishing {
     coordinates(artifactId = property("ARTIFACT_ID").toString(), version = project.version.toString())
     publishToMavenCentral(true)

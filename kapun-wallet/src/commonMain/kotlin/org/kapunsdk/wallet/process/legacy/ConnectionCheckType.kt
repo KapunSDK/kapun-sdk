@@ -17,30 +17,31 @@ under the License.
 package org.kapunsdk.wallet.process.legacy
 
 enum class ConnectionCheckType {
-	/** A connection from a verified agent is requested and the user has enabled "Always connect" */
-	VERIFIED_CONNECT,
+    /** A connection from a verified agent is requested and the user has enabled "Always connect" */
+    VERIFIED_CONNECT,
 
-	/** A connection from a verified agent is requested, but the user has enabled "Always ask" */
-	VERIFIED_ASK,
+    /** A connection from a verified agent is requested, but the user has enabled "Always ask" */
+    VERIFIED_ASK,
 
-	/** A connection from an unverified agent is requested, but the user has enabled "Always ask" */
-	UNVERIFIED_ASK,
+    /** A connection from an unverified agent is requested, but the user has enabled "Always ask" */
+    UNVERIFIED_ASK,
 
-	/** A connection from an unverified agent is requested and the user has enabled "Never connect" */
-	UNVERIFIED_DENY;
+    /** A connection from an unverified agent is requested and the user has enabled "Never connect" */
+    UNVERIFIED_DENY,
 
-	companion object {
-		fun validateConnectionType(
-			isVerified: Boolean,
-			isTrusted: Boolean,
-			trustedConnectionAlwaysAsk: Boolean,
-			untrustedConnectionAlwaysAsk: Boolean,
-		): ConnectionCheckType {
-			return if (isVerified && isTrusted) {
-				if (trustedConnectionAlwaysAsk) VERIFIED_ASK else VERIFIED_CONNECT
-			} else {
-				if (untrustedConnectionAlwaysAsk) UNVERIFIED_ASK else UNVERIFIED_DENY
-			}
-		}
-	}
+    ;
+
+    companion object {
+        fun validateConnectionType(
+            isVerified: Boolean,
+            isTrusted: Boolean,
+            trustedConnectionAlwaysAsk: Boolean,
+            untrustedConnectionAlwaysAsk: Boolean,
+        ): ConnectionCheckType =
+            if (isVerified && isTrusted) {
+                if (trustedConnectionAlwaysAsk) VERIFIED_ASK else VERIFIED_CONNECT
+            } else {
+                if (untrustedConnectionAlwaysAsk) UNVERIFIED_ASK else UNVERIFIED_DENY
+            }
+    }
 }

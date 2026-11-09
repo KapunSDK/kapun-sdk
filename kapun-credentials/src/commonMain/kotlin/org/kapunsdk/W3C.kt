@@ -16,11 +16,6 @@ under the License.
 
 package org.kapunsdk.credentials
 
-import org.kapunsdk.credentials.sdjwt.SdJwtVcSignatureResolver
-import org.kapunsdk.util.extensions.asObject
-import org.kapunsdk.util.extensions.asString
-import org.kapunsdk.util.extensions.get
-import org.kapunsdk.util.extensions.json
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.KeepGeneratedSerializer
@@ -33,12 +28,17 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.encoding.decodeStructure
 import kotlinx.serialization.encoding.encodeStructure
-import uniffi.kapun_credential_core_rust.SignatureCreator
+import org.kapunsdk.credentials.sdjwt.SdJwtVcSignatureResolver
+import org.kapunsdk.util.extensions.asObject
+import org.kapunsdk.util.extensions.asString
+import org.kapunsdk.util.extensions.get
+import org.kapunsdk.util.extensions.json
 import uniffi.kapun_credential_core_rust.*
+import uniffi.kapun_credential_core_rust.SignatureCreator
+import uniffi.kapun_crypto_rust.base64UrlEncode
+import uniffi.kapun_dcql_openbadges_rust.*
 import uniffi.kapun_dcql_sdjwt_rust.*
 import uniffi.kapun_dcql_w3c_rust.*
-import uniffi.kapun_dcql_openbadges_rust.*
-import uniffi.kapun_crypto_rust.base64UrlEncode
 import uniffi.kapun_util_rust.Value
 
 sealed class W3C {
@@ -46,8 +46,7 @@ sealed class W3C {
         val W3C_FORMATS: Array<String> = arrayOf("vc+sd-jwt")
 
         // NOTE: In the future other W3C formats can be supported
-        fun parse(credential: String): W3C =
-            SdJwt(parseW3cSdJwt(credential))
+        fun parse(credential: String): W3C = SdJwt(parseW3cSdJwt(credential))
     }
 
     abstract val docType: String
@@ -62,23 +61,20 @@ sealed class W3C {
 
     abstract fun isSignatureValid(): Boolean
 
-    data class SdJwt(val inner: W3cSdJwt) : W3C() {
+    data class SdJwt(
+        val inner: W3cSdJwt,
+    ) : W3C() {
         override val docType: String = inner.doctype
 
-        override fun asJson(): Value =
-            inner.json
+        override fun asJson(): Value = inner.json
 
-        override fun presentation(): SdJwtBuilder =
-            sdjwtBuilderFromW3c(inner)
+        override fun presentation(): SdJwtBuilder = sdjwtBuilderFromW3c(inner)
 
-        override fun getOriginalNumClaims(): Int =
-            inner.numDisclosures.toInt()
+        override fun getOriginalNumClaims(): Int = inner.numDisclosures.toInt()
 
-        override fun getNumDisclosed(): Int =
-            inner.numDisclosures.toInt()
+        override fun getNumDisclosed(): Int = inner.numDisclosures.toInt()
 
-        override fun isSignatureValid(): Boolean
-            = SdJwtVcSignatureResolver.isSignatureValid(inner.originalJwt)
+        override fun isSignatureValid(): Boolean = SdJwtVcSignatureResolver.isSignatureValid(inner.originalJwt)
 
         companion object {
             fun create(
@@ -87,10 +83,10 @@ sealed class W3C {
                 keyId: String?,
                 key: SignatureCreator,
                 pubKeyJwk: Value?,
-                hashAlg: String = "sha-256"
+                hashAlg: String = "sha-256",
             ): SdJwt? {
                 if (claims !is Value.Object) {
-                    return null;
+                    return null
                 }
 
                 val header = Header(typ = "vc+sd-jwt", alg = key.alg(), kid = keyId)
@@ -102,15 +98,18 @@ sealed class W3C {
 
                 val claimObject = Value.Object(keyClaims)
 
-                val sdJwt = createDisclosureForObject(claimObject, disclosures, 1, sdJwtHasher = SdJwtHasher.fromStr(hashAlg))
+                val sdJwt =
+                    createDisclosureForObject(claimObject, disclosures, 1, sdJwtHasher = SdJwtHasher.fromStr(hashAlg))
 
-                val headerEncoded = base64UrlEncode(
-                    json.encodeToString(Header.serializer(), header).encodeToByteArray()
-                )
+                val headerEncoded =
+                    base64UrlEncode(
+                        json.encodeToString(Header.serializer(), header).encodeToByteArray(),
+                    )
                 val sdJwtDisclosure = sdJwt.getOrNull() ?: return null
-                val bodyEncoded = base64UrlEncode(
-                    json.encodeToString(sdJwtDisclosure.disclosedObject).encodeToByteArray()
-                )
+                val bodyEncoded =
+                    base64UrlEncode(
+                        json.encodeToString(sdJwtDisclosure.disclosedObject).encodeToByteArray(),
+                    )
                 val msgPayload = "$headerEncoded.$bodyEncoded"
                 val signature = base64UrlEncode(key.sign(msgPayload.encodeToByteArray()))
                 val jwt = "$msgPayload.$signature"
@@ -121,17 +120,18 @@ sealed class W3C {
         }
     }
 
-    data class OpenBadge303(private val data: Data) : W3C() {
+    data class OpenBadge303(
+        private val data: Data,
+    ) : W3C() {
         /**
          * Helper class to store precomputed information such that we don't have to recompute it
          * again every time we load the credential.
          */
         @OptIn(ExperimentalSerializationApi::class)
-		@Serializable(with = OpenBadgesSerializer::class)
+        @Serializable(with = OpenBadgesSerializer::class)
         @KeepGeneratedSerializer
         data class Data(
             val credential: OpenBadges303Credential,
-
             // NOTE: To check the credential validity network requests must be potentially made, as
             //       such it is favorable to cache this value. But do note, that if the credential
             //       expires, this value won't be updated.
@@ -139,25 +139,33 @@ sealed class W3C {
         )
 
         override val docType: String
-            get() = data.credential.data.types.firstOrNull { it != "VerifiableCredential" }
-                ?: "VerifiableCredential"
+            get() =
+                data.credential.data.types
+                    .firstOrNull { it != "VerifiableCredential" }
+                    ?: "VerifiableCredential"
 
         val types: List<String>
             get() = data.credential.data.types
 
         val name: String?
-            get() = when (val name = data.credential.data.name) {
-                is LocalizableString.ManyLvo -> name.v1.firstOrNull()?.value
-                is LocalizableString.OneLvo -> name.v1.value
-                is LocalizableString.String -> name.v1
-                null -> null
-            }
+            get() =
+                when (val name = data.credential.data.name) {
+                    is LocalizableString.ManyLvo -> name.v1.firstOrNull()?.value
+                    is LocalizableString.OneLvo -> name.v1.value
+                    is LocalizableString.String -> name.v1
+                    null -> null
+                }
 
         val achievement: Value
-            get() = data.credential.data.credentialSubject?.get("achievement") ?: Value.Null
+            get() =
+                data.credential.data.credentialSubject
+                    ?.get("achievement") ?: Value.Null
 
         val issuerName: String?
-            get() = data.credential.data.issuer?.get("name")?.asString()
+            get() =
+                data.credential.data.issuer
+                    ?.get("name")
+                    ?.asString()
 
         val pngBytes: ByteArray = data.credential.imageBytes
 
@@ -170,44 +178,55 @@ sealed class W3C {
 
         override fun asJson(): Value = dataAsJson
 
-        override fun presentation(): SdJwtBuilder {
-            throw Exception("Use `asVerifiablePresentation()` instead")
-        }
+        override fun presentation(): SdJwtBuilder = throw Exception("Use `asVerifiablePresentation()` instead")
 
-        fun asVerifiablePresentation(): Result<String> = runCatching {
-            val proof = Value.Object(mapOf(
-                "@context" to Value.Array(listOf(
-                    Value.String("https://www.w3.org/2018/credentials/v1"),
-                    Value.String("https://w3id.org/security/data-integrity/v2")
-                )),
-                "type" to Value.Array(listOf(
-                    Value.String("VerifiablePresentation")
-                )),
-                "verifiableCredential" to Value.Array(listOf(dataAsJson)),
-            ))
+        fun asVerifiablePresentation(): Result<String> =
+            runCatching {
+                val proof =
+                    Value.Object(
+                        mapOf(
+                            "@context" to
+                                Value.Array(
+                                    listOf(
+                                        Value.String("https://www.w3.org/2018/credentials/v1"),
+                                        Value.String("https://w3id.org/security/data-integrity/v2"),
+                                    ),
+                                ),
+                            "type" to
+                                Value.Array(
+                                    listOf(
+                                        Value.String("VerifiablePresentation"),
+                                    ),
+                                ),
+                            "verifiableCredential" to Value.Array(listOf(dataAsJson)),
+                        ),
+                    )
 
-            json.encodeToString(proof)
-        }
+                json.encodeToString(proof)
+            }
 
         override fun getOriginalNumClaims(): Int = 0
+
         override fun getNumDisclosed(): Int = 0
 
         override fun isSignatureValid(): Boolean = data.isValid
 
-        fun serialized(): String =
-            json.encodeToString(this.data)
+        fun serialized(): String = json.encodeToString(this.data)
 
-        fun asW3CCredential(): W3cVerifiableCredential =
-            data.credential.originalData
+        fun asW3CCredential(): W3cVerifiableCredential = data.credential.originalData
 
         companion object {
             val OPEN_BADGE_FORMATS: Array<String> = arrayOf("ldp_vc")
 
             suspend fun parse(bytes: ByteArray): OpenBadge303 {
-                val credential = parseOpenBadges303Credential(bytes, listOf(
-                    "https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json",
-                    "https://purl.imsglobal.org/spec/ob/v3p0/extensions.json"
-                ))
+                val credential =
+                    parseOpenBadges303Credential(
+                        bytes,
+                        listOf(
+                            "https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json",
+                            "https://purl.imsglobal.org/spec/ob/v3p0/extensions.json",
+                        ),
+                    )
 
                 val isValid = verifySecuredDocumentString(credential.original)
 
@@ -219,11 +238,16 @@ sealed class W3C {
                 keyId: String,
                 key: SignatureCreator,
             ) {
-
             }
 
             fun parseSerialized(credential: String): OpenBadge303 {
-                val newFormat = runCatching { json.decodeFromString(OpenBadge303.Data.serializer(), credential) }.getOrNull()
+                val newFormat =
+                    runCatching {
+                        json.decodeFromString(
+                            OpenBadge303.Data.serializer(),
+                            credential,
+                        )
+                    }.getOrNull()
                 if (newFormat != null) {
                     return OpenBadge303(newFormat)
                 }
@@ -235,34 +259,36 @@ sealed class W3C {
 
 object OpenBadgesSerializer : KSerializer<W3C.OpenBadge303.Data> {
     override val descriptor: SerialDescriptor
-        get() =  buildClassSerialDescriptor("org.kapunsdk.credentials.W3C.OpenBadge303.Data") {
-            // Specifies each property with its type and name with the element() function
-            element<String>("credential")
-            element<Boolean>("isValid")
-        }
+        get() =
+            buildClassSerialDescriptor("org.kapunsdk.credentials.W3C.OpenBadge303.Data") {
+                // Specifies each property with its type and name with the element() function
+                element<String>("credential")
+                element<Boolean>("isValid")
+            }
 
-    override fun serialize(encoder: Encoder, value: W3C.OpenBadge303.Data) {
+    override fun serialize(
+        encoder: Encoder,
+        value: W3C.OpenBadge303.Data,
+    ) {
         encoder.encodeStructure(descriptor) {
-            encodeStringElement(descriptor,0 , serializeOpenBadges303(value.credential))
+            encodeStringElement(descriptor, 0, serializeOpenBadges303(value.credential))
             encodeBooleanElement(descriptor, 1, value.isValid)
         }
     }
 
-    override fun deserialize(decoder: Decoder): W3C.OpenBadge303.Data {
-       return decoder.decodeStructure(descriptor) {
-           var credential : String = ""
-           var isValid = false
-           while (true) {
-               when(val index = decodeElementIndex(descriptor)) {
-                   0 -> credential = decodeStringElement(descriptor, 0)
-                   1 -> isValid = decodeBooleanElement(descriptor, 1)
-                   CompositeDecoder.DECODE_DONE -> break
-                   else -> error("Unexepected index: $index")
-               }
-           }
-           val c = deserializeOpenBadges303FromStr(credential)
-           W3C.OpenBadge303.Data(c, isValid)
-       }
-    }
-
+    override fun deserialize(decoder: Decoder): W3C.OpenBadge303.Data =
+        decoder.decodeStructure(descriptor) {
+            var credential: String = ""
+            var isValid = false
+            while (true) {
+                when (val index = decodeElementIndex(descriptor)) {
+                    0 -> credential = decodeStringElement(descriptor, 0)
+                    1 -> isValid = decodeBooleanElement(descriptor, 1)
+                    CompositeDecoder.DECODE_DONE -> break
+                    else -> error("Unexepected index: $index")
+                }
+            }
+            val c = deserializeOpenBadges303FromStr(credential)
+            W3C.OpenBadge303.Data(c, isValid)
+        }
 }

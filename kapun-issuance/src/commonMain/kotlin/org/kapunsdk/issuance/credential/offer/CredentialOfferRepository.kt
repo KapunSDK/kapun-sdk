@@ -16,51 +16,54 @@ under the License.
 
 package org.kapunsdk.issuance.credential.offer
 
-import org.kapunsdk.issuance.di.KapunIssuanceKoinComponent
 import io.ktor.http.Url
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import org.kapunsdk.issuance.di.KapunIssuanceKoinComponent
 import org.koin.core.component.inject
 
 class CredentialOfferRepository : KapunIssuanceKoinComponent {
+    companion object {
+        private const val CREDENTIAL_OFFER_SCHEME = "openid-credential-offer"
+        private const val BIT_CREDENTIAL_OFFER_SCHEME = "swiyu"
+        private const val HAIP_CREDENTIAL_OFFER_SCHEME = "haip-vci"
 
-	companion object {
-		private const val CREDENTIAL_OFFER_SCHEME = "openid-credential-offer"
-		private const val BIT_CREDENTIAL_OFFER_SCHEME = "swiyu"
-		private const val HAIP_CREDENTIAL_OFFER_SCHEME = "haip-vci"
+        private const val PARAM_CREDENTIAL_OFFER_URI = "credential_offer_uri"
+        private const val PARAM_CREDENTIAL_OFFER = "credential_offer"
+    }
 
-		private const val PARAM_CREDENTIAL_OFFER_URI = "credential_offer_uri"
-		private const val PARAM_CREDENTIAL_OFFER = "credential_offer"
-	}
+    private val credentialOfferService by inject<CredentialOfferService>()
+    private val json by inject<Json>()
 
-	private val credentialOfferService by inject<CredentialOfferService>()
-	private val json by inject<Json>()
+    /**
+     * Parses a credential offer from a string according to https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-13.html#name-credential-offer
+     */
+    suspend fun parseCredentialOffer(offerString: String): CredentialOfferParameters? =
+        withContext(Dispatchers.IO) {
+            // Check if the offer string has the correct scheme
+            val parsedOfferString = Url(offerString)
+            val protocolName = parsedOfferString.protocol.name
+            if (!(
+                    protocolName == CREDENTIAL_OFFER_SCHEME || protocolName == BIT_CREDENTIAL_OFFER_SCHEME ||
+                        protocolName == HAIP_CREDENTIAL_OFFER_SCHEME
+                )
+            ) {
+                return@withContext null
+            }
 
-	/**
-	 * Parses a credential offer from a string according to https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-13.html#name-credential-offer
-	 */
-	suspend fun parseCredentialOffer(offerString: String): CredentialOfferParameters? = withContext(Dispatchers.IO) {
-		// Check if the offer string has the correct scheme
-		val parsedOfferString = Url(offerString)
-		val protocolName = parsedOfferString.protocol.name
-		if (!(protocolName == CREDENTIAL_OFFER_SCHEME || protocolName == BIT_CREDENTIAL_OFFER_SCHEME || protocolName == HAIP_CREDENTIAL_OFFER_SCHEME)) {
-			return@withContext null
-		}
-
-		// Check if the offer references a URI or contains the parameters directly
-		val offerUri = parsedOfferString.parameters[PARAM_CREDENTIAL_OFFER_URI]
-		if (offerUri != null) {
-			return@withContext credentialOfferService.doCredentialOfferRequest(offerUri)
-		} else {
-			val offer = parsedOfferString.parameters[PARAM_CREDENTIAL_OFFER]
-			return@withContext offer?.let {
-				runCatching {
-					json.decodeFromString<CredentialOfferParameters>(it)
-				}.getOrNull()
-			}
-		}
-	}
-
+            // Check if the offer references a URI or contains the parameters directly
+            val offerUri = parsedOfferString.parameters[PARAM_CREDENTIAL_OFFER_URI]
+            if (offerUri != null) {
+                return@withContext credentialOfferService.doCredentialOfferRequest(offerUri)
+            } else {
+                val offer = parsedOfferString.parameters[PARAM_CREDENTIAL_OFFER]
+                return@withContext offer?.let {
+                    runCatching {
+                        json.decodeFromString<CredentialOfferParameters>(it)
+                    }.getOrNull()
+                }
+            }
+        }
 }

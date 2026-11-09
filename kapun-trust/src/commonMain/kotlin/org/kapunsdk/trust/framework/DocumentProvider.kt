@@ -19,9 +19,10 @@ package org.kapunsdk.trust.framework
 import org.kapunsdk.credentials.models.credential.CredentialModel
 
 interface DocumentProvider {
+    suspend fun getAllCredentials(): List<CredentialModel>
 
-	suspend fun getAllCredentials(): List<CredentialModel>
-
-	suspend fun getCredentialsByDocType(docType: String, includeUsedCredentials: Boolean): List<CredentialModel>
-
+    suspend fun getCredentialsByDocType(
+        docType: String,
+        includeUsedCredentials: Boolean,
+    ): List<CredentialModel>
 }

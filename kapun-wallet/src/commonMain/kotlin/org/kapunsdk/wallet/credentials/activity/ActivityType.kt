@@ -17,6 +17,6 @@ under the License.
 package org.kapunsdk.wallet.credentials.activity
 
 enum class ActivityType {
-	ISSUANCE,
-	PROOF,
+    ISSUANCE,
+    PROOF,
 }

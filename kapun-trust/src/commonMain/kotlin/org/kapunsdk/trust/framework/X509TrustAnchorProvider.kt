@@ -20,9 +20,10 @@ import uniffi.kapun_crypto_rust.X509Certificate
 
 interface X509TrustAnchorProvider : org.kapunsdk.trust.framework.TrustAnchorProvider<List<X509Certificate>> {
     fun addCertificate(cert: String)
-    fun verifyChain(certs: List<X509Certificate>) : Boolean
-    fun getRoot(certs: List<X509Certificate>) : X509Certificate?
 
-    override fun isTrusted(certs: List<X509Certificate>): Boolean
-        = verifyChain(certs)
+    fun verifyChain(certs: List<X509Certificate>): Boolean
+
+    fun getRoot(certs: List<X509Certificate>): X509Certificate?
+
+    override fun isTrusted(certs: List<X509Certificate>): Boolean = verifyChain(certs)
 }

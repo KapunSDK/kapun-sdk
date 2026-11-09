@@ -16,19 +16,23 @@ under the License.
 
 package org.kapunsdk.visualization.stylejson.model
 
-import org.kapunsdk.visualization.oca.model.content.TextShade
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import org.kapunsdk.visualization.oca.model.content.TextShade
 
 @Serializable
 enum class StyleJsonTextShade {
-	@SerialName("light")
-	LIGHT,
-	@SerialName("dark")
-	DARK;
+    @SerialName("light")
+    LIGHT,
 
-	fun toTextShade() = when (this) {
-		LIGHT -> TextShade.LIGHT
-		DARK -> TextShade.DARK
-	}
+    @SerialName("dark")
+    DARK,
+
+    ;
+
+    fun toTextShade() =
+        when (this) {
+            LIGHT -> TextShade.LIGHT
+            DARK -> TextShade.DARK
+        }
 }

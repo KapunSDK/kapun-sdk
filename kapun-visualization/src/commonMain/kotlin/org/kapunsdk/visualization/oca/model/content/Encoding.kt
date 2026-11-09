@@ -21,9 +21,9 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 enum class Encoding {
-	@SerialName("utf-8")
-	UTF_8,
+    @SerialName("utf-8")
+    UTF_8,
 
-	@SerialName("base64")
-	BASE_64,
+    @SerialName("base64")
+    BASE_64,
 }

@@ -23,31 +23,33 @@ import org.kapunsdk.trust.model.AgentType
 import org.kapunsdk.util.platform.Platform
 
 fun TrustedIdentity?.toAgentInformation(
-	agentType: AgentType,
-	baseUrl: String,
-	isTrusted: Boolean,
-	trustData: TrustData,
-	frameworkId: String?
+    agentType: AgentType,
+    baseUrl: String,
+    isTrusted: Boolean,
+    trustData: TrustData,
+    frameworkId: String?,
 ): AgentInformation {
-	val userLanguage = Platform.getCurrentLocale()
-	return AgentInformation(
-		type = agentType,
-		domain = baseUrl,
-		displayName = this?.entityName?.let { entityName ->
-			entityName[userLanguage]
-				?: this.prefLang?.let { entityName[it] }
-				?: entityName.values.firstOrNull()
-		} ?: baseUrl,
-		logoUri = this?.logoUri?.let { logoUri ->
-			logoUri[userLanguage]
-				?: this.prefLang?.let { logoUri[it] }
-				?: logoUri.values.firstOrNull()
-		},
-		isTrusted = isTrusted,
-		isVerified = trustData.isVerified,
-		identityTrust = trustData.identityJwt,
-		issuanceTrust = (trustData as? TrustData.Issuance)?.issuanceJwt,
-		verificationTrust = (trustData as? TrustData.Verification)?.verificationJwt,
-		trustFrameworkId = frameworkId
-	)
+    val userLanguage = Platform.getCurrentLocale()
+    return AgentInformation(
+        type = agentType,
+        domain = baseUrl,
+        displayName =
+            this?.entityName?.let { entityName ->
+                entityName[userLanguage]
+                    ?: this.prefLang?.let { entityName[it] }
+                    ?: entityName.values.firstOrNull()
+            } ?: baseUrl,
+        logoUri =
+            this?.logoUri?.let { logoUri ->
+                logoUri[userLanguage]
+                    ?: this.prefLang?.let { logoUri[it] }
+                    ?: logoUri.values.firstOrNull()
+            },
+        isTrusted = isTrusted,
+        isVerified = trustData.isVerified,
+        identityTrust = trustData.identityJwt,
+        issuanceTrust = (trustData as? TrustData.Issuance)?.issuanceJwt,
+        verificationTrust = (trustData as? TrustData.Verification)?.verificationJwt,
+        trustFrameworkId = frameworkId,
+    )
 }

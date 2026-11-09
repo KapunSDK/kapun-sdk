@@ -32,17 +32,22 @@ import uniffi.kapun_util_rust.registerLogSink as registerRustLogSink
  * `KapunSdk.initialize` is where all of those calls happen, from the `kapun-wallet` module.
  */
 public object RustToKotlinLogSink : RustLogSink {
-	override fun log(priority: RustLogPriority, tag: String, message: String): Boolean {
-		val severity = when (priority) {
-			RustLogPriority.DEBUG, RustLogPriority.VERBOSE -> LogSeverity.DEBUG
-			RustLogPriority.INFO, RustLogPriority.DEFAULT, RustLogPriority.UNKNOWN -> LogSeverity.INFO
-			RustLogPriority.WARN -> LogSeverity.WARN
-			RustLogPriority.ERROR, RustLogPriority.FATAL -> LogSeverity.ERROR
-			RustLogPriority.SILENT -> return true
-		}
-		Logger.sink?.log(severity, tag, message)
-		return true
-	}
+    override fun log(
+        priority: RustLogPriority,
+        tag: String,
+        message: String,
+    ): Boolean {
+        val severity =
+            when (priority) {
+                RustLogPriority.DEBUG, RustLogPriority.VERBOSE -> LogSeverity.DEBUG
+                RustLogPriority.INFO, RustLogPriority.DEFAULT, RustLogPriority.UNKNOWN -> LogSeverity.INFO
+                RustLogPriority.WARN -> LogSeverity.WARN
+                RustLogPriority.ERROR, RustLogPriority.FATAL -> LogSeverity.ERROR
+                RustLogPriority.SILENT -> return true
+            }
+        Logger.sink?.log(severity, tag, message)
+        return true
+    }
 }
 
 /**
@@ -50,10 +55,10 @@ public object RustToKotlinLogSink : RustLogSink {
  * after `Logger.sink` has been assigned, so both language sides funnel into the same sink.
  */
 public fun bridgeRustLogsToKotlin() {
-	registerRustLogSink(RustToKotlinLogSink)
+    registerRustLogSink(RustToKotlinLogSink)
 }
 
 /** Stops forwarding Rust-originated logs. */
 public fun unbridgeRustLogs() {
-	clearRustLogSink()
+    clearRustLogSink()
 }

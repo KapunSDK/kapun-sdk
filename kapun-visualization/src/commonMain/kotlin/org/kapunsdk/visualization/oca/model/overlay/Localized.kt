@@ -19,9 +19,7 @@ package org.kapunsdk.visualization.oca.model.overlay
 import org.kapunsdk.util.locale.LocaleMatcher
 
 interface Localized {
-	val language: String
+    val language: String
 
-	fun matches(userLocale: String): Boolean {
-		return LocaleMatcher.matches(language, userLocale)
-	}
+    fun matches(userLocale: String): Boolean = LocaleMatcher.matches(language, userLocale)
 }

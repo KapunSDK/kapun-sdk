@@ -20,13 +20,11 @@ import org.kapunsdk.credentials.models.metadata.KeyMaterial
 import uniffi.kapun_wallet_rust.BatchSigner
 
 interface BatchSignerFactory {
-
-	fun createBatchSigner(
-		keyMaterial: KeyMaterial,
-		pin: String? = null,
-		frostBlob: String? = null,
-		passphrase: String? = null,
-		email: String? = null
-	): BatchSigner?
-
+    fun createBatchSigner(
+        keyMaterial: KeyMaterial,
+        pin: String? = null,
+        frostBlob: String? = null,
+        passphrase: String? = null,
+        email: String? = null,
+    ): BatchSigner?
 }
