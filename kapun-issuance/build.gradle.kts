@@ -52,6 +52,7 @@ kotlin {
 	sourceSets {
 		commonMain.dependencies {
 			api(project(":kapun-util"))
+			api(project(":kapun-federation"))
 			implementation(project(":kapun-crypto"))
 			implementation(libs.kotlin.coroutines)
 			implementation(libs.kotlin.serialization)

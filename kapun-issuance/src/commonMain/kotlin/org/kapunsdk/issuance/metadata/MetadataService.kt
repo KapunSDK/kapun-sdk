@@ -33,8 +33,8 @@ import io.ktor.http.appendPathSegments
 import org.koin.core.module.dsl.factoryOf
 import org.koin.dsl.module
 import uniffi.kapun_crypto_rust.parseEncodedJwtPayload
-import uniffi.kapun_util_rust.FederationResult
-import uniffi.kapun_util_rust.fetchMetadataFromIssuerUrl
+import uniffi.kapun_federation_rust.FederationResult
+import uniffi.kapun_federation_rust.fetchMetadataFromIssuerUrl
 
 internal class MetadataService(
 	private val httpClient: HttpClient,

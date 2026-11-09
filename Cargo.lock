@@ -5275,6 +5275,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "kapun-federation-rust"
+version = "0.1.0"
+dependencies = [
+ "kapun-util-rust",
+ "openid-federation",
+ "serde",
+ "serde_json",
+ "uniffi",
+]
+
+[[package]]
 name = "kapun-issuance-rust"
 version = "0.1.0"
 dependencies = [
@@ -5324,6 +5335,7 @@ dependencies = [
  "base64 0.22.1",
  "heidi-jwt",
  "josekit",
+ "kapun-federation-rust",
  "kapun-util-rust",
  "openid-federation",
  "reqwest 0.11.27",
@@ -5340,7 +5352,6 @@ dependencies = [
  "ciborium",
  "flate2",
  "libc",
- "openid-federation",
  "p256 0.13.2",
  "rand 0.8.8",
  "serde",
@@ -5385,6 +5396,7 @@ dependencies = [
  "kapun-dcql-rust",
  "kapun-dcql-sdjwt-rust",
  "kapun-dcql-w3c-rust",
+ "kapun-federation-rust",
  "kapun-issuance-rust",
  "kapun-presentation-rust",
  "kapun-trust-rust",

@@ -1,14 +1,17 @@
 use std::collections::HashMap;
 
+use kapun_util_rust::value::Value;
 use openid_federation::models::trust_chain::{FederationRelation, TrustAnchor, TrustStore};
 use openid_federation::FetchConfig;
 use serde::{Deserialize, Serialize};
+
+use crate::network::{SdkDefaultConfig, SdkNoVerifyConfig};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 pub struct FederationResult {
     is_valid: bool,
-    metadata: HashMap<String, crate::value::Value>,
+    metadata: HashMap<String, Value>,
 }
 
 #[derive(Debug)]
@@ -32,23 +35,15 @@ impl std::fmt::Display for MetadataFetchError {
 }
 
 #[cfg_attr(feature = "uniffi", uniffi::export(async_runtime = "tokio"))]
-/// Use openid-federation to fetch a certain entity types
+/// Use OpenID Federation to fetch a certain entity type.
 pub async fn fetch_metadata_from_issuer_url(
     url: &str,
     trust_store: Option<Vec<String>>,
 ) -> Result<FederationResult, MetadataFetchError> {
-    if crate::network::untrusted_tls_allowed() {
-        fetch_metadata_from_issuer_url_with_config::<crate::network::SdkNoVerifyConfig>(
-            url,
-            trust_store,
-        )
-        .await
+    if kapun_util_rust::network::untrusted_tls_allowed() {
+        fetch_metadata_from_issuer_url_with_config::<SdkNoVerifyConfig>(url, trust_store).await
     } else {
-        fetch_metadata_from_issuer_url_with_config::<crate::network::SdkDefaultConfig>(
-            url,
-            trust_store,
-        )
-        .await
+        fetch_metadata_from_issuer_url_with_config::<SdkDefaultConfig>(url, trust_store).await
     }
 }
 
@@ -68,18 +63,19 @@ async fn fetch_metadata_from_issuer_url_with_config<Config: FetchConfig>(
         MetadataFetchError::BuildTrustError(format!("Failed to construct trust: {e}"))
     })?;
     let is_valid = res_oidf.verify().is_ok();
-    let trust_store = trust_store.map(|a| {
+    let trust_store = trust_store.map(|anchors| {
         TrustStore(
-            a.into_iter()
-                .map(|sub| TrustAnchor::Subject(sub))
+            anchors
+                .into_iter()
+                .map(TrustAnchor::Subject)
                 .collect::<Vec<_>>(),
         )
     });
     let metadata = res_oidf.resolve_metadata(trust_store.as_ref());
     let mut new_metadata = HashMap::new();
-    for (k, data) in metadata {
+    for (key, data) in metadata {
         let intermediate: serde_json::Value = data.into();
-        new_metadata.insert(k, intermediate.into());
+        new_metadata.insert(key, intermediate.into());
     }
     Ok(FederationResult {
         is_valid,
