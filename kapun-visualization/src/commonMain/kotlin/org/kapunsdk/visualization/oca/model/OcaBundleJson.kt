@@ -71,6 +71,19 @@ fun  computeCesrEncodedDigest(layer: org.kapunsdk.visualization.oca.model.overla
 	val hash = base64UrlEncode(hashresult.toByteArray())
 	return hash.replaceRange(0,1,digest)
 }
+/**
+ * Computes the SAID of a capture base or overlay as it appears in the bundle JSON, without decoding it first
+ * (decoding would add default fields and change the digest).
+ */
+fun computeCesrEncodedDigest(obj: JsonObject, digest: String = "I") : String {
+	val replaced = JsonObject(obj + ("digest" to JsonPrimitive(SAID_HASH_PLACEHOLDER)))
+	val stringifiedObject = canonicalize(replaced)
+	val hashresult = hash(digest, stringifiedObject).toMutableList()
+	hashresult.add(0, 0)
+	val hash = base64UrlEncode(hashresult.toByteArray())
+	return hash.replaceRange(0,1,digest)
+}
+
 fun  computeBundleDigest(ocaBundle: org.kapunsdk.visualization.oca.model.OcaBundleJson, digest: String = "I") : String {
 	val stringifiedObject = org.kapunsdk.visualization.oca.model.canonicalize(
 		org.kapunsdk.visualization.oca.model.json.encodeToString(ocaBundle)
