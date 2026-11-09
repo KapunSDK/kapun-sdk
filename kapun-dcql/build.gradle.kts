@@ -68,9 +68,6 @@ kotlin {
 			implementation(project(":kapun-dcql-w3c"))
 			implementation(project(":kapun-dcql-openbadges"))
 		}
-		commonTest {
-			kotlin.exclude("**/TestPossum.kt")
-		}
 
 		androidMain.dependencies {
 			implementation(libs.koin.android)
