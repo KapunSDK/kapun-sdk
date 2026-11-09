@@ -20,7 +20,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.kapunsdk.proximity.ProximityError
 import org.kapunsdk.proximity.ble.ProximityBleOptions
@@ -60,7 +59,6 @@ internal class MdlTransportProtocol(
 	private var sessionCompleted = false
 	private var upstreamSidecarConnected = false
 	private var deferredGattError: ProximityError? = null
-	private var l2capFallbackJob: Job? = null
 	private var selectedGattFallbackJob: Job? = null
 	private var fallbackScope = newFallbackScope()
 
@@ -113,7 +111,6 @@ internal class MdlTransportProtocol(
 
 	companion object {
 		private const val TAG = "MdlTransportProtocol"
-		private const val L2CAP_FALLBACK_DELAY_MS = 5_000L
 	}
 
 	private fun newFallbackScope() = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -178,22 +175,17 @@ internal class MdlTransportProtocol(
 		sessionCompleted = false
 		upstreamSidecarConnected = false
 		deferredGattError = null
-		l2capFallbackJob?.cancel()
 		selectedGattFallbackJob?.cancel()
 		configureListeners()
 
 		if (l2capSidecarEnabled) {
-			Logger(TAG).debug("Starting selected GATT mode with ${if (isEngagementPresenter) "server" else "client"} L2CAP sidecar: role=$role")
+			Logger(TAG).debug("Starting selected GATT mode and ${if (isEngagementPresenter) "server" else "client"} L2CAP sidecar in parallel: role=$role")
 			when (l2cap) {
 				is MdlCentralClientModeTransportProtocol -> l2cap.connectL2capSidecar()
 				is MdlPeripheralServerModeTransportProtocol -> l2cap.connectL2capSidecar()
 			}
-			Logger(TAG).debug("Keeping selected GATT mode idle for ${L2CAP_FALLBACK_DELAY_MS}ms while L2CAP connects")
-			l2capFallbackJob = fallbackScope.launch {
-				delay(L2CAP_FALLBACK_DELAY_MS)
-				startSelectedGattFallback()
-			}
-		} else {
+		}
+		if (activeSidecarTransport == null && !selectedGattStarted) {
 			selectedGattStarted = true
 			selected?.connect()
 		}
@@ -231,8 +223,6 @@ internal class MdlTransportProtocol(
 
 	override fun disconnect() {
 		suppressSidecarCallbacks = true
-		l2capFallbackJob?.cancel()
-		l2capFallbackJob = null
 		selectedGattFallbackJob?.cancel()
 		selectedGattFallbackJob = null
 		fallbackScope.cancel()
@@ -303,8 +293,6 @@ internal class MdlTransportProtocol(
 			if (activeSidecarTransport == null) {
 				activeSidecarTransport = transport
 				deferredGattError = null
-				l2capFallbackJob?.cancel()
-				l2capFallbackJob = null
 				if (!upstreamSidecarConnected) {
 					upstreamSidecarConnected = true
 					upstreamListener?.onConnected()
@@ -377,6 +365,7 @@ internal class MdlTransportProtocol(
 	private fun startSelectedGattFallback() {
 		if (suppressSidecarCallbacks || activeSidecarTransport != null) return
 		l2capFallbackTriggered = true
+		disconnectSidecar(SidecarTransport.L2CAP)
 		if (selectedGattStarted) {
 			deferredGattError?.let { error ->
 				deferredGattError = null
@@ -385,9 +374,6 @@ internal class MdlTransportProtocol(
 			return
 		}
 		selectedGattStarted = true
-		l2capFallbackJob?.cancel()
-		l2capFallbackJob = null
-		disconnectSidecar(SidecarTransport.L2CAP)
 		Logger(TAG).warn("Starting selected GATT fallback after L2CAP failure or disconnect")
 		selectedGattFallbackJob = fallbackScope.launch {
 			if (!suppressSidecarCallbacks && activeSidecarTransport == null) {
