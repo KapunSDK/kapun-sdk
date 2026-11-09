@@ -114,6 +114,22 @@ fun BbsRust.body() : Value {
     return bbsGetBody(this)
 }
 
+private fun matchesBbsClaimQuery(
+    body: Value,
+    path: List<PointerPart>,
+    allowedValues: List<Value>?
+): Boolean {
+    val key = (path.firstOrNull() as? PointerPart.String)?.v1 ?: return false
+    val value = body[key]
+
+    // A missing property is returned as Null. An empty string is still a signed claim value.
+    if (value == Value.Null) {
+        return false
+    }
+
+    return allowedValues?.contains(value) ?: true
+}
+
 fun Bbs.getVpToken(
     query: CredentialQuery,
     issuerPk: String,
@@ -238,18 +254,18 @@ fun bbsCombinedClaimBasedProof(
     issuerKeyId: String,
 ): Result<String> {
     val vc1Body = vc1.body()
-    val claims1 = DcqlClaimQueryResolver.neededClaims(q1, { path, values ->
-        val key = (path.first() as? PointerPart.String)?.v1 ?: return@neededClaims false
-        val value = vc1Body[key]
-        values?.contains(value) ?: true
-    }) ?: return Result.failure(Exception("VC1 doesn't satisfy Q1"))
+    val claims1 = DcqlClaimQueryResolver.neededClaims(q1) { path, values ->
+        matchesBbsClaimQuery(vc1Body, path, values)
+    } ?: return Result.failure(
+        Exception("VC1 doesn't satisfy Q1: a requested claim is missing or has an unsupported value")
+    )
 
     val vc2Body = vc2.body()
-    val claims2 = DcqlClaimQueryResolver.neededClaims(q2, { path, values ->
-        val key = (path.first() as? PointerPart.String)?.v1 ?: return@neededClaims false
-        val value = vc2Body[key]
-        values?.contains(value) ?: true
-    }) ?: return Result.failure(Exception("VC2 doesn't satisfy Q2"))
+    val claims2 = DcqlClaimQueryResolver.neededClaims(q2) { path, values ->
+        matchesBbsClaimQuery(vc2Body, path, values)
+    } ?: return Result.failure(
+        Exception("VC2 doesn't satisfy Q2: a requested claim is missing or has an unsupported value")
+    )
 
     val dis1 = claims1.map { (it.path.first() as PointerPart.String).v1 }
     val dis2 = claims2.map { (it.path.first() as PointerPart.String).v1 }
