@@ -23,6 +23,21 @@ pub trait SignatureCreator: Send + Sync {
     fn sign(&self, bytes: Vec<u8>) -> Result<Vec<u8>, SigningError>;
 }
 
+/// Replaces this native component's additional illegal and undisclosable SD-JWT claim lists.
+#[cfg_attr(
+    feature = "uniffi",
+    uniffi::export(default(illegal_claims), default(undisclosable_claims))
+)]
+pub fn register_invalid_and_undisclosable_claims(
+    illegal_claims: Vec<String>,
+    undisclosable_claims: Vec<String>,
+) {
+    kapun_dcql_sdjwt_rust::sdjwt::register_invalid_and_undisclosable_claims(
+        illegal_claims,
+        undisclosable_claims,
+    );
+}
+
 #[cfg(target_arch = "arm")]
 #[used]
 static _KEEP_EH_FRAME_STUBS: [unsafe extern "C" fn(); 2] = [
