@@ -68,4 +68,10 @@ internal actual class BleGattFactory(private val context: Context) {
 		)
 	}
 
+	internal actual fun createL2capServer(): BleL2capServer? =
+		BluetoothL2capServer(bm = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager)
+
+	internal actual fun createL2capClient(): BleL2capClient? =
+		BluetoothL2capClient(bm = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager)
+
 }

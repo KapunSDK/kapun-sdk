@@ -14,10 +14,14 @@ specific language governing permissions and limitations
 under the License.
  */
 
-package org.kapunsdk.json
+package org.kapunsdk.possum
 
-import uniffi.kapun_dcql_rust.PossumExpression
+import uniffi.kapun_possum_rust.PossumException
+import uniffi.kapun_possum_rust.PossumExpression
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 
@@ -82,5 +86,35 @@ class TestPossum {
         val pe = PossumExpression.fromStr(expression)
         val result = pe.evaluate(data)
         assertTrue { result.isTruthy() }
+    }
+
+    private val data = """
+        {
+            "external": {"validationClock": "2026-10-27T10:15:00Z"},
+            "claims": {"dateOfExpiration": "2031-10-27", "categories": [{"code": "B"}, {"code": "C"}]}
+        }
+    """.trimIndent()
+
+    @Test
+    fun parseReportsInvalidSource() {
+        assertFailsWith<PossumException.Parse> { PossumExpression.parse("claims.x is after") }
+    }
+
+    @Test
+    fun evaluateBoolComparesDates() {
+        assertTrue(PossumExpression.parse("(claims.dateOfExpiration as DateTime) is after now()").evaluateBool(data))
+        assertFalse(PossumExpression.parse("claims.missing == true").evaluateBool(data))
+    }
+
+    @Test
+    fun evaluateJsonReturnsAnyValue() {
+        assertEquals("\"C\"", PossumExpression.parse("claims.categories.1.code").evaluateJson(data))
+        assertEquals("""[{"code":"B"},{"code":"C"}]""", PossumExpression.parse("claims.categories").evaluateJson(data))
+        assertEquals("null", PossumExpression.parse("claims.missing").evaluateJson(data))
+    }
+
+    @Test
+    fun evaluateBoolRejectsNonBooleans() {
+        assertFailsWith<PossumException.Evaluation> { PossumExpression.parse("claims.dateOfExpiration").evaluateBool(data) }
     }
 }
