@@ -16,6 +16,7 @@ under the License.
 package org.kapunsdk.proximity.verifier
 
 import org.kapunsdk.proximity.ProximityProtocol
+import org.kapunsdk.proximity.ProximityProcessEvent
 import org.kapunsdk.proximity.ble.ProximityBleOptions
 import org.kapunsdk.proximity.ProximityError
 import org.kapunsdk.proximity.documents.DocumentRequest
@@ -39,6 +40,7 @@ import org.kapunsdk.proximity.util.logPayloadDebug
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import uniffi.kapun_crypto_rust.EphemeralKey
 import uniffi.kapun_crypto_rust.KeyType
@@ -60,7 +62,9 @@ class ProximityVerifier<T> private constructor(
 	private val documentRequester: DocumentRequester<T>,
 	private var sessionCipher: SessionCipher? = null,
 	private var isDcApi : Boolean = true,
-	private val readerKey: Value? = null
+	private val readerKey: Value? = null,
+	/** Stable identifier for this created verifier process. */
+	val processId: Uuid = Uuid.random(),
 ) {
 	private val operationJob = SupervisorJob(scope.coroutineContext[Job])
 	private val operationScope = CoroutineScope(scope.coroutineContext + operationJob)
@@ -76,7 +80,8 @@ class ProximityVerifier<T> private constructor(
 							  preferDcApi: Boolean = true,
 							  peripheralServerUuid: String? = null,
 							  keyType: KeyType = KeyType.ED25519,
-							  bleOptions: ProximityBleOptions = ProximityBleOptions.Default): ProximityVerifier<T> {
+							  bleOptions: ProximityBleOptions = ProximityBleOptions.Default,
+							  enableL2cap: Boolean = true): ProximityVerifier<T> {
 			val publicKey = EphemeralKey(Role.SK_READER, keyType)
 			return when (protocol) {
 				ProximityProtocol.MDL -> {
@@ -88,7 +93,9 @@ class ProximityVerifier<T> private constructor(
 						Uuid.parse(serviceUuid),
 						peripheralServerUuid?.let { Uuid.parse(it)},
 						publicKey,
-						options = bleOptions
+						options = bleOptions,
+						enableL2cap = enableL2cap,
+						isEngagementPresenter = true,
 					)
 					val engagementBuilder = MdlEngagementBuilder(
 						"",
@@ -134,7 +141,9 @@ class ProximityVerifier<T> private constructor(
 						deviceEngagement?.centralClientUuid,
 						deviceEngagement?.peripheralServerUuid,
 						publicKey,
-						options = bleOptions
+						options = bleOptions,
+						l2capPsm = deviceEngagement?.l2capPsm,
+						isEngagementPresenter = false,
 					)
 					ProximityVerifier(protocol, scope, deviceEngagement, transportProtocol, requester, readerKey = coseKey, isDcApi = preferDcApi)
 				}
@@ -163,6 +172,8 @@ class ProximityVerifier<T> private constructor(
 
 	private val verifierStateMutable = MutableStateFlow<ProximityVerifierState>(ProximityVerifierState.Initial)
 	val verifierState = verifierStateMutable.asStateFlow()
+	/** Verifier state events tagged with [processId]. */
+	val events = verifierStateMutable.map { state -> ProximityProcessEvent(processId, state) }
 
 	init {
 		transportProtocol.setListener(
@@ -222,41 +233,51 @@ class ProximityVerifier<T> private constructor(
 		}
 		Logger(TAG).debug("requestDocument: building document request")
 		operationScope.launch {
-			// The session transcript is needed to derive origin
-			val sessionTranscript = (transportProtocol as MdlTransportProtocolExtensions).sessionTranscript ?: run {
-				publishState(ProximityVerifierState.Error(ProximityError.InvalidData("failed to get session transcript")))
-				return@launch
-			}
-			val origin = ProximityMdlUtils.buildIsoOriginFromSessionTranscript(sessionTranscript)
-			var documentRequest = documentRequester.createDocumentRequest(origin)
-			when(documentRequest) {
-				is DocumentRequest.Mdl -> {
-					isDcApi = false
+			try {
+				// The session transcript is needed to derive origin
+				val sessionTranscript = (transportProtocol as MdlTransportProtocolExtensions).sessionTranscript ?: run {
+					publishState(ProximityVerifierState.Error(ProximityError.InvalidData("failed to get session transcript")))
+					return@launch
 				}
-				is DocumentRequest.OpenId4Vp -> {
-					isDcApi = true
-					// convert our custom class to the DC-API object
-					val dcRequest = documentRequest.asDcRequest()
-					val serializedDcRequest = json.encodeToString(dcRequest)
-					val currentCipher = sessionCipher ?: run {
-						publishState(ProximityVerifierState.Error(ProximityError.InvalidData("no session cipher")))
-						return@launch
+				val origin = ProximityMdlUtils.buildIsoOriginFromSessionTranscript(sessionTranscript)
+				Logger(TAG).debug("requestDocument: calling document requester")
+				val documentRequest = documentRequester.createDocumentRequest(origin)
+				Logger(TAG).debug("requestDocument: document request created type=${documentRequest::class.simpleName}")
+				when (documentRequest) {
+					is DocumentRequest.Mdl -> {
+						isDcApi = false
 					}
-					readerKey ?: run {
-						publishState(ProximityVerifierState.Error(ProximityError.InvalidData("reader key is null")))
-						return@launch
+					is DocumentRequest.OpenId4Vp -> {
+						isDcApi = true
+						// convert our custom class to the DC-API object
+						val dcRequest = documentRequest.asDcRequest()
+						val serializedDcRequest = json.encodeToString(dcRequest)
+						val currentCipher = sessionCipher ?: run {
+							publishState(ProximityVerifierState.Error(ProximityError.InvalidData("no session cipher")))
+							return@launch
+						}
+						readerKey ?: run {
+							publishState(ProximityVerifierState.Error(ProximityError.InvalidData("reader key is null")))
+							return@launch
+						}
+						val encryptedData = currentCipher.encrypt(serializedDcRequest.encodeToByteArray()) ?: run {
+							publishState(ProximityVerifierState.Error(ProximityError.InvalidData("failed to encrypt data")))
+							return@launch
+						}
+						val readerKeyTagged = (24 to encodeCbor(readerKey.toCbor())).toCbor()
+						// In the session establishment data package, we need to transmit the other part of the key (ours)
+						val sessionEstablishment = MdlSessionEstablishment(readerKeyTagged, encryptedData, true)
+						Logger(TAG).debug("requestDocument: sending session establishment, plaintextBytes=${serializedDcRequest.length}")
+						transportProtocol.sendMessage(sessionEstablishment.asCbor())
+						Logger(TAG).debug("requestDocument: session establishment sent")
+						publishState(ProximityVerifierState.AwaitingDocuments)
 					}
-					val encryptedData = currentCipher.encrypt(serializedDcRequest.encodeToByteArray()) ?: run {
-						publishState(ProximityVerifierState.Error(ProximityError.InvalidData("failed to encrypt data")))
-						return@launch
-					}
-					var readerKeyTagged = (24 to encodeCbor(readerKey.toCbor())).toCbor()
-					// In the session establishment data package, we need to transmit the other part of the key (ours)
-					var sessionEstablishment = MdlSessionEstablishment(readerKeyTagged, encryptedData, true)
-					Logger(TAG).debug("requestDocument: sending session establishment, plaintextBytes=${serializedDcRequest.length}")
-					transportProtocol.sendMessage(sessionEstablishment.asCbor())
-					publishState(ProximityVerifierState.AwaitingDocuments)
 				}
+			} catch (e: CancellationException) {
+				throw e
+			} catch (e: Exception) {
+				Logger(TAG).error("requestDocument failed: ${e::class.simpleName}: ${e.message}")
+				throw e
 			}
 
 		}
@@ -277,9 +298,14 @@ class ProximityVerifier<T> private constructor(
 		operationScope.launch(Dispatchers.IO) {
 			when (protocol) {
 				ProximityProtocol.MDL, ProximityProtocol.OPENID4VP -> {
+					if (protocol == ProximityProtocol.MDL) {
+						val psm = (transportProtocol as? MdlTransportProtocol)?.prepareL2capPsm()
+						(engagementBuilder as? MdlEngagementBuilder)?.l2capPsm = psm
+					}
 					transportProtocol.connect()
 					val qrCodeData = engagementBuilder!!.createQrCodeForEngagement()
-					Logger(TAG).debug("startEngagement: QR ready, qrChars=${qrCodeData.length}")
+					val l2capPsm = (engagementBuilder as? MdlEngagementBuilder)?.l2capPsm
+					Logger(TAG).debug("startEngagement: QR ready, qrChars=${qrCodeData.length} l2capPsm=${l2capPsm ?: "none"}")
 					publishState(ProximityVerifierState.ReadyForEngagement(qrCodeData))
 				}
 			}
@@ -327,7 +353,21 @@ class ProximityVerifier<T> private constructor(
 							disconnect()
 							return@launch
 						}
-						sessionCipher = (transportProtocol as MdlTransportProtocolExtensions).getSessionCipher(engagementData.originalData, encodeCbor(readerKey.toCbor()), engagementData.coseKey)
+						sessionCipher = (transportProtocol as MdlTransportProtocolExtensions).getSessionCipher(
+							engagementData.originalData,
+							encodeCbor(readerKey.toCbor()),
+							engagementData.coseKey,
+						)
+						if (sessionCipher == null) {
+							Logger(TAG).error("Failed to derive session cipher from reverse engagement")
+							publishState(
+								ProximityVerifierState.Error(
+									ProximityError.InvalidData("Failed to derive session cipher from received engagement")
+								)
+							)
+							disconnect()
+							return@launch
+						}
 						requestDocument()
 						return@launch
 					}

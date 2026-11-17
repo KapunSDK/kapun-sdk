@@ -21,6 +21,8 @@ import kotlin.uuid.Uuid
 
 internal expect class BleGattFactory {
 	internal fun isBleAdvSupported() : Boolean
+	internal fun createL2capServer(): BleL2capServer?
+	internal fun createL2capClient(): BleL2capClient?
 	internal fun createServer(
 		serviceUuid: Uuid,
 	): BleGattServer

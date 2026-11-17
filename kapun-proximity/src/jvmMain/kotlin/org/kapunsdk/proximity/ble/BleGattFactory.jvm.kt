@@ -31,4 +31,6 @@ internal actual class BleGattFactory {
 	internal actual fun isBleAdvSupported() : Boolean {
 		TODO("Not yet implemented")
 	}
+	internal actual fun createL2capServer(): BleL2capServer? = null
+	internal actual fun createL2capClient(): BleL2capClient? = null
 }

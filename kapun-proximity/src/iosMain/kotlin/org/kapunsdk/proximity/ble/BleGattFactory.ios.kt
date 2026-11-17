@@ -38,4 +38,6 @@ internal actual class BleGattFactory() {
 	internal actual fun isBleAdvSupported() : Boolean {
 		return true
 	}
+	internal actual fun createL2capServer(): BleL2capServer? = IosL2capServer()
+	internal actual fun createL2capClient(): BleL2capClient? = IosL2capClient()
 }

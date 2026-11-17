@@ -32,6 +32,9 @@ class MdlEngagementBuilder(
     private val peripheralServerModeSupported: Boolean,
     private val capabilities: MdlCapabilities? = null,
 ) : EngagementBuilder {
+	/** Assigned by the platform listener before the QR engagement is encoded. */
+	internal var l2capPsm: Int? = null
+
     @OptIn(ExperimentalEncodingApi::class)
     override fun createQrCodeForEngagement(): String {
         val data = getEngagementBytes()
@@ -63,6 +66,7 @@ class MdlEngagementBuilder(
                     bleTransportOptions.put(11, it.toByteArray())
                 }
             }
+			l2capPsm?.let { bleTransportOptions.put(21, it) }
             deviceEngagement.put(2, listOf(
                     listOf(
                         2,
