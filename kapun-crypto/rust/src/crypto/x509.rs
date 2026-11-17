@@ -94,13 +94,35 @@ pub fn create_cert(
 
 #[uniffi::export]
 pub fn extract_certs(buf: Vec<u8>) -> Vec<X509Certificate> {
+    try_extract_certs(buf).expect("invalid DER certificate")
+}
+
+/// The input did not contain a complete sequence of DER certificates.
+#[derive(Debug, uniffi::Error)]
+pub enum X509ParseError {
+    MalformedCertificate,
+}
+
+impl std::fmt::Display for X509ParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("malformed DER certificate")
+    }
+}
+
+/// Parses one or more concatenated DER certificates, returning an error for
+/// empty, malformed, truncated, or trailing data. As with [`extract_certs`],
+/// each result retains the full input buffer in `original_cert`. Parsing does
+/// not verify certificate signatures or trust.
+#[uniffi::export]
+pub fn try_extract_certs(buf: Vec<u8>) -> Result<Vec<X509Certificate>, X509ParseError> {
     let mut oid_registry = OidRegistry::default().with_x509();
     let entry = OidEntry::new("organizationIdentifier", "organizationIdentifier");
     oid_registry.insert(oid!(2.5.4.97), entry);
     let mut certificates = vec![];
     let mut remaining_buf = buf.as_slice();
     loop {
-        let (rest, cert) = x509_parser::parse_x509_certificate(remaining_buf).unwrap();
+        let (rest, cert) = x509_parser::parse_x509_certificate(remaining_buf)
+            .map_err(|_| X509ParseError::MalformedCertificate)?;
         remaining_buf = rest;
         let mut sans = vec![];
         if let Ok(Some(san)) = cert.subject_alternative_name() {
@@ -147,7 +169,7 @@ pub fn extract_certs(buf: Vec<u8>) -> Vec<X509Certificate> {
             break;
         }
     }
-    certificates
+    Ok(certificates)
 }
 /// Extract a p256 key if it is p256 only. Otherwise return the der encoded data directly
 fn try_extract_p256_key(cert: &x509_parser::certificate::X509Certificate) -> X509PublicKey {
@@ -204,7 +226,73 @@ mod tests {
 
     use crate::{base64_decode, jwt::get_x509_from_jwt};
 
-    use super::extract_certs;
+    use super::{X509ParseError, extract_certs, try_extract_certs};
+
+    // Synthetic P-256 certificate generated for these tests; contains no private key.
+    const TEST_LEAF: &str = "-----BEGIN CERTIFICATE-----
+MIIBVTCB/aADAgECAgECMAoGCCqGSM49BAMCMBIxEDAOBgNVBAMMB1Rlc3QgQ0Ew
+HhcNMjYxMTEzMTU0NjAyWhcNMzYxMTEwMTU0NjAyWjAUMRIwEAYDVQQDDAlUZXN0
+IExlYWYwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAAR7wPnqSmKVIne8jrTWAiZ6
+54yLHVqTjBwPOO8pdpzL0/B3ZcmGaE8XccugveYvsoRsAQlMk4YySmRXS6Wog0+Z
+o0IwQDAdBgNVHQ4EFgQUKnXcgVSfa2HmyeFx+4J65X4+QwIwHwYDVR0jBBgwFoAU
+GjhOCc2ZFEn7eon2zMgIu7oRhSAwCgYIKoZIzj0EAwIDRwAwRAIgCoP3SdM/9NpU
+c1IvptPmkFxPwIsSEm6fYDByzv5TzvUCIHCqYJ8o5FBXn18nKf8HXZUCnNQ2eYn0
+KOhPlxk+GJT2
+-----END CERTIFICATE-----";
+
+    fn test_certificate(pem: &str) -> Vec<u8> {
+        x509_parser::pem::parse_x509_pem(pem.as_bytes())
+            .expect("valid test PEM")
+            .1
+            .contents
+    }
+
+    #[test]
+    fn fallible_parser_rejects_malformed_or_incomplete_input() {
+        let cert = test_certificate(TEST_LEAF);
+        for input in [
+            vec![],
+            vec![0x30, 0x03, 0x02, 0x01, 0x00],
+            cert[..cert.len() - 1].to_vec(),
+            [cert.clone(), vec![0xff]].concat(),
+            [cert.clone(), cert[..cert.len() - 1].to_vec()].concat(),
+        ] {
+            assert!(matches!(
+                try_extract_certs(input),
+                Err(X509ParseError::MalformedCertificate)
+            ));
+        }
+    }
+
+    #[test]
+    #[should_panic(expected = "invalid DER certificate")]
+    fn existing_parser_panics_on_malformed_input() {
+        extract_certs(vec![0x30, 0x03, 0x02, 0x01, 0x00]);
+    }
+
+    #[test]
+    fn fallible_parser_matches_existing_parser_on_valid_input() {
+        let der = test_certificate(TEST_LEAF);
+        for input in [der.clone(), [der.clone(), der.clone()].concat()] {
+            let parsed = try_extract_certs(input.clone()).unwrap();
+            let existing = extract_certs(input.clone());
+            assert_eq!(parsed.len(), existing.len());
+            for (new, old) in parsed.iter().zip(existing.iter()) {
+                assert_eq!(new.original_cert, input);
+                assert_eq!(new.original_cert, old.original_cert);
+                assert_eq!(new.subject, old.subject);
+                assert_eq!(new.issuer, old.issuer);
+                assert_eq!(new.serial, old.serial);
+                assert_eq!(new.algo_oid, old.algo_oid);
+                assert_eq!(new.authority_key_identifier, old.authority_key_identifier);
+                assert_eq!(
+                    format!("{:?}", new.public_key),
+                    format!("{:?}", old.public_key)
+                );
+                assert_eq!(format!("{:?}", new.san), format!("{:?}", old.san));
+            }
+        }
+    }
 
     #[test]
     fn test_san() {
