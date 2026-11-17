@@ -69,6 +69,13 @@ abstract class TransportProtocol(
 		inhibitCallbacks = true
 	}
 
+	/** Re-enables callbacks when a transport instance is deliberately reconnected for fallback. */
+	protected fun restoreCallbacksForReconnect() {
+		inhibitCallbacks = false
+		isConnected = false
+		messageReceivedQueue.clear()
+	}
+
 	protected fun reportConnecting() {
 		Logger(TAG).debug("connecting")
 		if (!inhibitCallbacks) {

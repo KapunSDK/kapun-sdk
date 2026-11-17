@@ -151,7 +151,7 @@ class LegacyPresentationController private constructor(
 					isTrusted = false,
 					isVerified = false
 				)
-				collectProximityWalletState(trustData)
+				proximityWallet?.let { collectProximityWalletState(it, trustData) }
 			} catch (e: ApiException) {
 				stateMutable.update {
 					val innerError = e.asErrorState()
@@ -165,9 +165,11 @@ class LegacyPresentationController private constructor(
 		}
 	}
 
-	private fun collectProximityWalletState(trustData: TrustData.Verification) {
+	private fun collectProximityWalletState(wallet: ProximityWallet, trustData: TrustData.Verification) {
 		launchSingleJob(::collectProximityWalletState.name) {
-			proximityWallet?.walletState?.collect { state ->
+			wallet.events.collect { processEvent ->
+				if (proximityWallet !== wallet || processEvent.processId != wallet.processId) return@collect
+				val state = processEvent.state
 				when (state) {
 					is ProximityWalletState.Initial -> stateMutable.update { PresentationWorkflow.Idle }
 					is ProximityWalletState.ReadyForEngagement -> TODO("Not yet supported")

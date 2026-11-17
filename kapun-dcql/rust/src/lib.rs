@@ -15,8 +15,6 @@ under the License.
  */
 
 pub mod models;
-#[cfg(feature = "jlc")]
-pub mod verify;
 
 kapun_util_rust::export_log_sink_bridge!();
 

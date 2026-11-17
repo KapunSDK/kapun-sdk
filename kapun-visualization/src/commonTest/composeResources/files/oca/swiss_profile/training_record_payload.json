@@ -1,0 +1,23 @@
+{
+  "vct": "training-record",
+  "familyName": "Muster",
+  "givenName": "Anna",
+  "birthDate": "1990-04-12",
+  "photo": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
+  "member": {
+    "id": "M-001"
+  },
+  "note": "",
+  "courses": [
+    {
+      "name": "First aid",
+      "completedOn": "2021-05-02",
+      "validUntil": ""
+    },
+    {
+      "name": "Fire safety",
+      "completedOn": "2022-03-01",
+      "validUntil": "2025-01-23"
+    }
+  ]
+}

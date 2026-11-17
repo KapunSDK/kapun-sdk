@@ -4,6 +4,7 @@ import org.kapunsdk.proximity.protocol.EngagementBuilder
 import org.kapunsdk.util.extensions.asArray
 import org.kapunsdk.util.extensions.asBoolean
 import org.kapunsdk.util.extensions.asBytes
+import org.kapunsdk.util.extensions.asLong
 import org.kapunsdk.util.extensions.asOrderedObject
 import org.kapunsdk.util.extensions.asString
 import org.kapunsdk.util.extensions.asTag
@@ -23,7 +24,8 @@ data class MdlEngagement(val coseKey: ByteArray,
 						 val centralClientModeSupported: Boolean,
 						 val peripheralServerModeSupported: Boolean,
 							 val capabilities: MdlCapabilities? = null,
-							 val originalData : ByteArray) : EngagementBuilder {
+							 val originalData : ByteArray,
+							 val l2capPsm: Int? = null) : EngagementBuilder {
 	companion object {
 		private const val MDL_ENGAGEMENT_VERSION = "1.1"
 
@@ -44,12 +46,17 @@ data class MdlEngagement(val coseKey: ByteArray,
 		var peripheralServerUuid : Uuid? = null
 		var centralClientModeSupported : Value? = null
 		var peripheralServerModeSupported : Value?  = null
+		var l2capPsm: Int? = null
 		if(transportOptions != null) {
 			val firstOption = transportOptions[0]
 			// BLE options are the third element
 			val bleOptions = firstOption[2].asOrderedObject()!!
 			peripheralServerModeSupported = bleOptions[Value.Number(JsonNumber.Integer(0))]
 			centralClientModeSupported = bleOptions[Value.Number(JsonNumber.Integer(1))]
+			l2capPsm = bleOptions[Value.Number(JsonNumber.Integer(21))]
+				?.asLong()
+				?.takeIf { it in 1..0xFFFF }
+				?.toInt()
 			centralClientUuid = if (centralClientModeSupported?.asBoolean() == true) {
 				bleOptions[Value.Number(JsonNumber.Integer(11))]?.asBytes()?.let {
 					Uuid.fromByteArray(it)
@@ -88,7 +95,8 @@ data class MdlEngagement(val coseKey: ByteArray,
 			centralClientModeSupported = centralClientModeSupported?.asBoolean() ?: run { false },
 			peripheralServerModeSupported = peripheralServerModeSupported?.asBoolean()?: run { false },
 			capabilities = capabilities,
-			originalData
+			originalData,
+			l2capPsm
 		)
 	}
 	}
@@ -102,6 +110,9 @@ data class MdlEngagement(val coseKey: ByteArray,
 		}
 		if(centralClientModeSupported && centralClientUuid != null) {
 			bleOptions.put(11, centralClientUuid)
+		}
+		if (l2capPsm != null) {
+			bleOptions.put(21, l2capPsm)
 		}
 		val deviceEngagement = mutableMapOf(
 			0 to MDL_ENGAGEMENT_VERSION,
