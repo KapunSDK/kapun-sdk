@@ -27,7 +27,19 @@ kotlin {
         target.binaries.framework { baseName = "kapun-dcql-sdjwt"; isStatic = true }
         target.compilations.configureEach { useRustUpLinker() }
     }
+
     sourceSets {
+        getByName("androidHostTest").dependencies {
+            implementation("net.java.dev.jna:jna:5.18.1@jar")
+            implementation(libs.uniffi.runtime.jvm)
+            implementation(project(":kapun-credential-core"))
+            // The project dependency selects Android variants; this JVM bundle supplies
+            // the native libraries JNA needs when androidHostTest runs on the host JVM.
+            implementation("org.kapunsdk:kapun-credential-core-jvm:" + project.version)
+            implementation("org.kapunsdk:kapun-util-jvm:" + project.version)
+            implementation("org.kapunsdk:kapun-crypto-jvm:" + project.version)
+        }
+
         commonMain.dependencies {
             api(project(":kapun-credential-core"))
             api(project(":kapun-dcql"))
@@ -45,7 +57,6 @@ kotlin {
 
 skie { analytics { enabled = false; disableUpload = true } }
 uniffi {
-    bindgenFromGitTag("https://github.com/UbiqueInnovation/uniffi-kotlin-multiplatform-bindings.git", libs.versions.uniffi.bindgen.get())
     generateFromLibrary()
 }
 cargo { packageDirectory = layout.projectDirectory.dir("rust"); ndkVersion = libs.versions.android.ndk.get() }

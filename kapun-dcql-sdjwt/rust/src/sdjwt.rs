@@ -14,9 +14,10 @@ specific language governing permissions and limitations
 under the License.
  */
 
-use crate::sdjwt_util;
+use crate::sdjwt_util::{self, REGISTERED_ILLEGAL_CLAIM_NAMES, REGISTERED_UNDISCLOSABLE_CLAIMS};
 use crate::sdjwt_util::{Disclosure, DisclosureTree, SdJwtDecodeError};
 use kapun_credential_core_rust::{claims_pointer::Selector, models::Pointer};
+use kapun_util_rust::log_error;
 use kapun_util_rust::value::Value;
 use serde::Serialize;
 use std::{collections::HashMap, sync::Arc};
@@ -51,6 +52,43 @@ pub fn encode_to_json(sdjwt: &SdJwtRust) -> Option<String> {
     serde_json::to_string(&json_val).ok()
 }
 
+#[uniffi::export(default(illegal_claims), default(undisclosable_claims))]
+/// Registers additional invalid/undisclosable claims.
+/// The parser by default checks for the claims defined in [SD-JWT-VC](https://www.ietf.org/archive/id/draft-ietf-oauth-sd-jwt-vc-25.html#name-registered-jwt-claims) and extends it with certain relevant JSON-LD claims.
+///
+/// In particular this contains the following claims:
+/// - "iss"
+/// - "iat"
+/// - "exp"
+/// - "nbf"
+/// - "cnf"
+/// - "status"
+/// - "vct"
+/// - "vct#integrity"
+/// - "aka_vcts"
+/// - "@context"
+/// - "issuer"
+/// - "validFrom"
+/// - "validUntil"
+///
+pub fn register_invalid_and_undisclosable_claims(
+    illegal_claims: Vec<String>,
+    undisclosable_claims: Vec<String>,
+) {
+    let Ok(mut illegal_claim_names) = REGISTERED_ILLEGAL_CLAIM_NAMES.lock() else {
+        log_error!("SDJWT", "Failed to register illegal claim names");
+        return;
+    };
+    *illegal_claim_names = illegal_claims;
+    drop(illegal_claim_names);
+    let Ok(mut undisclosable_claim_names) = REGISTERED_UNDISCLOSABLE_CLAIMS.lock() else {
+        log_error!("SDJWT", "Failed to register illegal claim names");
+        return;
+    };
+    *undisclosable_claim_names = undisclosable_claims;
+    drop(undisclosable_claim_names);
+}
+
 #[uniffi::export]
 pub fn decode_sdjwt(payload: &str) -> Result<SdJwtRust, SdJwtDecodeError> {
     let decoded = sdjwt_util::decode_sdjwt(payload)?;
@@ -71,10 +109,10 @@ mod tests {
     use crate::sdjwt_util::zkp::{Input, ZkProof, equality_proof::EqualityProof};
     #[cfg(feature = "experimental")]
     use crate::{sdjwt::SdJwtRust, sdjwt_util::SdJwtBuilder};
+    use base64::{Engine, prelude::BASE64_URL_SAFE_NO_PAD as TEST_BASE64_URL_SAFE_NO_PAD};
+    use kapun_credential_core_rust::models::PointerPart;
     #[cfg(feature = "experimental")]
-    use base64::Engine;
-    #[cfg(feature = "experimental")]
-    use kapun_credential_core_rust::{claims_pointer::Selector, models::PointerPart, pointer};
+    use kapun_credential_core_rust::{claims_pointer::Selector, pointer};
     #[cfg(feature = "experimental")]
     use next_gen_signatures::BASE64_URL_SAFE_NO_PAD;
     #[cfg(feature = "experimental")]
@@ -87,6 +125,91 @@ mod tests {
     use crate::{SignatureCreator, SigningError};
 
     use super::decode_sdjwt;
+
+    struct RegisteredClaimsReset;
+
+    impl Drop for RegisteredClaimsReset {
+        fn drop(&mut self) {
+            super::register_invalid_and_undisclosable_claims(vec![], vec![]);
+        }
+    }
+
+    fn sdjwt_with_disclosed_claim(claim_name: &str) -> String {
+        use kapun_util_rust::value::Value;
+
+        let salt = "test-salt";
+        let value = "test-value";
+        let disclosure = TEST_BASE64_URL_SAFE_NO_PAD
+            .encode(serde_json::to_vec(&serde_json::json!([salt, claim_name, value])).unwrap());
+        let hasher = crate::sdjwt_util::hash_algs::SdJwtHasher::from_str("sha-256");
+        let digest = hasher.hash(
+            disclosure.clone(),
+            salt.to_string(),
+            Some(claim_name.to_string()),
+            Value::String(value.to_string()),
+        );
+
+        let header = TEST_BASE64_URL_SAFE_NO_PAD.encode(
+            serde_json::to_vec(&serde_json::json!({
+                "alg": "none",
+                "typ": "dc+sd-jwt"
+            }))
+            .unwrap(),
+        );
+        let payload = TEST_BASE64_URL_SAFE_NO_PAD.encode(
+            serde_json::to_vec(&serde_json::json!({
+                "_sd": [digest],
+                "_sd_alg": "sha-256",
+                "vct": "test-type"
+            }))
+            .unwrap(),
+        );
+
+        let issued_sdjwt = format!("{header}.{payload}.signature~{disclosure}~");
+        let parsed_sdjwt = decode_sdjwt(&issued_sdjwt).unwrap();
+        let builder = crate::sdjwt_util::SdJwtBuilder::from_sdjwt(&parsed_sdjwt);
+        builder
+            .add_disclosure(vec![PointerPart::String(claim_name.to_string())])
+            .unwrap();
+        builder.build(None).unwrap()
+    }
+
+    #[test]
+    pub fn test_registered_claim_lists_allow_and_reject_expected_claims() {
+        let _reset_registered_claims = RegisteredClaimsReset;
+        super::register_invalid_and_undisclosable_claims(vec![], vec![]);
+
+        let undisclosable_token = sdjwt_with_disclosed_claim("custom_secret");
+        let unrelated_token = sdjwt_with_disclosed_claim("ordinary_claim");
+        let illegal_token = sdjwt_with_disclosed_claim("reserved_custom_claim");
+
+        assert!(decode_sdjwt(&undisclosable_token).is_ok());
+        assert!(decode_sdjwt(&unrelated_token).is_ok());
+        assert!(decode_sdjwt(&illegal_token).is_ok());
+
+        super::register_invalid_and_undisclosable_claims(vec![], vec!["custom_secret".to_string()]);
+        let undisclosable_result = decode_sdjwt(&undisclosable_token);
+        assert!(matches!(
+            undisclosable_result,
+            Err(SdJwtDecodeError::InvalidDisclosure)
+        ));
+        assert!(decode_sdjwt(&unrelated_token).is_ok());
+
+        super::register_invalid_and_undisclosable_claims(
+            vec!["reserved_custom_claim".to_string()],
+            vec![],
+        );
+        let illegal_result = decode_sdjwt(&illegal_token);
+        assert!(matches!(
+            illegal_result,
+            Err(SdJwtDecodeError::InvalidDisclosure)
+        ));
+        assert!(decode_sdjwt(&undisclosable_token).is_ok());
+
+        super::register_invalid_and_undisclosable_claims(vec![], vec![]);
+        assert!(decode_sdjwt(&undisclosable_token).is_ok());
+        assert!(decode_sdjwt(&illegal_token).is_ok());
+    }
 
     #[test]
     pub fn test_happy_case_disclosures() {

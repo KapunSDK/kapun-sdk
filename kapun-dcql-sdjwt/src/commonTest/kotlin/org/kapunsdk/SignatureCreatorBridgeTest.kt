@@ -17,12 +17,48 @@ under the License.
 package org.kapunsdk
 
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import org.kapunsdk.credentials.SdJwt
+import org.kapunsdk.credentials.registerInvalidAndUndisclosableClaims
+import org.kapunsdk.credentials.toClaimsPointer
 import uniffi.kapun_credential_core_rust.SignatureCreator
+import uniffi.kapun_dcql_sdjwt_rust.SdJwtDecodeException
+import uniffi.kapun_util_rust.Value
 
 class SignatureCreatorBridgeTest {
+    private val testSigner = object : SignatureCreator {
+        override fun alg(): String = "ES256"
+
+        override fun sign(bytes: ByteArray): ByteArray = byteArrayOf(1, 2, 3)
+    }
+
+    private fun issueSdJwt(claimName: String): String {
+        val claims = Value.Object(
+            mapOf(
+                "vct" to Value.String("test-type"),
+                claimName to Value.String("test-value"),
+            ),
+        )
+        val credential = SdJwt.create(
+            claims = claims,
+            disclosures = listOf(listOf(claimName).toClaimsPointer()!!),
+            keyId = "test-key",
+            key = testSigner,
+            pubKeyJwk = null,
+        )
+        return assertNotNull(credential).innerJwt.originalSdjwt
+    }
+
+    private fun assertInvalidDisclosure(jwt: String) {
+        val failure = assertFailsWith<Throwable> {
+            SdJwt.parse(jwt)
+        }
+        assertTrue(failure is SdJwtDecodeException.InvalidDisclosure)
+    }
+
     @Test
     fun signerCallbackIsRegisteredWithTheSdJwtLibrary() {
         var signedPayload: ByteArray? = null
@@ -35,8 +71,14 @@ class SignatureCreatorBridgeTest {
             }
         }
 
-        val credential = SdJwt.parse(
-            "eyJhbGciOiJFUzI1NiJ9.eyJjbmYiOnsiandrIjp7fX19.c2ln~",
+        val credential = assertNotNull(
+            SdJwt.create(
+                claims = Value.Object(mapOf("vct" to Value.String("test-type"))),
+                disclosures = emptyList(),
+                keyId = "test-key",
+                key = signer,
+                pubKeyJwk = Value.Object(emptyMap()),
+            ),
         )
         val presentation = credential.presentation().apply {
             withNonce("nonce")
@@ -45,5 +87,33 @@ class SignatureCreatorBridgeTest {
 
         assertTrue(presentation.endsWith(".AQID"))
         assertTrue(assertNotNull(signedPayload).isNotEmpty())
+    }
+
+    @Test
+    fun registeredClaimListsAllowAndRejectExpectedClaims() {
+        registerInvalidAndUndisclosableClaims(emptyList(), emptyList())
+        try {
+            val undisclosableJwt = issueSdJwt("custom_secret")
+            val ordinaryJwt = issueSdJwt("ordinary_claim")
+            val illegalJwt = issueSdJwt("reserved_custom_claim")
+
+            assertEquals(1, SdJwt.parse(undisclosableJwt).getNumDisclosed())
+            assertEquals(1, SdJwt.parse(ordinaryJwt).getNumDisclosed())
+            assertEquals(1, SdJwt.parse(illegalJwt).getNumDisclosed())
+
+            registerInvalidAndUndisclosableClaims(emptyList(), listOf("custom_secret"))
+            assertInvalidDisclosure(undisclosableJwt)
+            assertEquals(1, SdJwt.parse(ordinaryJwt).getNumDisclosed())
+
+            registerInvalidAndUndisclosableClaims(listOf("reserved_custom_claim"), emptyList())
+            assertInvalidDisclosure(illegalJwt)
+            assertEquals(1, SdJwt.parse(undisclosableJwt).getNumDisclosed())
+
+            registerInvalidAndUndisclosableClaims(emptyList(), emptyList())
+            assertEquals(1, SdJwt.parse(undisclosableJwt).getNumDisclosed())
+            assertEquals(1, SdJwt.parse(illegalJwt).getNumDisclosed())
+        } finally {
+            registerInvalidAndUndisclosableClaims(emptyList(), emptyList())
+        }
     }
 }
