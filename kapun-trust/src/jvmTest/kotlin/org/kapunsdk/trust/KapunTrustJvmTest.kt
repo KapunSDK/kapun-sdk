@@ -18,8 +18,11 @@ package org.kapunsdk.trust
 
 import kotlinx.coroutines.test.runTest
 import org.kapunsdk.credentials.models.credential.CredentialModel
+import org.kapunsdk.issuance.metadata.data.CredentialIssuerMetadata
+import org.kapunsdk.issuance.metadata.data.CredentialIssuerMetadataClaims
 import org.kapunsdk.presentation.request.PresentationRequest
 import org.kapunsdk.trust.framework.DocumentProvider
+import org.kapunsdk.trust.framework.DomainTrustAnchorProvider
 import org.kapunsdk.trust.framework.germany.EuTrustFramework
 import org.kapunsdk.trust.framework.oid4vp.Oid4VpTrustFramework
 import org.kapunsdk.trust.framework.oid4vp.StaticDidWebTrustAnchorProvider
@@ -75,6 +78,31 @@ class KapunTrustJvmTest {
 
 		assertEquals(clientId, agent.displayName)
 		assertFalse(agent.isTrusted)
+	}
+
+	@Test
+	fun `basic framework trusts an issuer by asking its domain trust anchor provider`() = runTest {
+		val framework = Oid4VpTrustFramework(
+			documentProvider = noDocuments,
+			domainTrustAnchorProvider = object : DomainTrustAnchorProvider {
+				override fun isTrusted(domain: String): Boolean = domain == "issuer.example"
+			},
+		)
+
+		suspend fun isIssuerTrusted(issuer: String) = framework.getIssuerInformation(
+			issuer,
+			emptyList(),
+			CredentialIssuerMetadata.Unsigned(
+				CredentialIssuerMetadataClaims(
+					credentialIssuer = issuer,
+					credentialEndpoint = "",
+					credentialConfigurationsSupported = mapOf(),
+				)
+			),
+		).isTrusted
+
+		assertTrue(isIssuerTrusted("https://issuer.example"))
+		assertFalse(isIssuerTrusted("https://other.example"))
 	}
 
 	@Test
