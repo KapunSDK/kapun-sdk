@@ -125,8 +125,8 @@ internal class MdlPeripheralServerModeTransportProtocol(
 
 	override fun getSessionCipher(engagementBytes: ByteArray ,eReaderKeyBytes: ByteArray, peerCoseKey: ByteArray?) : SessionCipher? {
 		sessionTranscript = listOf(24 to engagementBytes, 24 to eReaderKeyBytes, Value.Null).toCbor()
-		val sessionTranscriptBs = encodeCbor(sessionTranscript!!)
-		val sessionTranscriptBytes = encodeCbor(
+		val sessionTranscriptBs = uniffi.kapun_util_rust.encodeCborCanonical(sessionTranscript!!)
+		val sessionTranscriptBytes = uniffi.kapun_util_rust.encodeCborCanonical(
 			(24 to sessionTranscriptBs).toCbor()
 		)
 		val coseKey = runCatching { decodeCbor(peerCoseKey?: eReaderKeyBytes) }.getOrNull() ?: return null

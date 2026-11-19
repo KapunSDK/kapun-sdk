@@ -77,6 +77,7 @@ class MdlEngagementBuilder(
             )
         }
         capabilities?.let {
+            deviceEngagement.put(5, emptyList<Any>())
             deviceEngagement.put(6, capabilities.getValue())
         }
         return encodeCbor(deviceEngagement.toCbor())
