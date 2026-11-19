@@ -22,6 +22,9 @@ import uniffi.kapun_crypto_rust.SessionCipher
 import uniffi.kapun_crypto_rust.sha256Rs
 import uniffi.kapun_util_rust.Value
 import uniffi.kapun_util_rust.encodeCbor
+// Shared encoding support lets the new profile bind OpenID4VP to the existing ISO session machinery.
+import uniffi.kapun_util_rust.encodeCborCanonical
+import org.kapunsdk.util.extensions.toCbor
 
 object ProximityMdlUtils {
 	enum class PayloadDecryptFailureType {
@@ -49,10 +52,25 @@ object ProximityMdlUtils {
 	}
 
 	fun buildIsoOriginFromSessionTranscript(sessionTranscript: Value): String {
-		val sessionTranscriptBytes = encodeCbor(sessionTranscript)
-		val sessionTranscriptBytesHash = base64UrlEncode(sha256Rs(sessionTranscriptBytes))
-		return "iso-18013-5://${sessionTranscriptBytesHash}"
+		// The profile substitutes an ISO-bound Origin for the browser Origin, requiring the tagged KDF bytes.
+		return buildIsoOriginFromSessionTranscriptBytes(
+			encodeCborCanonical((24 to encodeCborCanonical(sessionTranscript)).toCbor())
+		)
 	}
+
+	fun buildIsoOriginFromSessionTranscriptBytes(sessionTranscriptBytes: ByteArray): String {
+		val sessionTranscriptBytesHash = base64UrlEncode(sha256Rs(sessionTranscriptBytes))
+		return "iso-18013-5://$sessionTranscriptBytesHash"
+	}
+
+	// The separate profile can advertise signed-only DC API without narrowing defaultDcApiCapabilities for MDL.
+	// The concrete caller is omitted with the source factory in this showcase, not replaced by an MVP policy.
+	fun signedDcApiCapabilities(): MdlCapabilities =
+		MdlCapabilities(
+			mapOf(
+				MdlCapabilities.DC_API_CAPABILITY_KEY to DcApiCapability(listOf("openid4vp-v1-signed")),
+			),
+		)
 
 	fun decryptAndValidatePayload(
 		encryptedPayload: ByteArray,
