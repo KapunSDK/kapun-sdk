@@ -77,6 +77,7 @@ class MdlEngagementBuilder(
             )
         }
         capabilities?.let {
+            // The profile's capabilities require OriginInfos, even when empty: reuse the ISO builder.
             deviceEngagement.put(5, emptyList<Any>())
             deviceEngagement.put(6, capabilities.getValue())
         }

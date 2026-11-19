@@ -22,6 +22,10 @@ enum class ProximityProtocol {
 	/** OpenID for Verifiable Presentations over BLE */
 	OPENID4VP,
 
-	/** Signed OpenID4VP DC API payloads over an ISO 18013-5 session (proposed profile). */
+	/**
+	 * Signed OpenID4VP DC API payloads over an ISO 18013-5 session (proposed profile).
+	 * An explicit selection isolates profile rules from MDL defaults and avoids replacing
+	 * OPENID4VP's different BLE exchange. MDL can already carry OpenID4VP; this selects stricter behavior.
+	 */
 	OPENID4VP_OVER_ISO,
 }

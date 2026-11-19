@@ -88,6 +88,7 @@ class ProximityWallet private constructor(
 						   enableL2cap: Boolean = true
 						   ) : ProximityWallet {
 			return when (protocol) {
+				// Explicit selection prevents silently treating the verifier-only profile as a supported MDL wallet flow.
 				ProximityProtocol.OPENID4VP_OVER_ISO -> throw UnsupportedOperationException("Wallet support is outside this verifier-only showcase")
 				ProximityProtocol.MDL -> {
 					val keypair = EphemeralKey(Role.SK_DEVICE,keyType)
@@ -132,6 +133,7 @@ class ProximityWallet private constructor(
 			enableL2cap: Boolean = true
 		): ProximityWallet {
 			return when (protocol) {
+				// Exhaustive enum plumbing only: preserve existing wallet behavior rather than implement another path.
 				ProximityProtocol.OPENID4VP_OVER_ISO -> throw UnsupportedOperationException("Wallet support is outside this verifier-only showcase")
 				ProximityProtocol.MDL -> {
 					val keypair = EphemeralKey(Role.SK_DEVICE, keyType)
@@ -207,6 +209,7 @@ class ProximityWallet private constructor(
 					)
 					ProximityWallet(protocol, scope, null,transportProtocol)
 				}
+				// A distinct selection can be unsupported explicitly instead of changing MDL creation semantics.
 				ProximityProtocol.OPENID4VP_OVER_ISO -> throw UnsupportedOperationException("Wallet support is outside this verifier-only showcase")
 			}
 		}

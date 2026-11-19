@@ -125,6 +125,8 @@ internal class MdlPeripheralServerModeTransportProtocol(
 
 	override fun getSessionCipher(engagementBytes: ByteArray ,eReaderKeyBytes: ByteArray, peerCoseKey: ByteArray?) : SessionCipher? {
 		sessionTranscript = listOf(24 to engagementBytes, 24 to eReaderKeyBytes, Value.Null).toCbor()
+		// ISO supplies session encryption; the separate profile adds OpenID4VP binding to this same transcript.
+		// Align both BLE modes' KDF bytes with the Origin helper. This source fix also affects legacy ISO callers.
 		val sessionTranscriptBs = uniffi.kapun_util_rust.encodeCborCanonical(sessionTranscript!!)
 		val sessionTranscriptBytes = uniffi.kapun_util_rust.encodeCborCanonical(
 			(24 to sessionTranscriptBs).toCbor()
