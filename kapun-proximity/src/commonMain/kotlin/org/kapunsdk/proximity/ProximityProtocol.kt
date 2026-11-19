@@ -21,4 +21,7 @@ enum class ProximityProtocol {
 
 	/** OpenID for Verifiable Presentations over BLE */
 	OPENID4VP,
+
+	/** Signed OpenID4VP DC API payloads over an ISO 18013-5 session (proposed profile). */
+	OPENID4VP_OVER_ISO,
 }

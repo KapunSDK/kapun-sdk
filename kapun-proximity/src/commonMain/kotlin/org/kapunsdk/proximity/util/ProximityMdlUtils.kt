@@ -22,6 +22,8 @@ import uniffi.kapun_crypto_rust.SessionCipher
 import uniffi.kapun_crypto_rust.sha256Rs
 import uniffi.kapun_util_rust.Value
 import uniffi.kapun_util_rust.encodeCbor
+import uniffi.kapun_util_rust.encodeCborCanonical
+import org.kapunsdk.util.extensions.toCbor
 
 object ProximityMdlUtils {
 	enum class PayloadDecryptFailureType {
@@ -49,10 +51,22 @@ object ProximityMdlUtils {
 	}
 
 	fun buildIsoOriginFromSessionTranscript(sessionTranscript: Value): String {
-		val sessionTranscriptBytes = encodeCbor(sessionTranscript)
-		val sessionTranscriptBytesHash = base64UrlEncode(sha256Rs(sessionTranscriptBytes))
-		return "iso-18013-5://${sessionTranscriptBytesHash}"
+		return buildIsoOriginFromSessionTranscriptBytes(
+			encodeCborCanonical((24 to encodeCborCanonical(sessionTranscript)).toCbor())
+		)
 	}
+
+	fun buildIsoOriginFromSessionTranscriptBytes(sessionTranscriptBytes: ByteArray): String {
+		val sessionTranscriptBytesHash = base64UrlEncode(sha256Rs(sessionTranscriptBytes))
+		return "iso-18013-5://$sessionTranscriptBytesHash"
+	}
+
+	fun signedDcApiCapabilities(): MdlCapabilities =
+		MdlCapabilities(
+			mapOf(
+				MdlCapabilities.DC_API_CAPABILITY_KEY to DcApiCapability(listOf("openid4vp-v1-signed")),
+			),
+		)
 
 	fun decryptAndValidatePayload(
 		encryptedPayload: ByteArray,

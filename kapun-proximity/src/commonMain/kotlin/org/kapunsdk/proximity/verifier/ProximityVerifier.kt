@@ -49,6 +49,7 @@ import uniffi.kapun_crypto_rust.SessionCipher
 import uniffi.kapun_crypto_rust.base64UrlEncode
 import uniffi.kapun_util_rust.Value
 import uniffi.kapun_util_rust.encodeCbor
+import uniffi.kapun_util_rust.encodeCborCanonical
 import kotlin.uuid.Uuid
 
 /**
@@ -66,6 +67,11 @@ class ProximityVerifier<T> private constructor(
 	/** Stable identifier for this created verifier process. */
 	val processId: Uuid = Uuid.random(),
 ) {
+	// OPENID4VP_OVER_ISO replaces this bundle on reset so its transport, engagement and key stay paired.
+	private var activeSession = VerifierSession(readerKey, engagementBuilder, transportProtocol)
+	private var reverseSessionFactory: (() -> VerifierSession)? = null
+	private var sessionNeedsRecreation: Boolean = false
+	private var transportListener: TransportProtocol.Listener
 	private val operationJob = SupervisorJob(scope.coroutineContext[Job])
 	private val operationScope = CoroutineScope(scope.coroutineContext + operationJob)
 
@@ -84,6 +90,17 @@ class ProximityVerifier<T> private constructor(
 							  enableL2cap: Boolean = true): ProximityVerifier<T> {
 			val publicKey = EphemeralKey(Role.SK_READER, keyType)
 			return when (protocol) {
+				ProximityProtocol.OPENID4VP_OVER_ISO -> {
+					val effectiveServiceUuid = peripheralServerUuid?.let { Uuid.parse(it) } ?: Uuid.parse(serviceUuid)
+					val createSession = {
+						createReverseOpenId4VpOverIsoSession(verifierName, effectiveServiceUuid, bleOptions)
+					}
+					val session = createSession()
+					ProximityVerifier(protocol, scope, session.engagementBuilder, session.transportProtocol,
+						requester, readerKey = session.readerKey, isDcApi = true).also {
+						it.reverseSessionFactory = createSession
+					}
+				}
 				ProximityProtocol.MDL -> {
 					val coseKey = MdlCoseKey.fromPublicKeyBytes(publicKey.publicKey(), keyType)
 					val coseKeyEncoded = encodeCbor(coseKey)
@@ -132,6 +149,7 @@ class ProximityVerifier<T> private constructor(
 		): ProximityVerifier<T>? {
 			val publicKey = EphemeralKey(Role.SK_READER, keyType)
 			return when (protocol) {
+				ProximityProtocol.OPENID4VP_OVER_ISO -> throw UnsupportedOperationException("Direct ISO profile engagement is outside this demo")
 				ProximityProtocol.MDL -> {
 					val coseKey = MdlCoseKey.fromPublicKeyBytes(publicKey.publicKey(), keyType)
 					val engagementData = qrcodeData ?: return null
@@ -187,10 +205,10 @@ class ProximityVerifier<T> private constructor(
 						return
 					}
 
-					if(protocol == ProximityProtocol.MDL) {
+					if(protocol == ProximityProtocol.MDL || protocol == ProximityProtocol.OPENID4VP_OVER_ISO) {
 						// We don't have a device engagement yet so wait for the first package
 						// from the wallet
-						when(engagementBuilder) {
+						when(val engagementBuilder = activeSession.engagementBuilder) {
 							is MdlEngagementBuilder -> return
 							is MdlEngagement -> {
 								sessionCipher = (transportProtocol as MdlTransportProtocolExtensions).getSessionCipher(engagementBuilder.originalData, encodeCbor(readerKey.toCbor()), engagementBuilder.coseKey)
@@ -206,7 +224,7 @@ class ProximityVerifier<T> private constructor(
 				}
 
 				override fun onMessageReceived() {
-					val message = transportProtocol.getMessage()
+					val message = activeSession.transportProtocol.getMessage()
 					if (message != null) {
 						processMessageReceived(message)
 					} else {
@@ -223,7 +241,7 @@ class ProximityVerifier<T> private constructor(
 					cancelPendingOperations()
 					publishState(ProximityVerifierState.Error(error))
 				}
-			}
+			}.also { transportListener = it }
 		)
 	}
 
@@ -235,7 +253,7 @@ class ProximityVerifier<T> private constructor(
 		operationScope.launch {
 			try {
 				// The session transcript is needed to derive origin
-				val sessionTranscript = (transportProtocol as MdlTransportProtocolExtensions).sessionTranscript ?: run {
+			val sessionTranscript = (activeSession.transportProtocol as MdlTransportProtocolExtensions).sessionTranscript ?: run {
 					publishState(ProximityVerifierState.Error(ProximityError.InvalidData("failed to get session transcript")))
 					return@launch
 				}
@@ -245,6 +263,10 @@ class ProximityVerifier<T> private constructor(
 				Logger(TAG).debug("requestDocument: document request created type=${documentRequest::class.simpleName}")
 				when (documentRequest) {
 					is DocumentRequest.Mdl -> {
+					if (protocol == ProximityProtocol.OPENID4VP_OVER_ISO) {
+						publishState(ProximityVerifierState.Error(ProximityError.InvalidState("ISO profile requires DocumentRequest.OpenId4Vp")))
+						return@launch
+					}
 						isDcApi = false
 					}
 					is DocumentRequest.OpenId4Vp -> {
@@ -256,7 +278,7 @@ class ProximityVerifier<T> private constructor(
 							publishState(ProximityVerifierState.Error(ProximityError.InvalidData("no session cipher")))
 							return@launch
 						}
-						readerKey ?: run {
+					activeSession.readerKey ?: run {
 							publishState(ProximityVerifierState.Error(ProximityError.InvalidData("reader key is null")))
 							return@launch
 						}
@@ -264,11 +286,14 @@ class ProximityVerifier<T> private constructor(
 							publishState(ProximityVerifierState.Error(ProximityError.InvalidData("failed to encrypt data")))
 							return@launch
 						}
-						val readerKeyTagged = (24 to encodeCbor(readerKey.toCbor())).toCbor()
+					val encodedReaderKey = if (protocol == ProximityProtocol.OPENID4VP_OVER_ISO) {
+						activeSession.readerKey?.let { encodeCborCanonical(it) } ?: return@launch
+					} else encodeCbor(readerKey.toCbor())
+					var readerKeyTagged = (24 to encodedReaderKey).toCbor()
 						// In the session establishment data package, we need to transmit the other part of the key (ours)
 						val sessionEstablishment = MdlSessionEstablishment(readerKeyTagged, encryptedData, true)
 						Logger(TAG).debug("requestDocument: sending session establishment, plaintextBytes=${serializedDcRequest.length}")
-						transportProtocol.sendMessage(sessionEstablishment.asCbor())
+						activeSession.transportProtocol.sendMessage(sessionEstablishment.asCbor())
 						Logger(TAG).debug("requestDocument: session establishment sent")
 						publishState(ProximityVerifierState.AwaitingDocuments)
 					}
@@ -289,15 +314,25 @@ class ProximityVerifier<T> private constructor(
 			return
 		}
 
-		if (transportProtocol.isConnected) {
+		if (activeSession.transportProtocol.isConnected) {
 			publishState(ProximityVerifierState.Error(ProximityError.InvalidState("Verifier is already connected")))
 			return
 		}
 
+		if (protocol == ProximityProtocol.OPENID4VP_OVER_ISO && sessionNeedsRecreation) {
+			val createSession = reverseSessionFactory ?: run {
+				publishState(ProximityVerifierState.Error(ProximityError.InvalidState("No reverse OPENID4VP_OVER_ISO session factory")))
+				return
+			}
+			activeSession = createSession()
+			sessionCipher = null
+			activeSession.transportProtocol.setListener(transportListener)
+			sessionNeedsRecreation = false
+		}
 		Logger(TAG).debug("startEngagement: protocol=$protocol")
 		operationScope.launch(Dispatchers.IO) {
 			when (protocol) {
-				ProximityProtocol.MDL, ProximityProtocol.OPENID4VP -> {
+				ProximityProtocol.MDL, ProximityProtocol.OPENID4VP, ProximityProtocol.OPENID4VP_OVER_ISO -> {
 					if (protocol == ProximityProtocol.MDL) {
 						val psm = (transportProtocol as? MdlTransportProtocol)?.prepareL2capPsm()
 						(engagementBuilder as? MdlEngagementBuilder)?.l2capPsm = psm
@@ -315,13 +350,15 @@ class ProximityVerifier<T> private constructor(
 	fun disconnect() {
 		Logger(TAG).debug("disconnect() was called")
 		cancelPendingOperations()
-		transportProtocol.disconnect()
+		activeSession.transportProtocol.disconnect()
 		publishState(ProximityVerifierState.Disconnected)
 	}
 
 	fun reset() {
 		Logger(TAG).debug("reset() was called")
 		disconnect()
+		// MDL preserves its existing reset semantics.
+		if (protocol == ProximityProtocol.OPENID4VP_OVER_ISO) sessionNeedsRecreation = true
 		verifierStateMutable.update { ProximityVerifierState.Initial }
 	}
 
@@ -331,7 +368,7 @@ class ProximityVerifier<T> private constructor(
 		}
 		Logger(TAG).debug("connect: starting transport")
 		operationScope.launch(Dispatchers.IO) {
-			transportProtocol.connect()
+			activeSession.transportProtocol.connect()
 		}
 
 	}
@@ -342,20 +379,27 @@ class ProximityVerifier<T> private constructor(
 		}
 		operationScope.launch(Dispatchers.IO) {
 			when (protocol) {
-				ProximityProtocol.MDL -> {
+				ProximityProtocol.MDL, ProximityProtocol.OPENID4VP_OVER_ISO -> {
+					// Legacy ISO application behavior remains unchanged.
 					Logger(TAG).debug("Processing message of size ${message.size}")
 					logPayloadDebug("Verifier received MDL payload", message)
 					// if we don't yet have a session cipher, but we received a message, we are
 					// probably in the reverse engagement flow, so try parse a DeviceEngagement
 					if(sessionCipher == null) {
-						val engagementData = MdlEngagement.fromCbor(message) ?: run {
+						val engagementData = (if (protocol == ProximityProtocol.OPENID4VP_OVER_ISO) {
+							// Source parser mixes profile checks with an MVP curve restriction: omit, do not rewrite.
+							TODO("Showcase omission: strict reverse Holder engagement parser")
+						} else MdlEngagement.fromCbor(message)) ?: run {
 							Logger(TAG).debug("First data package needs to be MdlEngagement for reverse engagement")
 							disconnect()
 							return@launch
 						}
-						sessionCipher = (transportProtocol as MdlTransportProtocolExtensions).getSessionCipher(
+						val encodedReaderKey = if (protocol == ProximityProtocol.OPENID4VP_OVER_ISO) {
+							activeSession.readerKey?.let { encodeCborCanonical(it) } ?: return@launch
+						} else encodeCbor(readerKey.toCbor())
+						sessionCipher = (activeSession.transportProtocol as MdlTransportProtocolExtensions).getSessionCipher(
 							engagementData.originalData,
-							encodeCbor(readerKey.toCbor()),
+							encodedReaderKey,
 							engagementData.coseKey,
 						)
 						if (sessionCipher == null) {
@@ -464,4 +508,20 @@ class ProximityVerifier<T> private constructor(
 			this is ProximityVerifierState.Error ||
 			this is ProximityVerifierState.VerificationResult<*>
 
+}
+
+internal data class VerifierSession(
+	val readerKey: Value?,
+	val engagementBuilder: EngagementBuilder?,
+	val transportProtocol: TransportProtocol,
+)
+
+// Legacy Mdl* naming is reused as ISO transport/session machinery; this is NOT a native mDL flow.
+internal fun createReverseOpenId4VpOverIsoSession(
+	verifierName: String,
+	serviceUuid: Uuid,
+	bleOptions: ProximityBleOptions,
+): VerifierSession {
+	// Omitted as a unit: the source factory contains the temporary P-256 choice.
+	TODO("Showcase omission: concrete reverse session factory")
 }
