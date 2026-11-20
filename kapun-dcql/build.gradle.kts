@@ -1,11 +1,11 @@
-import ch.ubique.uniffi.plugin.extensions.useRustUpLinker
+import dev.oxikt.gradle.plugin.extensions.useRustUpLinker
 
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.android.kotlin.multiplatform.library)
     alias(libs.plugins.skie)
     alias(libs.plugins.kotlin.atomicfu)
-    alias(libs.plugins.uniffi.plugin)
+    alias(libs.plugins.oxikt.plugin)
     alias(libs.plugins.vanniktech.publish)
     alias(libs.plugins.kotlin.serialization)
 }

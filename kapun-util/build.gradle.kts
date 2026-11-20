@@ -4,7 +4,7 @@ plugins {
     alias(libs.plugins.skie)
     alias(libs.plugins.vanniktech.publish)
     alias(libs.plugins.kotlin.atomicfu)
-    alias(libs.plugins.uniffi.plugin)
+    alias(libs.plugins.oxikt.plugin)
     alias(libs.plugins.kotlin.serialization)
 }
 

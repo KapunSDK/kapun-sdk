@@ -1,3 +1,4 @@
+package_name = "uniffi.kapun_credential_core_rust"
 generate_serializable_records = true
 generate_immutable_records = true
 import_pointer_from = ["uniffi.kapun_util_rust"]
