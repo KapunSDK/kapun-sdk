@@ -1,0 +1,67 @@
+# This file contains settings for `cargo hakari`.
+# See https://docs.rs/cargo-hakari/latest/cargo_hakari/config for a full list of options.
+
+hakari-package = "workspace-hack"
+
+# Format version for hakari's output. Version 4 requires cargo-hakari 0.9.22 or above.
+dep-format-version = "4"
+
+# Setting workspace.resolver = "2" or higher in the root Cargo.toml is HIGHLY recommended.
+# Hakari works much better with the v2 resolver. (The v2 and v3 resolvers are identical from
+# hakari's perspective, so you're welcome to set either.)
+#
+# For more about the new feature resolver, see:
+# https://blog.rust-lang.org/2021/03/25/Rust-1.51.0.html#cargos-new-feature-resolver
+resolver = "2"
+
+# Every Rust target the oxikt Gradle plugin builds (see its BuildTarget), plus the machines that
+# run the builds: a platform's build scripts and proc macros are only unified when it's listed.
+# https://doc.rust-lang.org/rustc/platform-support.html
+platforms = [
+    # JVM: the host for debug builds, all of these for release builds. Also the CI/dev hosts.
+    "aarch64-apple-darwin",
+    "x86_64-apple-darwin",
+    "aarch64-unknown-linux-gnu",
+    "x86_64-unknown-linux-gnu",
+    "x86_64-pc-windows-gnu",
+    # Android
+    "aarch64-linux-android",
+    "x86_64-linux-android",
+    "armv7-linux-androideabi",
+    # iOS
+    "aarch64-apple-ios",
+    "aarch64-apple-ios-sim",
+]
+
+# Write out exact versions rather than a semver range. (Defaults to false.)
+# exact-versions = true
+
+# Other repositories depend on these crates through Git (josekit and heidi-jwt on
+# kapun-crypto-provider and kapun-x509, next-gen-signatures on zkp-util and rdf-util). If they
+# depended on workspace-hack, every downstream build would pull in the dependencies of the whole
+# SDK, with all their features. Their dependencies are still unified in the SDK's builds, because
+# the module crates that use them depend on workspace-hack.
+#
+# `cargo hakari verify` reports these crates when they're built on their own; that is expected.
+[final-excludes]
+workspace-members = [
+    "kapun-crypto-provider",
+    "kapun-x509",
+    "zkp-util",
+    "rdf-util",
+]
+#
+# Hakari unifies the features that every workspace crate needs when built with no, default and
+# all features, with and without dev-dependencies, and gives them to all crates. Features that only
+# tests, the CLI or --all-features builds use would end up in the shipped SDK libraries. The
+# crates below have such features that change what the libraries do.
+third-party = [
+    # kapun-x509's tests and kapun-x509-cli enable `legacy-crypto`, which makes josekit accept
+    # SHA-1 RSA signatures (RS1, sha1WithRSAEncryption).
+    { name = "josekit", git = "https://github.com/heidiverse/josekit-rs.git" },
+    # zkp-util's non-default `asm` feature switches the proof system to its assembly backend.
+    { name = "ecdsa_pops", git = "https://github.com/hpicrypto/ecdsa_pops.git", rev = "5cf1c72db8b182be7aac879cfea7105ce1b93ee6" },
+    { name = "r1csipa", git = "https://github.com/hpicrypto/ecdsa_pops.git", rev = "5cf1c72db8b182be7aac879cfea7105ce1b93ee6" },
+    { name = "halo2curves" },
+    { name = "halo2derive" },
+]

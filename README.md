@@ -58,6 +58,19 @@ builds. To remove the Rust cache as well, run:
 ./gradlew cleanCargoCache
 ```
 
+The modules also share their dependency builds through the `workspace-hack` crate, which
+[cargo-hakari](https://docs.rs/cargo-hakari) generates. It gives every module the same features of
+each third-party crate, so Cargo builds each of them once instead of once per module. When you add,
+remove or change a Rust dependency, update it and commit the result; CI fails if it is out of date:
+
+```bash
+cargo install cargo-hakari --version 0.9.39 --locked
+cargo hakari manage-deps --yes  # only changes something after a crate was added to the workspace
+cargo hakari generate
+```
+
+The settings, including the crates kept out of `workspace-hack` and why, are in `.config/hakari.toml`.
+
 When the SDK is included in another KMP project, the included SDK build still uses this same
 checkout-local directory. If the consumer is configured as a separate Gradle build that does not
 load the SDK root build configuration, set the same absolute path in both builds:
