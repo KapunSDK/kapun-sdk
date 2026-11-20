@@ -1,5 +1,6 @@
-import ch.ubique.uniffi.plugin.dsl.CargoExtension
-import ch.ubique.uniffi.plugin.tasks.CargoBuildTask
+import dev.oxikt.gradle.plugin.dsl.BuildMode
+import dev.oxikt.gradle.plugin.dsl.CargoExtension
+import dev.oxikt.gradle.plugin.tasks.CargoBuildTask
 import org.gradle.api.attributes.Bundling
 import org.gradle.api.tasks.Delete
 import org.gradle.kotlin.dsl.configure
@@ -25,18 +26,23 @@ plugins {
     alias(libs.plugins.skie) apply false
 
     // Rust plugins
-    alias(libs.plugins.uniffi.plugin) apply false
+    alias(libs.plugins.oxikt.plugin) apply false
 
     // Library publishing plugins
     alias(libs.plugins.vanniktech.publish) apply false
 }
 
 subprojects {
-    pluginManager.withPlugin("ch.ubique.uniffi.plugin") {
+    pluginManager.withPlugin("dev.oxikt.gradle.plugin") {
         extensions.configure<CargoExtension> {
             // Keep Cargo's shared compilation cache in a visible, dedicated directory.
             // It is intentionally outside Gradle's build directories so `clean` does not remove it.
             targetDirectory.set(rootProject.layout.projectDirectory.dir("cargo-target"))
+
+            // Each module builds its own crate with `cargo rustc` and only the crate types its targets
+            // need, so the crates don't declare `[lib] crate-type`. Keep it that way: with Cargo before
+            // 1.100, a `cdylib` in a crate that other crates depend on is rebuilt on every build.
+            buildMode.set(BuildMode.Individual)
         }
 
         // gradle.properties defines this as a Gradle project property, but Cargo/clang only read it

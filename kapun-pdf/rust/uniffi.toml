@@ -1,2 +1,3 @@
+package_name = "uniffi.kapun_pdf_rust"
 generate_serializable_records = true
 generate_immutable_records = true

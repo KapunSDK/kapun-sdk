@@ -1,4 +1,4 @@
-import ch.ubique.uniffi.plugin.extensions.useRustUpLinker
+import dev.oxikt.gradle.plugin.extensions.useRustUpLinker
 
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
@@ -6,7 +6,7 @@ plugins {
     alias(libs.plugins.skie)
     alias(libs.plugins.vanniktech.publish)
     alias(libs.plugins.kotlin.serialization)
-    alias(libs.plugins.uniffi.plugin)
+    alias(libs.plugins.oxikt.plugin)
 }
 
 kotlin {
@@ -40,7 +40,7 @@ kotlin {
     sourceSets {
         getByName("androidHostTest").dependencies {
             implementation("net.java.dev.jna:jna:5.18.1@jar")
-            implementation(libs.uniffi.runtime.jvm)
+            implementation(libs.oxikt.runtime.jvm)
             implementation(project(":kapun-credential-core"))
             // The project dependency selects Android variants; this JVM bundle supplies
             // the native libraries JNA needs when androidHostTest runs on the host JVM.
