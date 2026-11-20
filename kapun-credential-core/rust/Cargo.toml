@@ -12,6 +12,7 @@ rand.workspace = true
 serde.workspace = true
 chrono.workspace = true
 kapun-util-rust = { path = "../../kapun-util/rust" }
+workspace-hack = { version = "0.1", path = "../../workspace-hack" }
 
 [dev-dependencies]
 serde_json.workspace = true
