@@ -16,6 +16,7 @@ serde_json.workspace = true
 serde.workspace = true
 tokio = { features = ["time"], optional = true, workspace = true }
 heidi-jwt.workspace = true
+workspace-hack = { version = "0.1", path = "../../workspace-hack" }
 
 
 [features]
