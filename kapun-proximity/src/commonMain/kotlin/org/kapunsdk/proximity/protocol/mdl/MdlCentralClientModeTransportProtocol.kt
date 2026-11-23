@@ -130,8 +130,9 @@ internal class MdlCentralClientModeTransportProtocol(
 	* */
 	override fun getSessionCipher(engagementBytes: ByteArray, eReaderKeyBytes: ByteArray, peerCoseKey: ByteArray?): SessionCipher? {
 		sessionTranscript = listOf(24 to engagementBytes, 24 to eReaderKeyBytes, Value.Null).toCbor()
-		val sessionTranscriptBs = encodeCbor(sessionTranscript!!)
-		val sessionTranscriptBytes = encodeCbor(
+		// The new profile reuses ISO encryption, so KDF salt and its OpenID4VP Origin must hash the same bytes.
+		val sessionTranscriptBs = uniffi.kapun_util_rust.encodeCborCanonical(sessionTranscript!!)
+		val sessionTranscriptBytes = uniffi.kapun_util_rust.encodeCborCanonical(
 			(24 to sessionTranscriptBs).toCbor()
 		)
 		// Use the peerKey if we are the mdl reader

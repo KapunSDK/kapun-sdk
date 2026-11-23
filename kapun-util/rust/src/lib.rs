@@ -16,7 +16,8 @@ under the License.
 
 use crate::value::Value;
 use base64::{prelude::BASE64_URL_SAFE_NO_PAD, Engine};
-use ciborium::Value as CborValue;
+// Shared canonical encoding supports ISO-bound OpenID4VP without creating another crypto/transport stack.
+use ciborium::{value::CanonicalValue, Value as CborValue};
 use flate2::read::ZlibDecoder;
 use std::{
     fmt::{Display, Formatter},
@@ -131,6 +132,39 @@ pub fn encode_cbor(cbor: Value) -> Result<Vec<u8>, CborParseError> {
     let cbor_val: CborValue = cbor.into();
     let mut result = vec![];
     ciborium::into_writer(&cbor_val, &mut result).map_err(|_| CborParseError::InvalidEncoding)?;
+    Ok(result)
+}
+
+// The profile needs stable reader-key/transcript bytes. Reuse this encoder instead of changing encode_cbor.
+// This is a shared source dependency, not a policy selected by the proximity enum itself.
+fn canonicalize_cbor_value(val: CborValue) -> CborValue {
+    match val {
+        CborValue::Array(arr) => CborValue::Array(arr.into_iter().map(canonicalize_cbor_value).collect()),
+        CborValue::Map(entries) => {
+            let mut canonical_entries: Vec<(CanonicalValue, CborValue)> = entries
+                .into_iter()
+                .map(|(k, v)| (k.into(), canonicalize_cbor_value(v)))
+                .collect();
+            canonical_entries.sort_by(|(k1, _), (k2, _)| k1.cmp(k2));
+            CborValue::Map(
+                canonical_entries
+                    .into_iter()
+                    .map(|(k, v)| (k.into(), v))
+                    .collect(),
+            )
+        }
+        CborValue::Tag(tag, inner) => CborValue::Tag(tag, Box::new(canonicalize_cbor_value(*inner))),
+        other => other,
+    }
+}
+
+#[cfg_attr(feature = "uniffi", uniffi::export)]
+// A separate entry point lets profile key encoding opt in while legacy encode_cbor remains available.
+pub fn encode_cbor_canonical(cbor: Value) -> Result<Vec<u8>, CborParseError> {
+    let cbor_val: CborValue = cbor.into();
+    let canonical_cbor = canonicalize_cbor_value(cbor_val);
+    let mut result = vec![];
+    ciborium::into_writer(&canonical_cbor, &mut result).map_err(|_| CborParseError::InvalidEncoding)?;
     Ok(result)
 }
 #[cfg_attr(feature = "uniffi", uniffi::export)]
