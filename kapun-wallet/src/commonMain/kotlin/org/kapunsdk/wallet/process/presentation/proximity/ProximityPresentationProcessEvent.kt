@@ -22,26 +22,33 @@ import org.kapunsdk.wallet.process.ProcessEvent
 import uniffi.kapun_util_rust.Value
 
 sealed interface ProximityPresentationProcessEvent : ProcessEvent {
+    data class PresentationRequested(
+        val engagementData: String,
+    ) : ProximityPresentationProcessEvent
 
-	data class PresentationRequested(val engagementData: String) : ProximityPresentationProcessEvent
-	data object PeerConnecting : ProximityPresentationProcessEvent
-	data object PeerConected : ProximityPresentationProcessEvent
-	data class DocumentRequested(val documentRequest: DocumentRequest, val sessionTranscript: Value) : ProximityPresentationProcessEvent
-	data class PinEntered(
-		val pin: String,
-		val viewModel: Map.Entry<String, CredentialSelectionUiModel>,
-		val credentialsWithPin: List<Map.Entry<String, CredentialSelectionUiModel>>,
-		val credentialsWithFrost: List<Map.Entry<String, CredentialSelectionUiModel>>,
-	) : ProximityPresentationProcessEvent
+    data object PeerConnecting : ProximityPresentationProcessEvent
 
-	data class PassphraseEntered(
-		val passphrase: String,
-		val viewModel: Map.Entry<String, CredentialSelectionUiModel>,
-		val credentialsWithFrost: List<Map.Entry<String, CredentialSelectionUiModel>>,
-	) : ProximityPresentationProcessEvent
+    data object PeerConected : ProximityPresentationProcessEvent
 
-	data class CredentialSelected(
-		val credentialMapping: Map<String, CredentialSelectionUiModel>,
-	) : ProximityPresentationProcessEvent
+    data class DocumentRequested(
+        val documentRequest: DocumentRequest,
+        val sessionTranscript: Value,
+    ) : ProximityPresentationProcessEvent
 
+    data class PinEntered(
+        val pin: String,
+        val viewModel: Map.Entry<String, CredentialSelectionUiModel>,
+        val credentialsWithPin: List<Map.Entry<String, CredentialSelectionUiModel>>,
+        val credentialsWithFrost: List<Map.Entry<String, CredentialSelectionUiModel>>,
+    ) : ProximityPresentationProcessEvent
+
+    data class PassphraseEntered(
+        val passphrase: String,
+        val viewModel: Map.Entry<String, CredentialSelectionUiModel>,
+        val credentialsWithFrost: List<Map.Entry<String, CredentialSelectionUiModel>>,
+    ) : ProximityPresentationProcessEvent
+
+    data class CredentialSelected(
+        val credentialMapping: Map<String, CredentialSelectionUiModel>,
+    ) : ProximityPresentationProcessEvent
 }

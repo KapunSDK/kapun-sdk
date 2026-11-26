@@ -17,10 +17,8 @@ under the License.
 package org.kapunsdk.wallet.process
 
 interface ProcessEvent {
-
-	/**
-	 * Generic continuation event without additional data for any process step
-	 */
-	data object Continue : ProcessEvent
-
+    /**
+     * Generic continuation event without additional data for any process step
+     */
+    data object Continue : ProcessEvent
 }

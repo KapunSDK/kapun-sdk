@@ -11,11 +11,11 @@ package org.kapunsdk.credentials
 
 /** Replaces the additional illegal and undisclosable SD-JWT claim names for this module. */
 public fun registerInvalidAndUndisclosableClaims(
-	illegalClaims: List<String> = emptyList(),
-	undisclosableClaims: List<String> = emptyList(),
+    illegalClaims: List<String> = emptyList(),
+    undisclosableClaims: List<String> = emptyList(),
 ) {
-	uniffi.kapun_dcql_sdjwt_rust.registerInvalidAndUndisclosableClaims(
-		illegalClaims,
-		undisclosableClaims,
-	)
+    uniffi.kapun_dcql_sdjwt_rust.registerInvalidAndUndisclosableClaims(
+        illegalClaims,
+        undisclosableClaims,
+    )
 }

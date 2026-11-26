@@ -20,15 +20,15 @@ import org.kapunsdk.credentials.models.metadata.KeyMaterialType
 import org.kapunsdk.credentials.models.oca.OcaBundleModel
 
 class CredentialModel(
-	val id: Long,
-	val identityId: Long,
-	val name: String,
-	val metadata: CredentialMetadata,
-	val keyMaterialType: KeyMaterialType,
-	val credentialType: CredentialType,
-	val payload: String,
-	val docType: String,
-	val ocaBundle: OcaBundleModel?,
-	val isUsed: Boolean,
-	val createdAt: Long,
+    val id: Long,
+    val identityId: Long,
+    val name: String,
+    val metadata: CredentialMetadata,
+    val keyMaterialType: KeyMaterialType,
+    val credentialType: CredentialType,
+    val payload: String,
+    val docType: String,
+    val ocaBundle: OcaBundleModel?,
+    val isUsed: Boolean,
+    val createdAt: Long,
 )

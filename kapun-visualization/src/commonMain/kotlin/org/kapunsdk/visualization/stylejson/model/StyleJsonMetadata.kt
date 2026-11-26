@@ -20,9 +20,9 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class StyleJsonMetadata(
-	val credentialIdentifier: String,
-	val version: String,
-	val published: Boolean,
-	val textColor: StyleJsonTextShade,
-	val cardColor: String,
+    val credentialIdentifier: String,
+    val version: String,
+    val published: Boolean,
+    val textColor: StyleJsonTextShade,
+    val cardColor: String,
 )

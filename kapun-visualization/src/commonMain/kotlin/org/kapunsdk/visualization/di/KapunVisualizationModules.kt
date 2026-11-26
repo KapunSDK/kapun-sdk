@@ -19,6 +19,5 @@ package org.kapunsdk.visualization.di
 import org.koin.core.KoinApplication
 
 internal fun KoinApplication.visualizationModules() {
-	modules(
-	)
+    modules()
 }

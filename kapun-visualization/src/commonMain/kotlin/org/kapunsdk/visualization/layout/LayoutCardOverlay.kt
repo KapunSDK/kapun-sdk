@@ -16,23 +16,25 @@ under the License.
 
 package org.kapunsdk.visualization.layout
 
-import org.kapunsdk.visualization.stylejson.model.StyleJson
 import kotlinx.serialization.Serializable
+import org.kapunsdk.visualization.stylejson.model.StyleJson
 
 @Serializable
 sealed interface LayoutCardOverlayContent {
-	@Serializable
-	data class Image(
-		val image: LayoutCardImage,
-		val imageType: ImageType
-	) : LayoutCardOverlayContent
+    @Serializable
+    data class Image(
+        val image: LayoutCardImage,
+        val imageType: ImageType,
+    ) : LayoutCardOverlayContent
 
-	@Serializable
-	data class Text(val text: String) : LayoutCardOverlayContent
+    @Serializable
+    data class Text(
+        val text: String,
+    ) : LayoutCardOverlayContent
 }
 
 @Serializable
 data class LayoutCardOverlay(
-	val content: LayoutCardOverlayContent,
-	val position: StyleJson.StyleOverlay.OverlayPosition
+    val content: LayoutCardOverlayContent,
+    val position: StyleJson.StyleOverlay.OverlayPosition,
 )

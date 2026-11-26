@@ -20,6 +20,7 @@ import org.kapunsdk.util.platform.PlatformType
 import java.util.Locale
 
 actual object Platform {
-	actual val os = PlatformType.JVM
-	actual fun getCurrentLocale() = Locale.getDefault().language
+    actual val os = PlatformType.JVM
+
+    actual fun getCurrentLocale() = Locale.getDefault().language
 }

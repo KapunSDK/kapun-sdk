@@ -23,6 +23,7 @@ internal fun CoreSignatureCreator?.asNativeMdocSignatureCreator(): NativeMdocSig
     this?.let { delegate ->
         object : NativeMdocSignatureCreator {
             override fun alg(): String = delegate.alg()
+
             override fun sign(bytes: ByteArray): ByteArray = delegate.sign(bytes)
         }
     }

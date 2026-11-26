@@ -31,8 +31,8 @@ import io.ktor.client.HttpClient
  * Federation discovery.
  */
 class KapunNetworkConfiguration(
-	val httpClient: HttpClient? = null,
-	/** Allows SDK-owned Rust requests to skip certificate and hostname validation. */
-	val allowUntrustedCertificates: Boolean = false,
-	val userAgent: String? = null,
+    val httpClient: HttpClient? = null,
+    /** Allows SDK-owned Rust requests to skip certificate and hostname validation. */
+    val allowUntrustedCertificates: Boolean = false,
+    val userAgent: String? = null,
 )

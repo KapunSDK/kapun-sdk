@@ -21,15 +21,13 @@ import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
 object MdocUtils {
+    private const val KEY_ISSUER_AUTH = "issuerAuth"
+    private const val KEY_DOC_TYPE = "docType"
 
-	private const val KEY_ISSUER_AUTH = "issuerAuth"
-	private const val KEY_DOC_TYPE = "docType"
-
-	@OptIn(ExperimentalEncodingApi::class)
-	fun getDocType(payload: String): String {
-		val base64 = Base64.UrlSafe.withPadding(Base64.PaddingOption.PRESENT_OPTIONAL)
-		val mdoc = Cbor.decode(base64.decode(payload))
-		return Cbor.decode(mdoc[KEY_ISSUER_AUTH].asArray[2].asBstr).asTaggedEncodedCbor[KEY_DOC_TYPE].asTstr
-	}
-
+    @OptIn(ExperimentalEncodingApi::class)
+    fun getDocType(payload: String): String {
+        val base64 = Base64.UrlSafe.withPadding(Base64.PaddingOption.PRESENT_OPTIONAL)
+        val mdoc = Cbor.decode(base64.decode(payload))
+        return Cbor.decode(mdoc[KEY_ISSUER_AUTH].asArray[2].asBstr).asTaggedEncodedCbor[KEY_DOC_TYPE].asTstr
+    }
 }

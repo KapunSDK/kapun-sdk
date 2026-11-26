@@ -11,13 +11,13 @@ software distributed under the License is distributed on an
 "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
-under the License.   
+under the License.
  */
 package org.kapunsdk.proximity.ble.client
 
+import kotlinx.cinterop.ObjCSignatureOverride
 import org.kapunsdk.proximity.ProximityError
 import org.kapunsdk.util.log.Logger
-import kotlinx.cinterop.ObjCSignatureOverride
 import platform.CoreBluetooth.CBCentralManager
 import platform.CoreBluetooth.CBCentralManagerDelegateProtocol
 import platform.CoreBluetooth.CBCentralManagerStatePoweredOn
@@ -28,60 +28,65 @@ import platform.Foundation.NSNumber
 import platform.darwin.NSObject
 
 internal class CentralManagerDelegate(
-	private val gattClient: GattClient,
-	private val manager: CBCentralManager,
-	private val isReady: (Boolean) -> Unit
-) : NSObject(), CBCentralManagerDelegateProtocol {
+    private val gattClient: GattClient,
+    private val manager: CBCentralManager,
+    private val isReady: (Boolean) -> Unit,
+) : NSObject(),
+    CBCentralManagerDelegateProtocol {
+    override fun centralManager(
+        central: CBCentralManager,
+        didDiscoverPeripheral: CBPeripheral,
+        advertisementData: Map<Any?, *>,
+        RSSI: NSNumber,
+    ) {
+        Logger("CentralManagerDelegate").debug("Central Manager didDiscoverPeripheral")
+        gattClient.discoveredPeripherals.add(didDiscoverPeripheral)
+        didDiscoverPeripheral.delegate = gattClient.peripheralDelegate
+        gattClient.onConnectionAttemptStarted()
+        manager.connectPeripheral(didDiscoverPeripheral, null)
+    }
 
-	override fun centralManager(
-		central: CBCentralManager,
-		didDiscoverPeripheral: CBPeripheral,
-		advertisementData: Map<Any?, *>,
-		RSSI: NSNumber
-	) {
-		Logger("CentralManagerDelegate").debug("Central Manager didDiscoverPeripheral")
-		gattClient.discoveredPeripherals.add(didDiscoverPeripheral)
-		didDiscoverPeripheral.delegate = gattClient.peripheralDelegate
-		gattClient.onConnectionAttemptStarted()
-		manager.connectPeripheral(didDiscoverPeripheral, null)
-	}
+    override fun centralManager(
+        central: CBCentralManager,
+        didConnectPeripheral: CBPeripheral,
+    ) {
+        Logger("CentralManagerDelegate").debug("Connected to peripheral: ${didConnectPeripheral.identifier}")
+        didConnectPeripheral.discoverServices(listOf(CBUUID.UUIDWithString(gattClient.serviceUuid.toString())))
+        gattClient.connectedPeripheral = didConnectPeripheral
+        gattClient.listener?.onPeerConnecting()
+    }
 
-	override fun centralManager(central: CBCentralManager, didConnectPeripheral: CBPeripheral) {
-		Logger("CentralManagerDelegate").debug("Connected to peripheral: ${didConnectPeripheral.identifier}")
-		didConnectPeripheral.discoverServices(listOf(CBUUID.UUIDWithString(gattClient.serviceUuid.toString())))
-		gattClient.connectedPeripheral = didConnectPeripheral
-		gattClient.listener?.onPeerConnecting()
-	}
+    @ObjCSignatureOverride
+    override fun centralManager(
+        central: CBCentralManager,
+        didFailToConnectPeripheral: CBPeripheral,
+        error: NSError?,
+    ) {
+        gattClient.reportConnectionError(
+            ProximityError.ConnectionFailed,
+        )
+    }
 
-	@ObjCSignatureOverride
-	override fun centralManager(
-		central: CBCentralManager,
-		didFailToConnectPeripheral: CBPeripheral,
-		error: NSError?
-	) {
-		gattClient.reportConnectionError(
-			ProximityError.ConnectionFailed
-		)
-	}
+    @ObjCSignatureOverride
+    override fun centralManager(
+        central: CBCentralManager,
+        didDisconnectPeripheral: CBPeripheral,
+        error: NSError?,
+    ) {
+        Logger("CentralManagerDelegate").debug("Disconnected from peripheral: ${didDisconnectPeripheral.identifier}")
+        if (error != null) {
+            gattClient.reportConnectionError(
+                ProximityError.PeripheralDisconnected,
+            )
+        }
+        gattClient.onPeripheralDisconnected(didDisconnectPeripheral)
+    }
 
-	@ObjCSignatureOverride
-	override fun centralManager(
-		central: CBCentralManager,
-		didDisconnectPeripheral: CBPeripheral,
-		error: NSError?
-	) {
-		Logger("CentralManagerDelegate").debug("Disconnected from peripheral: ${didDisconnectPeripheral.identifier}")
-		if (error != null) {
-			gattClient.reportConnectionError(
-				ProximityError.PeripheralDisconnected
-			)
-		}
-		gattClient.onPeripheralDisconnected(didDisconnectPeripheral)
-	}
-
-	override fun centralManagerDidUpdateState(central: CBCentralManager) {
-		Logger("CentralManagerDelegate").debug("Central Manager did update state ${central.state} ${central.isScanning}")
-		isReady(central.state == CBCentralManagerStatePoweredOn)
-		gattClient.onCentralStateChanged(central.state)
-	}
+    override fun centralManagerDidUpdateState(central: CBCentralManager) {
+        Logger(
+            "CentralManagerDelegate",
+        ).debug("Central Manager did update state ${central.state} ${central.isScanning}")
+        isReady(central.state == CBCentralManagerStatePoweredOn)
+        gattClient.onCentralStateChanged(central.state)
+    }
 }

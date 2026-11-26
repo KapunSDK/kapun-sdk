@@ -22,26 +22,28 @@ package org.kapunsdk.trust.framework.swiss
  * environments must configure both their trust-statement issuers and trust-registry base URLs.
  */
 data class SwissTrustConfiguration(
-	val trustedStatementIssuers: List<String> = listOf(
-		"did:webvh:QmdVPcfEJgvQAJKEjaTWAhskT1kc59KZQiXNenqHBB7iH5:identifier-reg.trust-infra.swiyu-int.admin.ch:api:v1:did:4c131dc4-ced1-454b-bbd4-9401c7512e37",
-		"did:webvh:QmNTHuhETA3u2ypoujoaEMaZGKf5HpPwkV6ktfgzu7JzMp:identifier-reg.trust-infra.swiyu-int.admin.ch:api:v1:did:5e5de412-0e7d-4982-a0ed-bd55a0f25a04",
-	),
-	val trustStatementApiBaseUrls: List<String> = listOf(
-		"https://trust-reg.trust-infra.swiyu-int.admin.ch",
-	),
+    val trustedStatementIssuers: List<String> =
+        listOf(
+            "did:webvh:QmdVPcfEJgvQAJKEjaTWAhskT1kc59KZQiXNenqHBB7iH5:identifier-reg.trust-infra.swiyu-int.admin.ch:api:v1:did:4c131dc4-ced1-454b-bbd4-9401c7512e37",
+            "did:webvh:QmNTHuhETA3u2ypoujoaEMaZGKf5HpPwkV6ktfgzu7JzMp:identifier-reg.trust-infra.swiyu-int.admin.ch:api:v1:did:5e5de412-0e7d-4982-a0ed-bd55a0f25a04",
+        ),
+    val trustStatementApiBaseUrls: List<String> =
+        listOf(
+            "https://trust-reg.trust-infra.swiyu-int.admin.ch",
+        ),
 ) {
-	init {
-		require(trustedStatementIssuers.isNotEmpty())
-		require(trustedStatementIssuers.all { it.trim().startsWith("did:") })
-		require(trustStatementApiBaseUrls.isNotEmpty())
-		require(trustStatementApiBaseUrls.all { it.trim().startsWith("https://") })
-	}
+    init {
+        require(trustedStatementIssuers.isNotEmpty())
+        require(trustedStatementIssuers.all { it.trim().startsWith("did:") })
+        require(trustStatementApiBaseUrls.isNotEmpty())
+        require(trustStatementApiBaseUrls.all { it.trim().startsWith("https://") })
+    }
 }
 
 internal fun SwissTrustConfiguration.allowsStatementIssuer(issuer: String): Boolean =
-	trustedStatementIssuers.any {
-		it.trim().removePrefix("decentralized_identifier:").substringBefore('#') == issuer
-	}
+    trustedStatementIssuers.any {
+        it.trim().removePrefix("decentralized_identifier:").substringBefore('#') == issuer
+    }
 
 internal fun SwissTrustConfiguration.allowsApiBaseUrl(apiBaseUrl: String): Boolean =
-	trustStatementApiBaseUrls.any { it.trim().trimEnd('/') == apiBaseUrl.trimEnd('/') }
+    trustStatementApiBaseUrls.any { it.trim().trimEnd('/') == apiBaseUrl.trimEnd('/') }

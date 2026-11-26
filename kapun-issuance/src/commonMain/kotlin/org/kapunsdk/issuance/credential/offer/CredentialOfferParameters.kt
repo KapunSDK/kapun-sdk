@@ -24,65 +24,56 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class CredentialOfferParameters(
-	@SerialName("credential_issuer")
-	val credentialIssuer: String,
-
-	@SerialName("credential_configuration_ids")
-	val credentialConfigurationIds: List<String>,
-
-	@SerialName("grants")
-	val grants: Grants? = null,
+    @SerialName("credential_issuer")
+    val credentialIssuer: String,
+    @SerialName("credential_configuration_ids")
+    val credentialConfigurationIds: List<String>,
+    @SerialName("grants")
+    val grants: Grants? = null,
 )
 
 @Serializable
 data class Grants(
-	@SerialName("authorization_code")
-	val authorizationCode: AuthorizationCode? = null,
-
-	@SerialName("urn:ietf:params:oauth:grant-type:pre-authorized_code")
-	val preAuthorizedCode: PreAuthorizedCode? = null,
+    @SerialName("authorization_code")
+    val authorizationCode: AuthorizationCode? = null,
+    @SerialName("urn:ietf:params:oauth:grant-type:pre-authorized_code")
+    val preAuthorizedCode: PreAuthorizedCode? = null,
 )
 
 @Serializable
 data class AuthorizationCode(
-	@SerialName("issuer_state")
-	val issuerState: String? = null,
-
-	@SerialName("authorization_server")
-	val authorizationServer: String? = null,
+    @SerialName("issuer_state")
+    val issuerState: String? = null,
+    @SerialName("authorization_server")
+    val authorizationServer: String? = null,
 )
 
 @Serializable
 data class PreAuthorizedCode(
-	@SerialName("pre-authorized_code")
-	val preAuthorizedCode: String,
-
-	@SerialName("tx_code")
-	val txCode: TransactionCode? = null,
-
-	@SerialName("interval")
-	val interval: Int? = null,
-
-	@SerialName("authorization_server")
-	val authorizationServer: String? = null,
+    @SerialName("pre-authorized_code")
+    val preAuthorizedCode: String,
+    @SerialName("tx_code")
+    val txCode: TransactionCode? = null,
+    @SerialName("interval")
+    val interval: Int? = null,
+    @SerialName("authorization_server")
+    val authorizationServer: String? = null,
 )
 
 @Serializable
 data class TransactionCode(
-	@SerialName("input_mode")
-	val inputMode: InputMode? = null,
-
-	@SerialName("length")
-	val length: Int? = null,
-
-	@SerialName("description")
-	val description: String? = null,
+    @SerialName("input_mode")
+    val inputMode: InputMode? = null,
+    @SerialName("length")
+    val length: Int? = null,
+    @SerialName("description")
+    val description: String? = null,
 )
 
 enum class InputMode {
-	@SerialName("numeric")
-	NUMERIC,
+    @SerialName("numeric")
+    NUMERIC,
 
-	@SerialName("text")
-	TEXT,
+    @SerialName("text")
+    TEXT,
 }

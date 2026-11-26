@@ -16,23 +16,25 @@ under the License.
 
 package org.kapunsdk.visualization.oca.model.overlay.input
 
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import org.kapunsdk.visualization.oca.model.SAID_HASH_PLACEHOLDER
 import org.kapunsdk.visualization.oca.model.content.AttributeName
 import org.kapunsdk.visualization.oca.model.content.Conformance
 import org.kapunsdk.visualization.oca.model.content.SAID
 import org.kapunsdk.visualization.oca.model.overlay.Overlay
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
 
 @Serializable
 data class ConformanceOverlay(
-	@SerialName("attribute_conformance") val attributeConformance: Map<AttributeName, Conformance>,
-	@SerialName("capture_base") override val captureBase: SAID,
-	@SerialName("type") override val type: String = "spec/overlays/conformance/1.0",
-	@SerialName("digest") override val digest: SAID = SAID_HASH_PLACEHOLDER,
+    @SerialName("attribute_conformance") val attributeConformance: Map<AttributeName, Conformance>,
+    @SerialName("capture_base") override val captureBase: SAID,
+    @SerialName("type") override val type: String = "spec/overlays/conformance/1.0",
+    @SerialName("digest") override val digest: SAID = SAID_HASH_PLACEHOLDER,
 ) : InputOverlay {
+    fun isMandatory(attributeName: AttributeName) = attributeConformance[attributeName] == Conformance.MANDATORY
 
-	fun isMandatory(attributeName: AttributeName) = attributeConformance[attributeName] == Conformance.MANDATORY
-	override fun updateDigest(digest: SAID, captureBase: SAID): Overlay = copy(digest = digest, captureBase = captureBase)
+    override fun updateDigest(
+        digest: SAID,
+        captureBase: SAID,
+    ): Overlay = copy(digest = digest, captureBase = captureBase)
 }
-

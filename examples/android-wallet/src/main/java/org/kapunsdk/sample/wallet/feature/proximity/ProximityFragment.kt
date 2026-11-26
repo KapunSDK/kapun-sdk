@@ -11,7 +11,7 @@ software distributed under the License is distributed on an
 "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
-under the License.   
+under the License.
  */
 package org.kapunsdk.sample.wallet.feature.proximity
 
@@ -33,77 +33,88 @@ import org.kapunsdk.sample.wallet.feature.scanner.QrScannerViewModel
 import org.koin.androidx.viewmodel.ext.android.viewModel
 import org.koin.core.component.KoinComponent
 
-class ProximityFragment : Fragment(), KoinComponent {
+class ProximityFragment :
+    Fragment(),
+    KoinComponent {
+    companion object {
+        val TAG = "ProximityFragment"
 
-	companion object {
-		val TAG = "ProximityFragment"
+        fun newInstance() = ProximityFragment()
+    }
 
-		fun newInstance() = ProximityFragment()
-	}
+    private val viewModel by viewModel<ProximityViewModel>()
+    private val qrScannerViewModel by viewModel<QrScannerViewModel>()
 
-	private val viewModel by viewModel<ProximityViewModel>()
-	private val qrScannerViewModel by viewModel<QrScannerViewModel>()
+    private var _binding: FragmentComposeBinding? = null
+    private val binding get() = _binding!!
 
-	private var _binding: FragmentComposeBinding? = null
-	private val binding get() = _binding!!
+    private val bluetoothPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
+            if (permissions.all { it.value }) {
+                locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+            }
+        }
 
-	private val bluetoothPermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
-		if (permissions.all { it.value }) {
-			locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-		}
-	}
+    private val locationPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) {
+                // TODO Handle permissions properly?
+            }
+        }
 
-	private val locationPermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-		if (granted) {
-			// TODO Handle permissions properly?
-		}
-	}
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?,
+    ): View {
+        _binding = FragmentComposeBinding.inflate(inflater, container, false)
+        return binding.root
+    }
 
-	override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
-		_binding = FragmentComposeBinding.inflate(inflater, container, false)
-		return binding.root
-	}
+    override fun onViewCreated(
+        view: View,
+        savedInstanceState: Bundle?,
+    ) {
+        super.onViewCreated(view, savedInstanceState)
 
-	override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-		super.onViewCreated(view, savedInstanceState)
+        bluetoothPermissionLauncher.launch(
+            arrayOf(
+                Manifest.permission.BLUETOOTH,
+                Manifest.permission.BLUETOOTH_SCAN,
+                Manifest.permission.BLUETOOTH_ADVERTISE,
+                Manifest.permission.BLUETOOTH_CONNECT,
+            ),
+        )
 
-		bluetoothPermissionLauncher.launch(
-			arrayOf(
-				Manifest.permission.BLUETOOTH,
-				Manifest.permission.BLUETOOTH_SCAN,
-				Manifest.permission.BLUETOOTH_ADVERTISE,
-				Manifest.permission.BLUETOOTH_CONNECT,
-			)
-		)
+        binding.composeView.setContent {
+            KapunTheme {
+                ProximityScreen(
+                    proximityState = viewModel.proximityState.collectAsState(),
+                    qrScannerViewModel = qrScannerViewModel,
+                    scannerCallbacks =
+                        object : QrScannerScreenCallbacks {
+                            override fun onPermissionInSettingsChange() {
+                                val intent =
+                                    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                                        .addCategory(Intent.CATEGORY_DEFAULT)
+                                        .setData(Uri.parse("package:${requireContext().packageName}"))
+                                startActivity(intent)
+                            }
 
-		binding.composeView.setContent {
-			KapunTheme {
-				ProximityScreen(
-					proximityState = viewModel.proximityState.collectAsState(),
-					qrScannerViewModel = qrScannerViewModel,
-					scannerCallbacks = object : QrScannerScreenCallbacks {
-						override fun onPermissionInSettingsChange() {
-							val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
-								.addCategory(Intent.CATEGORY_DEFAULT)
-								.setData(Uri.parse("package:${requireContext().packageName}"))
-							startActivity(intent)
-						}
+                            override fun onSuccess(data: String) {
+                                viewModel.startEngagement(data)
+                            }
+                        },
+                    onSubmitDocumentClicked = viewModel::submitDocument,
+                    onStartEngagementClicked = viewModel::startEngagementMdl,
+                    onResetState = viewModel::reset,
+                )
+            }
+        }
+    }
 
-						override fun onSuccess(data: String) {
-							viewModel.startEngagement(data)
-						}
-					},
-					onSubmitDocumentClicked = viewModel::submitDocument,
-					onStartEngagementClicked = viewModel::startEngagementMdl,
-					onResetState = viewModel::reset
-				)
-			}
-		}
-	}
-
-	override fun onDestroyView() {
-		super.onDestroyView()
-		_binding = null
-	}
-
+    override fun onDestroyView() {
+        super.onDestroyView()
+        _binding = null
+    }
 }

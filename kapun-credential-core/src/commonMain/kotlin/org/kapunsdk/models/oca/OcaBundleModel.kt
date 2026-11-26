@@ -17,7 +17,7 @@ under the License.
 package org.kapunsdk.credentials.models.oca
 
 data class OcaBundleModel(
-	val url: String,
-	val content: String,
-	val updatedAt: Long,
+    val url: String,
+    val content: String,
+    val updatedAt: Long,
 )

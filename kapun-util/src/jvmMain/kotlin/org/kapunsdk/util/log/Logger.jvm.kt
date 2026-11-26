@@ -16,13 +16,19 @@ under the License.
 
 package org.kapunsdk.util.log
 
-actual fun platformConsoleLogSink(): LogSink = object : LogSink {
-	override fun log(severity: LogSeverity, tag: String, message: String, throwable: Throwable?) {
-		val prefix = "[$severity] [$tag]"
-		if (throwable != null) {
-			System.out.println("$prefix $message, $throwable")
-		} else {
-			System.out.println("$prefix $message")
-		}
-	}
-}
+actual fun platformConsoleLogSink(): LogSink =
+    object : LogSink {
+        override fun log(
+            severity: LogSeverity,
+            tag: String,
+            message: String,
+            throwable: Throwable?,
+        ) {
+            val prefix = "[$severity] [$tag]"
+            if (throwable != null) {
+                System.out.println("$prefix $message, $throwable")
+            } else {
+                System.out.println("$prefix $message")
+            }
+        }
+    }

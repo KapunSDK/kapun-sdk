@@ -21,6 +21,7 @@ import platform.Foundation.currentLocale
 import platform.Foundation.languageCode
 
 actual object Platform {
-	actual val os = PlatformType.IOS
-	actual fun getCurrentLocale() = NSLocale.currentLocale.languageCode
+    actual val os = PlatformType.IOS
+
+    actual fun getCurrentLocale() = NSLocale.currentLocale.languageCode
 }

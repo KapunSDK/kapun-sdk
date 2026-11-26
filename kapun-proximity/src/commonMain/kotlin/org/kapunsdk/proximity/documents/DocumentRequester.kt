@@ -11,20 +11,18 @@ software distributed under the License is distributed on an
 "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
-under the License.   
+under the License.
  */
 package org.kapunsdk.proximity.documents
 
 interface DocumentRequester<T> {
+    /**
+     * Creates a document request to be transmitted to the wallet. This might involve network requests.
+     */
+    suspend fun createDocumentRequest(expectedOrigin: String? = null): DocumentRequest
 
-	/**
-	 * Creates a document request to be transmitted to the wallet. This might involve network requests.
-	 */
-	suspend fun createDocumentRequest(expectedOrigin: String? = null): DocumentRequest
-
-	/**
-	 * Verifies the submitted documents. This might involve network requests.
-	 */
-	suspend fun verifySubmittedDocuments(data: ByteArray): T
-
+    /**
+     * Verifies the submitted documents. This might involve network requests.
+     */
+    suspend fun verifySubmittedDocuments(data: ByteArray): T
 }

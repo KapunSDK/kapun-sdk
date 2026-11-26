@@ -11,7 +11,7 @@ software distributed under the License is distributed on an
 "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
-under the License.   
+under the License.
  */
 package org.kapunsdk.sample.wallet.di
 
@@ -19,9 +19,10 @@ import org.kapunsdk.sample.wallet.feature.proximity.ProximityViewModel
 import org.kapunsdk.sample.wallet.feature.scanner.QrScannerViewModel
 import org.koin.dsl.module
 
-fun viewModelsModule() = module {
-	includes(
-		QrScannerViewModel.koinModule,
-		ProximityViewModel.koinModule,
-	)
-}
+fun viewModelsModule() =
+    module {
+        includes(
+            QrScannerViewModel.koinModule,
+            ProximityViewModel.koinModule,
+        )
+    }

@@ -21,18 +21,20 @@ import org.kapunsdk.wallet.crypto.SecureHardwareAccessControl
 import uniffi.kapun_wallet_rust.NativeSigner
 
 interface HardwareSignerFactory : NativeSignerFactory {
-	fun getHardwareSigner(dataRepresenation: ByteArray) : NativeSigner?
-	fun newHardwareSigner(accessControl: SecureHardwareAccessControl) : NativeSigner
+    fun getHardwareSigner(dataRepresenation: ByteArray): NativeSigner?
 
-	override fun createSigner(
-		keyMaterial: KeyMaterial,
-		pin: String?,
-		frostBlob: String?,
-		passphrase: String?,
-		email: String?
-	): NativeSigner? {
-		return if (keyMaterial is KeyMaterial.Local.HardwareBacked) {
-			getHardwareSigner(keyMaterial.deviceKeyReference)
-		} else null
-	}
+    fun newHardwareSigner(accessControl: SecureHardwareAccessControl): NativeSigner
+
+    override fun createSigner(
+        keyMaterial: KeyMaterial,
+        pin: String?,
+        frostBlob: String?,
+        passphrase: String?,
+        email: String?,
+    ): NativeSigner? =
+        if (keyMaterial is KeyMaterial.Local.HardwareBacked) {
+            getHardwareSigner(keyMaterial.deviceKeyReference)
+        } else {
+            null
+        }
 }

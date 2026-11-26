@@ -18,23 +18,27 @@ under the License.
 
 package org.kapunsdk.visualization.oca.model.overlay.semantic
 
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonNames
 import org.kapunsdk.visualization.oca.model.SAID_HASH_PLACEHOLDER
 import org.kapunsdk.visualization.oca.model.content.SAID
 import org.kapunsdk.visualization.oca.model.overlay.Localized
 import org.kapunsdk.visualization.oca.model.overlay.Overlay
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonNames
 
 @Serializable
 data class MetaOverlay(
-	@SerialName("name") val name: String? = null,
-	@SerialName("description") val description: String? = null,
-	@JsonNames("issuer", "issuer_name") val issuerName: String? = null,
-	@SerialName("capture_base") override val captureBase: SAID,
-	@SerialName("type") override val type: String = "spec/overlays/meta/1.0",
-	@SerialName("language") override val language: String,
-	@SerialName("digest") override val digest: SAID = SAID_HASH_PLACEHOLDER,
-) : SemanticOverlay, Localized {
-	override fun updateDigest(digest: SAID, captureBase: SAID): Overlay = copy(digest = digest, captureBase = captureBase)
+    @SerialName("name") val name: String? = null,
+    @SerialName("description") val description: String? = null,
+    @JsonNames("issuer", "issuer_name") val issuerName: String? = null,
+    @SerialName("capture_base") override val captureBase: SAID,
+    @SerialName("type") override val type: String = "spec/overlays/meta/1.0",
+    @SerialName("language") override val language: String,
+    @SerialName("digest") override val digest: SAID = SAID_HASH_PLACEHOLDER,
+) : SemanticOverlay,
+    Localized {
+    override fun updateDigest(
+        digest: SAID,
+        captureBase: SAID,
+    ): Overlay = copy(digest = digest, captureBase = captureBase)
 }

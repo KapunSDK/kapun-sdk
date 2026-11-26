@@ -23,8 +23,10 @@ import org.koin.core.module.Module
 import org.koin.dsl.bind
 
 actual fun Module.sqliteDriverModule(databaseName: String) {
-	single { create(get(), databaseName) }.bind<SqliteDriverFactory>()
+    single { create(get(), databaseName) }.bind<SqliteDriverFactory>()
 }
-internal fun create(context: Context, databaseName: String): AndroidSqliteDriverFactory {
-	return AndroidSqliteDriverFactory(context, databaseName)
-}
+
+internal fun create(
+    context: Context,
+    databaseName: String,
+): AndroidSqliteDriverFactory = AndroidSqliteDriverFactory(context, databaseName)

@@ -23,6 +23,7 @@ internal fun CoreSignatureCreator?.asNativeW3cSignatureCreator(): NativeW3cSigna
     this?.let { delegate ->
         object : NativeW3cSignatureCreator {
             override fun alg(): String = delegate.alg()
+
             override fun sign(bytes: ByteArray): ByteArray = delegate.sign(bytes)
         }
     }

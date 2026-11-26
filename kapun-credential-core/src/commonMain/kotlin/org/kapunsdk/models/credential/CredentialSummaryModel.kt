@@ -27,29 +27,30 @@ import org.kapunsdk.credentials.models.oca.OcaBundleModel
  * string for every credential in the wallet.
  */
 data class CredentialSummaryModel(
-	val id: Long,
-	val identityId: Long,
-	val name: String,
-	val metadata: CredentialMetadata,
-	val keyMaterialType: KeyMaterialType,
-	val credentialType: CredentialType,
-	val payload: String?,
-	val docType: String,
-	val ocaBundle: OcaBundleModel?,
-	val isUsed: Boolean,
-	val createdAt: Long,
+    val id: Long,
+    val identityId: Long,
+    val name: String,
+    val metadata: CredentialMetadata,
+    val keyMaterialType: KeyMaterialType,
+    val credentialType: CredentialType,
+    val payload: String?,
+    val docType: String,
+    val ocaBundle: OcaBundleModel?,
+    val isUsed: Boolean,
+    val createdAt: Long,
 ) {
-	fun toCredentialModel() = CredentialModel(
-		id = id,
-		identityId = identityId,
-		name = name,
-		metadata = metadata,
-		keyMaterialType = keyMaterialType,
-		credentialType = credentialType,
-		payload = payload.orEmpty(),
-		docType = docType,
-		ocaBundle = ocaBundle,
-		isUsed = isUsed,
-		createdAt = createdAt,
-	)
+    fun toCredentialModel() =
+        CredentialModel(
+            id = id,
+            identityId = identityId,
+            name = name,
+            metadata = metadata,
+            keyMaterialType = keyMaterialType,
+            credentialType = credentialType,
+            payload = payload.orEmpty(),
+            docType = docType,
+            ocaBundle = ocaBundle,
+            isUsed = isUsed,
+            createdAt = createdAt,
+        )
 }

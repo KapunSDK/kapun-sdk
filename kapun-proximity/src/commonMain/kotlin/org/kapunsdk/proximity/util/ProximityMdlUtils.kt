@@ -17,68 +17,73 @@ package org.kapunsdk.proximity.util
 
 import org.kapunsdk.proximity.protocol.mdl.DcApiCapability
 import org.kapunsdk.proximity.protocol.mdl.MdlCapabilities
-import uniffi.kapun_crypto_rust.base64UrlEncode
 import uniffi.kapun_crypto_rust.SessionCipher
+import uniffi.kapun_crypto_rust.base64UrlEncode
 import uniffi.kapun_crypto_rust.sha256Rs
 import uniffi.kapun_util_rust.Value
 import uniffi.kapun_util_rust.encodeCbor
 
 object ProximityMdlUtils {
-	enum class PayloadDecryptFailureType {
-		SHA_MISMATCH,
-		MISSING_CIPHER,
-		DECRYPT_FAILED,
-	}
+    enum class PayloadDecryptFailureType {
+        SHA_MISMATCH,
+        MISSING_CIPHER,
+        DECRYPT_FAILED,
+    }
 
-	sealed class PayloadDecryptResult {
-		data class Success(val data: ByteArray) : PayloadDecryptResult()
-		data class Failure(
-			val type: PayloadDecryptFailureType,
-			val debugMessage: String,
-		) : PayloadDecryptResult()
-	}
+    sealed class PayloadDecryptResult {
+        data class Success(
+            val data: ByteArray,
+        ) : PayloadDecryptResult()
 
-	fun defaultDcApiCapabilities(): MdlCapabilities {
-		return MdlCapabilities(
-			mapOf(
-				MdlCapabilities.DC_API_CAPABILITY_KEY to DcApiCapability(
-					listOf("openid4vp-v1-unsigned", "openid4vp-v1-signed")
-				)
-			)
-		)
-	}
+        data class Failure(
+            val type: PayloadDecryptFailureType,
+            val debugMessage: String,
+        ) : PayloadDecryptResult()
+    }
 
-	fun buildIsoOriginFromSessionTranscript(sessionTranscript: Value): String {
-		val sessionTranscriptBytes = encodeCbor(sessionTranscript)
-		val sessionTranscriptBytesHash = base64UrlEncode(sha256Rs(sessionTranscriptBytes))
-		return "iso-18013-5://${sessionTranscriptBytesHash}"
-	}
+    fun defaultDcApiCapabilities(): MdlCapabilities =
+        MdlCapabilities(
+            mapOf(
+                MdlCapabilities.DC_API_CAPABILITY_KEY to
+                    DcApiCapability(
+                        listOf("openid4vp-v1-unsigned", "openid4vp-v1-signed"),
+                    ),
+            ),
+        )
 
-	fun decryptAndValidatePayload(
-		encryptedPayload: ByteArray,
-		expectedSha: ByteArray?,
-		sessionCipher: SessionCipher?,
-	): PayloadDecryptResult {
-		expectedSha?.let { expected ->
-			val actualSha = sha256Rs(encryptedPayload)
-			if (!expected.contentEquals(actualSha)) {
-				return PayloadDecryptResult.Failure(
-					PayloadDecryptFailureType.SHA_MISMATCH,
-					"sha mismatch expected=${base64UrlEncode(expected)} actual=${base64UrlEncode(actualSha)}",
-				)
-			}
-		}
+    fun buildIsoOriginFromSessionTranscript(sessionTranscript: Value): String {
+        val sessionTranscriptBytes = encodeCbor(sessionTranscript)
+        val sessionTranscriptBytesHash = base64UrlEncode(sha256Rs(sessionTranscriptBytes))
+        return "iso-18013-5://$sessionTranscriptBytesHash"
+    }
 
-		val currentCipher = sessionCipher ?: return PayloadDecryptResult.Failure(
-			PayloadDecryptFailureType.MISSING_CIPHER,
-			"missing session cipher",
-		)
+    fun decryptAndValidatePayload(
+        encryptedPayload: ByteArray,
+        expectedSha: ByteArray?,
+        sessionCipher: SessionCipher?,
+    ): PayloadDecryptResult {
+        expectedSha?.let { expected ->
+            val actualSha = sha256Rs(encryptedPayload)
+            if (!expected.contentEquals(actualSha)) {
+                return PayloadDecryptResult.Failure(
+                    PayloadDecryptFailureType.SHA_MISMATCH,
+                    "sha mismatch expected=${base64UrlEncode(expected)} actual=${base64UrlEncode(actualSha)}",
+                )
+            }
+        }
 
-		val data = currentCipher.decrypt(encryptedPayload) ?: return PayloadDecryptResult.Failure(
-			PayloadDecryptFailureType.DECRYPT_FAILED,
-			"failed to decrypt payload of size ${encryptedPayload.size}",
-		)
+        val currentCipher =
+            sessionCipher ?: return PayloadDecryptResult.Failure(
+                PayloadDecryptFailureType.MISSING_CIPHER,
+                "missing session cipher",
+            )
 
-		return PayloadDecryptResult.Success(data)
-	}
+        val data =
+            currentCipher.decrypt(encryptedPayload) ?: return PayloadDecryptResult.Failure(
+                PayloadDecryptFailureType.DECRYPT_FAILED,
+                "failed to decrypt payload of size ${encryptedPayload.size}",
+            )
+
+        return PayloadDecryptResult.Success(data)
+    }
 }

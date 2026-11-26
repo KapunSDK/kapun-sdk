@@ -17,13 +17,19 @@ package org.kapunsdk.util.log
 
 import android.util.Log
 
-actual fun platformConsoleLogSink(): LogSink = object : LogSink {
-	override fun log(severity: LogSeverity, tag: String, message: String, throwable: Throwable?) {
-		when (severity) {
-			LogSeverity.DEBUG -> Log.d(tag, message)
-			LogSeverity.INFO -> Log.i(tag, message)
-			LogSeverity.WARN -> Log.w(tag, message)
-			LogSeverity.ERROR -> if (throwable != null) Log.e(tag, message, throwable) else Log.e(tag, message)
-		}
-	}
-}
+actual fun platformConsoleLogSink(): LogSink =
+    object : LogSink {
+        override fun log(
+            severity: LogSeverity,
+            tag: String,
+            message: String,
+            throwable: Throwable?,
+        ) {
+            when (severity) {
+                LogSeverity.DEBUG -> Log.d(tag, message)
+                LogSeverity.INFO -> Log.i(tag, message)
+                LogSeverity.WARN -> Log.w(tag, message)
+                LogSeverity.ERROR -> if (throwable != null) Log.e(tag, message, throwable) else Log.e(tag, message)
+            }
+        }
+    }

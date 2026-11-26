@@ -11,17 +11,40 @@ import platform.Foundation.NSError
 import platform.darwin.NSObject
 
 internal class GattServerDelegate(
-    private val handler: Handler
-) : NSObject(), CBPeripheralManagerDelegateProtocol {
-
+    private val handler: Handler,
+) : NSObject(),
+    CBPeripheralManagerDelegateProtocol {
     internal interface Handler {
         fun onStateUpdated(peripheral: CBPeripheralManager)
-        fun onRead(peripheral: CBPeripheralManager, request: CBATTRequest)
-        fun onWrite(peripheral: CBPeripheralManager, requests: List<*>)
-        fun onStartAdvertising(peripheral: CBPeripheralManager, error: NSError?)
-        fun onAddService(peripheral: CBPeripheralManager, service: CBService, error: NSError?)
+
+        fun onRead(
+            peripheral: CBPeripheralManager,
+            request: CBATTRequest,
+        )
+
+        fun onWrite(
+            peripheral: CBPeripheralManager,
+            requests: List<*>,
+        )
+
+        fun onStartAdvertising(
+            peripheral: CBPeripheralManager,
+            error: NSError?,
+        )
+
+        fun onAddService(
+            peripheral: CBPeripheralManager,
+            service: CBService,
+            error: NSError?,
+        )
+
         fun onReadyToUpdateSubscribers(peripheral: CBPeripheralManager)
-        fun onSubscribe(peripheral: CBPeripheralManager, central: CBCentral, characteristic: CBCharacteristic)
+
+        fun onSubscribe(
+            peripheral: CBPeripheralManager,
+            central: CBCentral,
+            characteristic: CBCharacteristic,
+        )
     }
 
     override fun peripheralManagerDidUpdateState(peripheral: CBPeripheralManager) {
@@ -30,21 +53,21 @@ internal class GattServerDelegate(
 
     override fun peripheralManager(
         peripheral: CBPeripheralManager,
-        didReceiveReadRequest: CBATTRequest
+        didReceiveReadRequest: CBATTRequest,
     ) {
         handler.onRead(peripheral, didReceiveReadRequest)
     }
 
     override fun peripheralManager(
         peripheral: CBPeripheralManager,
-        didReceiveWriteRequests: List<*>
+        didReceiveWriteRequests: List<*>,
     ) {
         handler.onWrite(peripheral, didReceiveWriteRequests)
     }
 
     override fun peripheralManagerDidStartAdvertising(
         peripheral: CBPeripheralManager,
-        error: NSError?
+        error: NSError?,
     ) {
         handler.onStartAdvertising(peripheral, error)
     }
@@ -52,7 +75,7 @@ internal class GattServerDelegate(
     override fun peripheralManager(
         peripheral: CBPeripheralManager,
         didAddService: CBService,
-        error: NSError?
+        error: NSError?,
     ) {
         handler.onAddService(peripheral, didAddService, error)
     }
@@ -65,7 +88,7 @@ internal class GattServerDelegate(
     override fun peripheralManager(
         peripheral: CBPeripheralManager,
         central: CBCentral,
-        didSubscribeToCharacteristic: CBCharacteristic
+        didSubscribeToCharacteristic: CBCharacteristic,
     ) {
         handler.onSubscribe(peripheral, central, didSubscribeToCharacteristic)
     }
@@ -74,4 +97,3 @@ internal class GattServerDelegate(
         handler.onReadyToUpdateSubscribers(toUpdateSubscribers)
     }
 }
-

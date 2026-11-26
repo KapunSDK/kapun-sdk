@@ -21,39 +21,44 @@ import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.module
 
 /** Persists user-added trust anchors in the wallet database. */
-class TrustAnchorRepository private constructor(db: KapunDatabase) {
+class TrustAnchorRepository private constructor(
+    db: KapunDatabase,
+) {
+    companion object {
+        val koinModule =
+            module {
+                singleOf(::TrustAnchorRepository)
+            }
+    }
 
-	companion object {
-		val koinModule = module {
-			singleOf(::TrustAnchorRepository)
-		}
-	}
+    private val queries = db.trustAnchorQueries
 
-	private val queries = db.trustAnchorQueries
+    fun getAll() = queries.getAll().executeAsList().map { it.toModel() }
 
-	fun getAll() = queries.getAll().executeAsList().map { it.toModel() }
+    fun getByFramework(trustFrameworkId: String) =
+        queries.getByFramework(trustFrameworkId).executeAsList().map { it.toModel() }
 
-	fun getByFramework(trustFrameworkId: String) =
-		queries.getByFramework(trustFrameworkId).executeAsList().map { it.toModel() }
+    fun save(trustAnchor: TrustAnchorInfo) =
+        queries.insert(
+            trustAnchor.trustFrameworkId,
+            trustAnchor.key,
+            trustAnchor.subject,
+        )
 
-	fun save(trustAnchor: TrustAnchorInfo) = queries.insert(
-		trustAnchor.trustFrameworkId,
-		trustAnchor.key,
-		trustAnchor.subject,
-	)
+    fun remove(trustAnchor: TrustAnchorInfo) =
+        queries.remove(
+            trustAnchor.trustFrameworkId,
+            trustAnchor.key,
+            trustAnchor.subject,
+        )
 
-	fun remove(trustAnchor: TrustAnchorInfo) = queries.remove(
-		trustAnchor.trustFrameworkId,
-		trustAnchor.key,
-		trustAnchor.subject,
-	)
+    fun clear() = queries.clear()
 
-	fun clear() = queries.clear()
-
-	private fun org.kapunsdk.wallet.TrustAnchorEntity.toModel() = TrustAnchorInfo(
-		key = key,
-		subject = subject,
-		trustFrameworkId = trust_framework_id,
-		isRemovable = true,
-	)
+    private fun org.kapunsdk.wallet.TrustAnchorEntity.toModel() =
+        TrustAnchorInfo(
+            key = key,
+            subject = subject,
+            trustFrameworkId = trust_framework_id,
+            isRemovable = true,
+        )
 }

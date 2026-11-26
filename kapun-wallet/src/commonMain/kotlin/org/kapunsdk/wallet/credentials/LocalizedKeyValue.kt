@@ -19,4 +19,8 @@ package org.kapunsdk.wallet.credentials
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class LocalizedKeyValue(val translationKey: String, val value: String, val label: String? = null)
+data class LocalizedKeyValue(
+    val translationKey: String,
+    val value: String,
+    val label: String? = null,
+)

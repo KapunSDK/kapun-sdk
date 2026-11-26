@@ -16,14 +16,18 @@ under the License.
 
 package org.kapunsdk.visualization.oca.model.content
 
-import org.kapunsdk.visualization.oca.serialization.EntryCodeValueSerializer
 import kotlinx.serialization.Serializable
+import org.kapunsdk.visualization.oca.serialization.EntryCodeValueSerializer
 
 @Serializable(with = EntryCodeValueSerializer::class)
 sealed interface EntryCodeValue {
-	@Serializable
-	data class Reference(val reference: String) : EntryCodeValue
+    @Serializable
+    data class Reference(
+        val reference: String,
+    ) : EntryCodeValue
 
-	@Serializable
-	data class Predefined(val keys: List<String>) : EntryCodeValue
+    @Serializable
+    data class Predefined(
+        val keys: List<String>,
+    ) : EntryCodeValue
 }

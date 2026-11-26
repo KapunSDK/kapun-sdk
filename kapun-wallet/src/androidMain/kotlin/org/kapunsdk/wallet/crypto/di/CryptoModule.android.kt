@@ -23,5 +23,5 @@ import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.bind
 
 actual fun Module.nativeSignerFactory() {
-	singleOf(::AndroidHardwareSignerFactory).bind<HardwareSignerFactory>()
+    singleOf(::AndroidHardwareSignerFactory).bind<HardwareSignerFactory>()
 }

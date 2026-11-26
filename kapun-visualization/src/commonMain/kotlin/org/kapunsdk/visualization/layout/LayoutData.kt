@@ -18,33 +18,35 @@ package org.kapunsdk.visualization.layout
 
 import org.kapunsdk.visualization.oca.model.content.TextShade
 
-fun deferredCard(name: String) : LayoutData.Card {
-	return LayoutData.Card(
-		name,
-		"",
-		"Deferred Issuance: $name",
-		"Touch for issuance trial",
-		TextShade.DARK,
-		0xffffffffL,
-		null,
-		null
-	)
-}
+fun deferredCard(name: String): LayoutData.Card =
+    LayoutData.Card(
+        name,
+        "",
+        "Deferred Issuance: $name",
+        "Touch for issuance trial",
+        TextShade.DARK,
+        0xffffffffL,
+        null,
+        null,
+    )
+
 sealed interface LayoutData {
+    data class Card(
+        val credentialName: String?,
+        val issuerName: String?,
+        val title: String?,
+        val subtitle: String?,
+        val textColor: TextShade,
+        val cardColor: Long?,
+        val backgroundImage: LayoutCardImage?,
+        val overlays: List<LayoutCardOverlay>?,
+    ) : LayoutData
 
-	data class Card(
-		val credentialName: String?,
-		val issuerName: String?,
-		val title: String?,
-		val subtitle: String?,
-		val textColor: TextShade,
-		val cardColor: Long?,
-		val backgroundImage: LayoutCardImage?,
-		val overlays: List<LayoutCardOverlay>?
-	) : LayoutData
+    data class DetailList(
+        val sections: List<LayoutSection>,
+    ) : LayoutData
 
-	data class DetailList(val sections: List<LayoutSection>) : LayoutData
-
-	data class Raw(val payload: String) : LayoutData
-
+    data class Raw(
+        val payload: String,
+    ) : LayoutData
 }

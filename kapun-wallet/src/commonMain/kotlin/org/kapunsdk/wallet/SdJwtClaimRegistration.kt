@@ -16,12 +16,12 @@ import org.kapunsdk.registerInvalidAndUndisclosableClaims as registerW3cClaims
  * by the standalone SD-JWT, W3C, and wallet native components.
  */
 public fun registerInvalidAndUndisclosableClaims(
-	illegalClaims: List<String> = emptyList(),
-	undisclosableClaims: List<String> = emptyList(),
+    illegalClaims: List<String> = emptyList(),
+    undisclosableClaims: List<String> = emptyList(),
 ) {
-	registerW3cClaims(illegalClaims, undisclosableClaims)
-	uniffi.kapun_wallet_rust.registerInvalidAndUndisclosableClaims(
-		illegalClaims,
-		undisclosableClaims,
-	)
+    registerW3cClaims(illegalClaims, undisclosableClaims)
+    uniffi.kapun_wallet_rust.registerInvalidAndUndisclosableClaims(
+        illegalClaims,
+        undisclosableClaims,
+    )
 }

@@ -16,9 +16,9 @@ under the License.
 
 package org.kapunsdk
 
-import org.kapunsdk.credentials.SdJwtErrors
 import org.kapunsdk.credentials.SdJwt
 import org.kapunsdk.credentials.SdJwt.Companion.SD_JWT_FORMATS
+import org.kapunsdk.credentials.SdJwtErrors
 import org.kapunsdk.credentials.toClaimsPointer
 import org.kapunsdk.util.extensions.asArray
 import org.kapunsdk.util.extensions.asString
@@ -30,27 +30,33 @@ import uniffi.kapun_dcql_rust.ClaimsQuery
 import uniffi.kapun_dcql_rust.CredentialQuery
 import uniffi.kapun_util_rust.Value
 
-fun SdJwt.getVpToken(authRequestObject: Value,
-                     inputDescriptorId: String,
-                     audience: String,
-                     transactionData: List<String>?,
-                     specVersion: SpecVersion?,
-                     nonce: String,
-                     signer: SignatureCreator,
-                     overrideDisclosures: List<List<PointerPart>>? = null) : Result<String> {
+fun SdJwt.getVpToken(
+    authRequestObject: Value,
+    inputDescriptorId: String,
+    audience: String,
+    transactionData: List<String>?,
+    specVersion: SpecVersion?,
+    nonce: String,
+    signer: SignatureCreator,
+    overrideDisclosures: List<List<PointerPart>>? = null,
+): Result<String> {
     val builder = this.presentation()
     builder.withAudience(audience)
     builder.withNonce(nonce)
     if (transactionData != null && specVersion != null) {
-        builder.withTransactionData(transactionData, specVersion);
+        builder.withTransactionData(transactionData, specVersion)
     }
     // useful for tests
     overrideDisclosures?.let {
         it.forEach { ptr -> builder.addDisclosure(ptr) }
         return Result.success(builder.build(signer.asNativeSdJwtSignatureCreator()))
     }
-    val inputDescriptors = authRequestObject["presentation_definition"]["input_descriptors"].asArray() ?: return Result.failure(SdJwtErrors.InvalidFormat(""))
-    val inputDescriptor = inputDescriptors.find { it["id"].asString() == inputDescriptorId } ?: return Result.failure(SdJwtErrors.InvalidFormat(""))
+    val inputDescriptors =
+        authRequestObject["presentation_definition"]["input_descriptors"].asArray()
+            ?: return Result.failure(SdJwtErrors.InvalidFormat(""))
+    val inputDescriptor =
+        inputDescriptors.find { it["id"].asString() == inputDescriptorId }
+            ?: return Result.failure(SdJwtErrors.InvalidFormat(""))
     inputDescriptor["constraints"]["fields"].asArray()?.forEach {
         val path = it["path"].asArray() ?: return@forEach
 //        val optional = it["optional"].asBoolean() ?: false
@@ -74,17 +80,20 @@ fun SdJwt.getVpToken(authRequestObject: Value,
 val ARRAY_INDICES = Regex("\\[(\\d+)]")
 val PROPERTY_INDICES = Regex("\\[('.+?')]")
 
-fun transformDisclosurePath(path: String) : List<PointerPart>? {
+fun transformDisclosurePath(path: String): List<PointerPart>? {
     val p2 = path.replace(ARRAY_INDICES, "/$1")
     val p3 = p2.replace(PROPERTY_INDICES, "/$1")
-    return p3.replace("$", "")
+    return p3
+        .replace("$", "")
         .replace(".", "/")
         .replace("[", "")
         .replace("]", "")
         .replace("'", "")
         .replace("\"", "")
-        .trimStart('/').split("/").toClaimsPointer()?.path
-
+        .trimStart('/')
+        .split("/")
+        .toClaimsPointer()
+        ?.path
 }
 
 fun SdJwt.getVpToken(
@@ -94,7 +103,7 @@ fun SdJwt.getVpToken(
     specVersion: SpecVersion?,
     nonce: String,
     signer: SignatureCreator?,
-    overrideDisclosures: List<List<PointerPart>>? = null
+    overrideDisclosures: List<List<PointerPart>>? = null,
 ): Result<String> {
     if (!SD_JWT_FORMATS.contains(query.format)) {
         return Result.failure(SdJwtErrors.InvalidFormat(query.format))
@@ -108,6 +117,6 @@ fun SdJwt.getVpToken(
         specVersion,
         nonce,
         signer,
-        overrideDisclosures
+        overrideDisclosures,
     )
 }

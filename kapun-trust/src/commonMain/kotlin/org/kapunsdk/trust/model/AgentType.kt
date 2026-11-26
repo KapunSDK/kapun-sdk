@@ -17,6 +17,6 @@ under the License.
 package org.kapunsdk.trust.model
 
 enum class AgentType {
-	ISSUER,
-	VERIFIER,
+    ISSUER,
+    VERIFIER,
 }

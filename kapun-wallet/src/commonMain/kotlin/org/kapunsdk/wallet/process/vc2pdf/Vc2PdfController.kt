@@ -16,54 +16,54 @@ under the License.
 
 package org.kapunsdk.wallet.process.vc2pdf
 
-import org.kapunsdk.util.log.Logger
-import org.kapunsdk.wallet.process.ProcessRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.launch
+import org.kapunsdk.util.log.Logger
+import org.kapunsdk.wallet.process.ProcessRepository
 import org.koin.dsl.module
 
 class Vc2PdfController private constructor(
-	private val processRepository: ProcessRepository,
-	private val scope: CoroutineScope,
+    private val processRepository: ProcessRepository,
+    private val scope: CoroutineScope,
 ) {
-	companion object {
-		val koinModule = module {
-			factory { (scope: CoroutineScope) ->
-				Vc2PdfController(
-					processRepository = get(),
-					scope = scope,
-				)
-			}
-		}
-	}
+    companion object {
+        val koinModule =
+            module {
+                factory { (scope: CoroutineScope) ->
+                    Vc2PdfController(
+                        processRepository = get(),
+                        scope = scope,
+                    )
+                }
+            }
+    }
 
-	val currentProcessStep = processRepository.currentProcessStep
+    val currentProcessStep = processRepository.currentProcessStep
 
-	fun resetState() {
-		scope.launch(Dispatchers.IO) {
-			processRepository.cancelProcess()
-		}
-	}
+    fun resetState() {
+        scope.launch(Dispatchers.IO) {
+            processRepository.cancelProcess()
+        }
+    }
 
-	// VC2PDF methods
-	fun startVc2PdfConversion(flowId: String = "4") {
-		scope.launch(Dispatchers.IO) {
-			Logger.debug("Vc2PdfProcessEvent.InitiateCredentialToPdf with flowId: $flowId")
-			processRepository.continueProcess(
-				Vc2PdfProcessEvent.InitiateCredentialToPdf(flowId)
-			)
-		}
-	}
+    // VC2PDF methods
+    fun startVc2PdfConversion(flowId: String = "4") {
+        scope.launch(Dispatchers.IO) {
+            Logger.debug("Vc2PdfProcessEvent.InitiateCredentialToPdf with flowId: $flowId")
+            processRepository.continueProcess(
+                Vc2PdfProcessEvent.InitiateCredentialToPdf(flowId),
+            )
+        }
+    }
 
-	fun onPresentationCompleted(redirectUri: String) {
-		scope.launch(Dispatchers.IO) {
-			Logger.debug("Vc2PdfProcessEvent.PresentationCompleted with URI: $redirectUri")
-			processRepository.continueProcess(
-				Vc2PdfProcessEvent.PresentationCompleted(redirectUri)
-			)
-		}
-	}
-
+    fun onPresentationCompleted(redirectUri: String) {
+        scope.launch(Dispatchers.IO) {
+            Logger.debug("Vc2PdfProcessEvent.PresentationCompleted with URI: $redirectUri")
+            processRepository.continueProcess(
+                Vc2PdfProcessEvent.PresentationCompleted(redirectUri),
+            )
+        }
+    }
 }

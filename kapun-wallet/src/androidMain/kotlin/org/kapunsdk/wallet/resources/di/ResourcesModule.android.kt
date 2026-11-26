@@ -23,5 +23,5 @@ import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.bind
 
 actual fun Module.stringResourceProviderModule() {
-	singleOf(::AndroidStringResourceProvider).bind<StringResourceProvider>()
+    singleOf(::AndroidStringResourceProvider).bind<StringResourceProvider>()
 }

@@ -15,23 +15,27 @@ under the License.
  */
 package org.kapunsdk.visualization.oca.model.overlay.presentation
 
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import org.kapunsdk.visualization.oca.model.SAID_HASH_PLACEHOLDER
 import org.kapunsdk.visualization.oca.model.content.AttributeName
 import org.kapunsdk.visualization.oca.model.content.SAID
 import org.kapunsdk.visualization.oca.model.overlay.Overlay
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
 
 /** The display order of a capture base's attributes (lower first). */
 @Serializable
 data class OrderOverlay(
-	@SerialName("attribute_orders") val attributeOrders: Map<AttributeName, Int>,
-	@SerialName("capture_base") override val captureBase: SAID,
-	@SerialName("type") override val type: String = "extend/overlays/order/1.0",
-	@SerialName("digest") override val digest: SAID = SAID_HASH_PLACEHOLDER,
+    @SerialName("attribute_orders") val attributeOrders: Map<AttributeName, Int>,
+    @SerialName("capture_base") override val captureBase: SAID,
+    @SerialName("type") override val type: String = "extend/overlays/order/1.0",
+    @SerialName("digest") override val digest: SAID = SAID_HASH_PLACEHOLDER,
 ) : PresentationOverlay {
+    fun getOrder(attributeName: AttributeName) = attributeOrders[attributeName]
 
-	fun getOrder(attributeName: AttributeName) = attributeOrders[attributeName]
-	override fun updateDigest(digest: SAID, captureBase: SAID): Overlay = copy(digest = digest, captureBase = captureBase)
-	override fun presentsAttributes() = attributeOrders.keys.toList()
+    override fun updateDigest(
+        digest: SAID,
+        captureBase: SAID,
+    ): Overlay = copy(digest = digest, captureBase = captureBase)
+
+    override fun presentsAttributes() = attributeOrders.keys.toList()
 }

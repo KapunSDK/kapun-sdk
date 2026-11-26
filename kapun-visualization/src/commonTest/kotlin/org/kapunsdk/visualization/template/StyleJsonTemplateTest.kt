@@ -21,46 +21,48 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class StyleJsonTemplateTest {
+    private val data =
+        mapOf(
+            "given_name" to "John",
+            "family_name" to "Doe",
+        )
 
-	private val data = mapOf(
-		"given_name" to "John",
-		"family_name" to "Doe",
-	)
+    @Test
+    fun `Test replacing a single placeholder`() {
+        val inputToExpected =
+            mapOf(
+                "{{unknown}}" to "{{unknown}}",
+                "{{ unknown }}" to "{{ unknown }}",
+                "{{given_name}}" to "John",
+                "{{ given_name }}" to "John",
+                "My first name is {{ given_name }}" to "My first name is John",
+                "{{family_name}}" to "Doe",
+                "{{ family_name }}" to "Doe",
+                "{{ family_name }} is my last name" to "Doe is my last name",
+            )
 
-	@Test
-	fun `Test replacing a single placeholder`() {
-		val inputToExpected = mapOf(
-			"{{unknown}}" to "{{unknown}}",
-			"{{ unknown }}" to "{{ unknown }}",
-			"{{given_name}}" to "John",
-			"{{ given_name }}" to "John",
-			"My first name is {{ given_name }}" to "My first name is John",
-			"{{family_name}}" to "Doe",
-			"{{ family_name }}" to "Doe",
-			"{{ family_name }} is my last name" to "Doe is my last name",
-		)
+        inputToExpected.forEach { (input, expected) ->
+            val actual = StyleJsonTemplate(input).interpolate { data[it] }
+            assertEquals(expected, actual, "Input '$input' didn't interpolate as expected")
+        }
+    }
 
-		inputToExpected.forEach { (input, expected) ->
-			val actual = StyleJsonTemplate(input).interpolate { data[it] }
-			assertEquals(expected, actual, "Input '$input' didn't interpolate as expected")
-		}
-	}
+    @Test
+    fun `Test replacing multiple placeholders`() {
+        val inputToExpected =
+            mapOf(
+                "{{ given_name }} {{ family_name }}" to "John Doe",
+                "{{ given_name }}{{ family_name }}" to "JohnDoe",
+                "My name is {{ given_name }} {{ family_name }}" to "My name is John Doe",
+                "{{ given_name }} {{ family_name }} is my name" to "John Doe is my name",
+                "{{ given_name }} is my first name and my last name is {{ family_name }}" to
+                    "John is my first name and my last name is Doe",
+                "One {{ given_name }} Two {{ family_name }} Three" to "One John Two Doe Three",
+            )
 
-	@Test
-	fun `Test replacing multiple placeholders`() {
-		val inputToExpected = mapOf(
-			"{{ given_name }} {{ family_name }}" to "John Doe",
-			"{{ given_name }}{{ family_name }}" to "JohnDoe",
-			"My name is {{ given_name }} {{ family_name }}" to "My name is John Doe",
-			"{{ given_name }} {{ family_name }} is my name" to "John Doe is my name",
-			"{{ given_name }} is my first name and my last name is {{ family_name }}" to "John is my first name and my last name is Doe",
-			"One {{ given_name }} Two {{ family_name }} Three" to "One John Two Doe Three",
-		)
-
-		inputToExpected.forEach { (input, expected) ->
-			val actual = StyleJsonTemplate(input).interpolate { data[it] }
-			assertEquals(expected, actual, "Input '$input' didn't interpolate as expected")
-		}
-	}
-
+        inputToExpected.forEach { (input, expected) ->
+            val actual = StyleJsonTemplate(input).interpolate { data[it] }
+            assertEquals(expected, actual, "Input '$input' didn't interpolate as expected")
+        }
+    }
 }

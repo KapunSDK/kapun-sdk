@@ -21,43 +21,42 @@ import org.kapunsdk.wallet.process.ProcessEvent
 import uniffi.kapun_dcql_bbs_rust.DeviceBindingType
 
 sealed interface RemotePresentationProcessEvent : ProcessEvent {
+    data class PresentationRequested(
+        val qrCodeData: String,
+        val presentationScope: String? = null,
+        val authSession: String? = null,
+        val isDCApi: Boolean = false,
+        val selectedId: String? = null,
+        val origin: String? = null,
+        val useLegacyVpToken: Boolean = false,
+        val zkpDeviceBindingType: DeviceBindingType = DeviceBindingType.SIGMA,
+    ) : RemotePresentationProcessEvent
 
-	data class PresentationRequested(
-		val qrCodeData: String,
-		val presentationScope: String? = null,
-		val authSession: String? = null,
-		val isDCApi: Boolean = false,
-		val selectedId : String? = null,
-		val origin: String? = null,
-		val useLegacyVpToken: Boolean = false,
-		val zkpDeviceBindingType: DeviceBindingType = DeviceBindingType.SIGMA
-	) : RemotePresentationProcessEvent
+    data class PinEntered(
+        val pin: String,
+        val viewModel: Map.Entry<String, CredentialSelectionUiModel>,
+        val credentialsWithPin: List<Map.Entry<String, CredentialSelectionUiModel>>,
+        val credentialsWithFrost: List<Map.Entry<String, CredentialSelectionUiModel>>,
+    ) : RemotePresentationProcessEvent
 
-	data class PinEntered(
-		val pin: String,
-		val viewModel: Map.Entry<String, CredentialSelectionUiModel>,
-		val credentialsWithPin: List<Map.Entry<String, CredentialSelectionUiModel>>,
-		val credentialsWithFrost: List<Map.Entry<String, CredentialSelectionUiModel>>,
-	) : RemotePresentationProcessEvent
+    data class PassphraseEntered(
+        val passphrase: String,
+        val viewModel: Map.Entry<String, CredentialSelectionUiModel>,
+        val credentialsWithFrost: List<Map.Entry<String, CredentialSelectionUiModel>>,
+    ) : RemotePresentationProcessEvent
 
-	data class PassphraseEntered(
-		val passphrase: String,
-		val viewModel: Map.Entry<String, CredentialSelectionUiModel>,
-		val credentialsWithFrost: List<Map.Entry<String, CredentialSelectionUiModel>>,
-	) : RemotePresentationProcessEvent
+    data class CredentialSelected(
+        val credentialMapping: Map<String, CredentialSelectionUiModel>,
+    ) : RemotePresentationProcessEvent
 
-	data class CredentialSelected(
-		val credentialMapping: Map<String, CredentialSelectionUiModel>,
-	) : RemotePresentationProcessEvent
+    /**
+     * User requested to try loading new tokens (refresh/issuance handled externally by UI).
+     * After external refresh completes, the handler will call continueWithCredentialSelection() again.
+     */
+    data object RefreshRequested : RemotePresentationProcessEvent
 
-	/**
-	 * User requested to try loading new tokens (refresh/issuance handled externally by UI).
-	 * After external refresh completes, the handler will call continueWithCredentialSelection() again.
-	 */
-	data object RefreshRequested : RemotePresentationProcessEvent
-
-	/**
-	 * User requested to fallback to a random selection of used-but-valid credentials.
-	 */
-	data object FallbackRandomRequested : RemotePresentationProcessEvent
+    /**
+     * User requested to fallback to a random selection of used-but-valid credentials.
+     */
+    data object FallbackRandomRequested : RemotePresentationProcessEvent
 }

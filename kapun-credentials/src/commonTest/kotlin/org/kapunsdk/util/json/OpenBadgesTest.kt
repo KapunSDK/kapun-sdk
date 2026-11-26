@@ -10,12 +10,11 @@ class OpenBadgesTest {
     fun `Creating an verifying an OpenBadge Credential should work`() {
         val issuerKey = SoftwareKeyPair()
 
-        val credential = W3C.OpenBadge303.create(
-            claims = Value.Object(mapOf()),
-            keyId = "",
-            key = TestSigner(issuerKey)
-        )
-
-
+        val credential =
+            W3C.OpenBadge303.create(
+                claims = Value.Object(mapOf()),
+                keyId = "",
+                key = TestSigner(issuerKey),
+            )
     }
 }

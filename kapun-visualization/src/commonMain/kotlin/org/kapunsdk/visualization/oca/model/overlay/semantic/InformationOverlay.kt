@@ -16,23 +16,27 @@ under the License.
 
 package org.kapunsdk.visualization.oca.model.overlay.semantic
 
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import org.kapunsdk.visualization.oca.model.SAID_HASH_PLACEHOLDER
 import org.kapunsdk.visualization.oca.model.content.AttributeName
 import org.kapunsdk.visualization.oca.model.content.SAID
 import org.kapunsdk.visualization.oca.model.overlay.Localized
 import org.kapunsdk.visualization.oca.model.overlay.Overlay
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
 
 @Serializable
 data class InformationOverlay(
-	@SerialName("attribute_information") val attributeInformation: Map<AttributeName, String>,
-	@SerialName("capture_base") override val captureBase: SAID,
-	@SerialName("type") override val type: String = "spec/overlays/information/1.0",
-	@SerialName("language") override val language: String,
-	@SerialName("digest") override val digest: SAID = SAID_HASH_PLACEHOLDER,
-) : SemanticOverlay, Localized {
+    @SerialName("attribute_information") val attributeInformation: Map<AttributeName, String>,
+    @SerialName("capture_base") override val captureBase: SAID,
+    @SerialName("type") override val type: String = "spec/overlays/information/1.0",
+    @SerialName("language") override val language: String,
+    @SerialName("digest") override val digest: SAID = SAID_HASH_PLACEHOLDER,
+) : SemanticOverlay,
+    Localized {
+    fun getInformation(attributeName: AttributeName) = attributeInformation[attributeName]
 
-	fun getInformation(attributeName: AttributeName) = attributeInformation[attributeName]
-	override fun updateDigest(digest: SAID, captureBase: SAID): Overlay = copy(digest = digest, captureBase = captureBase)
+    override fun updateDigest(
+        digest: SAID,
+        captureBase: SAID,
+    ): Overlay = copy(digest = digest, captureBase = captureBase)
 }

@@ -25,41 +25,43 @@ import org.kapunsdk.wallet.process.legacy.presentation.PresentationError
 import org.kapunsdk.wallet.process.presentation.PresentationStep
 
 sealed interface ProximityPresentationProcessStep : ProcessStep {
+    data class Error(
+        val errorMessage: String,
+        val errorCode: String? = null,
+        val cause: Exception? = null,
+        val retry: (() -> Unit)? = null,
+    ) : ProximityPresentationProcessStep
 
-	data class Error(
-		val errorMessage: String,
-		val errorCode: String? = null,
-		val cause: Exception? = null,
-		val retry: (() -> Unit)? = null,
-	) : ProximityPresentationProcessStep
+    data class QrCodeEngagementReady(
+        val engagementData: String,
+    ) : ProximityPresentationProcessStep
 
-	data class QrCodeEngagementReady(val engagementData: String) : ProximityPresentationProcessStep
+    data object PeerConnecting : ProximityPresentationProcessStep
 
-	data object PeerConnecting : ProximityPresentationProcessStep
-	data object PeerConnected: ProximityPresentationProcessStep
+    data object PeerConnected : ProximityPresentationProcessStep
 
-	data class CredentialSelection(
-		override val presentationModel: PresentationUiModel,
-		override val agentInformation: AgentInformation,
-		override val validationInfo: ValidationInfo? = null
-	) : ProximityPresentationProcessStep, PresentationStep.CredentialSelection
+    data class CredentialSelection(
+        override val presentationModel: PresentationUiModel,
+        override val agentInformation: AgentInformation,
+        override val validationInfo: ValidationInfo? = null,
+    ) : ProximityPresentationProcessStep,
+        PresentationStep.CredentialSelection
 
-	data class EnterPin(
-		val viewModel: Map.Entry<String, CredentialSelectionUiModel>,
-		val credentialsWithPin: MutableList<Map.Entry<String, CredentialSelectionUiModel>>,
-		val credentialsWithFrost: MutableList<Map.Entry<String, CredentialSelectionUiModel>>,
-		val needsBiometry: Boolean = false,
-		val error: PresentationError? = null,
-	) : ProximityPresentationProcessStep
+    data class EnterPin(
+        val viewModel: Map.Entry<String, CredentialSelectionUiModel>,
+        val credentialsWithPin: MutableList<Map.Entry<String, CredentialSelectionUiModel>>,
+        val credentialsWithFrost: MutableList<Map.Entry<String, CredentialSelectionUiModel>>,
+        val needsBiometry: Boolean = false,
+        val error: PresentationError? = null,
+    ) : ProximityPresentationProcessStep
 
-	data class EnterPassphrase(
-		val viewModel: Map.Entry<String, CredentialSelectionUiModel>,
-		val credentialsWithFrost: MutableList<Map.Entry<String, CredentialSelectionUiModel>>,
-		val error: PresentationError? = null,
-	) : ProximityPresentationProcessStep
+    data class EnterPassphrase(
+        val viewModel: Map.Entry<String, CredentialSelectionUiModel>,
+        val credentialsWithFrost: MutableList<Map.Entry<String, CredentialSelectionUiModel>>,
+        val error: PresentationError? = null,
+    ) : ProximityPresentationProcessStep
 
-	data class Success(
-		val token: ByteArray
-	) : ProximityPresentationProcessStep
-
+    data class Success(
+        val token: ByteArray,
+    ) : ProximityPresentationProcessStep
 }

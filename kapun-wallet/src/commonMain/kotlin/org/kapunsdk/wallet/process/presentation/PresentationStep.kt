@@ -22,8 +22,8 @@ import org.kapunsdk.wallet.credentials.presentation.PresentationUiModel
 
 interface PresentationStep {
     interface CredentialSelection {
-        val presentationModel : PresentationUiModel
+        val presentationModel: PresentationUiModel
         val agentInformation: AgentInformation
-        val validationInfo : ValidationInfo?
+        val validationInfo: ValidationInfo?
     }
 }

@@ -16,18 +16,21 @@ under the License.
 
 package org.kapunsdk
 
-import org.kapunsdk.credentials.W3C.Companion.W3C_FORMATS
 import org.kapunsdk.credentials.*
-import uniffi.kapun_credential_core_rust.SignatureCreator
+import org.kapunsdk.credentials.W3C.Companion.W3C_FORMATS
 import uniffi.kapun_credential_core_rust.*
-import uniffi.kapun_dcql_sdjwt_rust.*
-import uniffi.kapun_dcql_w3c_rust.*
+import uniffi.kapun_credential_core_rust.SignatureCreator
 import uniffi.kapun_dcql_openbadges_rust.*
 import uniffi.kapun_dcql_rust.CredentialQuery
+import uniffi.kapun_dcql_sdjwt_rust.*
+import uniffi.kapun_dcql_w3c_rust.*
 
-sealed class W3CPresentationError(msg: String) : Exception(msg) {
-    data class InvalidFormat(val format: String) :
-        W3CPresentationError("Invalid format for W3C Credential: $format")
+sealed class W3CPresentationError(
+    msg: String,
+) : Exception(msg) {
+    data class InvalidFormat(
+        val format: String,
+    ) : W3CPresentationError("Invalid format for W3C Credential: $format")
 }
 
 fun W3C.getVpToken(
@@ -37,7 +40,7 @@ fun W3C.getVpToken(
     specVersion: SpecVersion?,
     nonce: String,
     signer: SignatureCreator?,
-    overrideDisclosures: List<List<PointerPart>>? = null
+    overrideDisclosures: List<List<PointerPart>>? = null,
 ): Result<String> {
     if (!W3C_FORMATS.contains(query.format)) {
         return Result.failure(W3CPresentationError.InvalidFormat(query.format))
@@ -52,6 +55,6 @@ fun W3C.getVpToken(
         specVersion,
         nonce,
         signer,
-        overrideDisclosures
+        overrideDisclosures,
     )
 }

@@ -16,25 +16,28 @@ under the License.
 
 package org.kapunsdk.visualization.oca.model.overlay.transformation
 
-import org.kapunsdk.visualization.oca.model.SAID_HASH_PLACEHOLDER
-import org.kapunsdk.visualization.oca.model.content.AttributeName
-import org.kapunsdk.visualization.oca.model.content.SAID
-import org.kapunsdk.visualization.oca.model.overlay.Overlay
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonNames
+import org.kapunsdk.visualization.oca.model.SAID_HASH_PLACEHOLDER
+import org.kapunsdk.visualization.oca.model.content.AttributeName
+import org.kapunsdk.visualization.oca.model.content.SAID
+import org.kapunsdk.visualization.oca.model.overlay.Overlay
 
 @OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class UnitMappingOverlay(
-	@SerialName("metric_system") val metricSystem: String,
-	@SerialName("code_table") val codeTable: SAID,
-	@JsonNames("attribute_units", "attr_units") val attributeUnits: Map<AttributeName, String>,
-	@SerialName("capture_base") override val captureBase: SAID,
-	@SerialName("type") override val type: String = "spec/overlays/unit/1.0",
-	@SerialName("digest") override val digest: SAID = SAID_HASH_PLACEHOLDER,
-	// TODO The spec used this type twice for the Unit and UnitMapping overlays
+    @SerialName("metric_system") val metricSystem: String,
+    @SerialName("code_table") val codeTable: SAID,
+    @JsonNames("attribute_units", "attr_units") val attributeUnits: Map<AttributeName, String>,
+    @SerialName("capture_base") override val captureBase: SAID,
+    @SerialName("type") override val type: String = "spec/overlays/unit/1.0",
+    @SerialName("digest") override val digest: SAID = SAID_HASH_PLACEHOLDER,
+    // TODO The spec used this type twice for the Unit and UnitMapping overlays
 ) : TransformationOverlay {
-	override fun updateDigest(digest: SAID, captureBase: SAID): Overlay = copy(digest = digest, captureBase = captureBase)
+    override fun updateDigest(
+        digest: SAID,
+        captureBase: SAID,
+    ): Overlay = copy(digest = digest, captureBase = captureBase)
 }

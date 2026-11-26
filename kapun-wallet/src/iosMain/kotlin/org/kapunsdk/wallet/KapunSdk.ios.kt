@@ -27,40 +27,41 @@ import org.kapunsdk.wallet.di.KapunWalletKoinContext
 import org.koin.dsl.module
 
 actual class KapunSdk(
-	private val hardwareSignerFactory: HardwareSignerFactory,
+    private val hardwareSignerFactory: HardwareSignerFactory,
 ) {
+    actual fun initialize(
+        logSink: LogSink?,
+        databaseName: String,
+    ) {
+        initialize(logSink, databaseName, KapunNetworkConfiguration())
+    }
 
-	actual fun initialize(logSink: LogSink?, databaseName: String) {
-		initialize(logSink, databaseName, KapunNetworkConfiguration())
-	}
+    actual fun initialize(
+        logSink: LogSink?,
+        databaseName: String,
+        networkConfiguration: KapunNetworkConfiguration,
+    ) {
+        Logger.sink = logSink
+        bridgeAllRustLogSinks()
+        uniffi.kapun_wallet_rust.setUntrustedTls(networkConfiguration.allowUntrustedCertificates)
+        uniffi.kapun_wallet_rust.setUserAgent(networkConfiguration.userAgent)
+        uniffi.kapun_util_rust.setUserAgent(networkConfiguration.userAgent)
+        KapunTrust().initialize(networkConfiguration)
+        KapunIssuance().initialize(networkConfiguration)
+        KapunVisualization().initialize()
+        KapunWalletKoinContext.initialize(databaseName, networkConfiguration) {
+            modules(
+                module {
+                    single<HardwareSignerFactory> { hardwareSignerFactory }
+                },
+            )
+        }
+        logKapunSdkInitialized()
+    }
 
-	actual fun initialize(
-		logSink: LogSink?,
-		databaseName: String,
-		networkConfiguration: KapunNetworkConfiguration,
-	) {
-		Logger.sink = logSink
-		bridgeAllRustLogSinks()
-		uniffi.kapun_wallet_rust.setUntrustedTls(networkConfiguration.allowUntrustedCertificates)
-		uniffi.kapun_wallet_rust.setUserAgent(networkConfiguration.userAgent)
-		uniffi.kapun_util_rust.setUserAgent(networkConfiguration.userAgent)
-		KapunTrust().initialize(networkConfiguration)
-		KapunIssuance().initialize(networkConfiguration)
-		KapunVisualization().initialize()
-		KapunWalletKoinContext.initialize(databaseName, networkConfiguration) {
-			modules(
-				module {
-					single<HardwareSignerFactory> { hardwareSignerFactory }
-				},
-			)
-		}
-		logKapunSdkInitialized()
-	}
-
-	actual fun setUntrustedCertificatesAllowed(allow: Boolean) {
-		uniffi.kapun_wallet_rust.setUntrustedTls(allow)
-		uniffi.kapun_trust_rust.setUntrustedTls(allow)
-		uniffi.kapun_util_rust.setUntrustedTls(allow)
-	}
-
+    actual fun setUntrustedCertificatesAllowed(allow: Boolean) {
+        uniffi.kapun_wallet_rust.setUntrustedTls(allow)
+        uniffi.kapun_trust_rust.setUntrustedTls(allow)
+        uniffi.kapun_util_rust.setUntrustedTls(allow)
+    }
 }

@@ -13,12 +13,12 @@ import org.kapunsdk.credentials.registerInvalidAndUndisclosableClaims as registe
 
 /** Replaces the additional illegal and undisclosable claims for standalone SD-JWT and W3C parsing. */
 public fun registerInvalidAndUndisclosableClaims(
-	illegalClaims: List<String> = emptyList(),
-	undisclosableClaims: List<String> = emptyList(),
+    illegalClaims: List<String> = emptyList(),
+    undisclosableClaims: List<String> = emptyList(),
 ) {
-	registerSdJwtClaims(illegalClaims, undisclosableClaims)
-	uniffi.kapun_dcql_w3c_rust.registerInvalidAndUndisclosableClaims(
-		illegalClaims,
-		undisclosableClaims,
-	)
+    registerSdJwtClaims(illegalClaims, undisclosableClaims)
+    uniffi.kapun_dcql_w3c_rust.registerInvalidAndUndisclosableClaims(
+        illegalClaims,
+        undisclosableClaims,
+    )
 }

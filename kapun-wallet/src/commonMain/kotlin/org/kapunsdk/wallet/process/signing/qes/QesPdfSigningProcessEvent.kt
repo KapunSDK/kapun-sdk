@@ -19,18 +19,16 @@ package org.kapunsdk.wallet.process.signing.qes
 import org.kapunsdk.wallet.process.ProcessEvent
 
 sealed interface QesPdfSigningProcessEvent : ProcessEvent {
+    data class InitiatePdfSigning(
+        val pdfData: ByteArray,
+        val fileName: String,
+    ) : QesPdfSigningProcessEvent
 
-	data class InitiatePdfSigning(
-		val pdfData: ByteArray,
-		val fileName: String,
-	) : QesPdfSigningProcessEvent
+    data class PresentationCompleted(
+        val redirectUri: String,
+    ) : QesPdfSigningProcessEvent
 
-	data class PresentationCompleted(
-		val redirectUri: String,
-	) : QesPdfSigningProcessEvent
+    data object UserAcceptedSigning : QesPdfSigningProcessEvent
 
-	data object UserAcceptedSigning : QesPdfSigningProcessEvent
-
-	data object UserRejectedSigning : QesPdfSigningProcessEvent
-
+    data object UserRejectedSigning : QesPdfSigningProcessEvent
 }

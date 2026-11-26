@@ -18,84 +18,90 @@ package org.kapunsdk.wallet.credentials.signeddocument
 
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
-import org.kapunsdk.wallet.KapunDatabase
-import org.kapunsdk.wallet.SignedDocumentEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import org.kapunsdk.wallet.KapunDatabase
+import org.kapunsdk.wallet.SignedDocumentEntity
 import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.module
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
 data class SignedDocumentModel(
-	val id: Long,
-	val fileName: String,
-	val fileData: ByteArray,
-	val transactionId: String,
-	val signedDate: Long
+    val id: Long,
+    val fileName: String,
+    val fileData: ByteArray,
+    val transactionId: String,
+    val signedDate: Long,
 )
 
 @OptIn(ExperimentalTime::class)
-class SignedDocumentsRepository private constructor(db: KapunDatabase) {
-	companion object {
-		val koinModule = module {
-			singleOf(::SignedDocumentsRepository)
-		}
-	}
+class SignedDocumentsRepository private constructor(
+    db: KapunDatabase,
+) {
+    companion object {
+        val koinModule =
+            module {
+                singleOf(::SignedDocumentsRepository)
+            }
+    }
 
-	private val queries = db.signedDocumentQueries
+    private val queries = db.signedDocumentQueries
 
-	fun clear() = queries.clear()
+    fun clear() = queries.clear()
 
-	fun insertSignedDocument(
-		fileName: String,
-		fileData: ByteArray,
-		transactionId: String,
-	): SignedDocumentModel {
-		val signedDate = Clock.System.now().toEpochMilliseconds()
+    fun insertSignedDocument(
+        fileName: String,
+        fileData: ByteArray,
+        transactionId: String,
+    ): SignedDocumentModel {
+        val signedDate = Clock.System.now().toEpochMilliseconds()
 		
-		return queries.transactionWithResult {
-			queries.insert(
-				fileName,
-				fileData,
-				transactionId,
-				signedDate
-			)
-			// Get the last inserted document
-			queries.getAll().executeAsList().first().toModel()
-		}
-	}
+        return queries.transactionWithResult {
+            queries.insert(
+                fileName,
+                fileData,
+                transactionId,
+                signedDate,
+            )
+            // Get the last inserted document
+            queries
+                .getAll()
+                .executeAsList()
+                .first()
+                .toModel()
+        }
+    }
 
-	fun getAll(): List<SignedDocumentModel> {
-		return queries.getAll()
-			.executeAsList()
-			.map { it.toModel() }
-	}
+    fun getAll(): List<SignedDocumentModel> =
+        queries
+            .getAll()
+            .executeAsList()
+            .map { it.toModel() }
 
-	fun getAllAsFlow(): Flow<List<SignedDocumentModel>> {
-		return queries.getAll()
-			.asFlow()
-			.mapToList(Dispatchers.IO)
-			.map { entities -> entities.map { entity -> entity.toModel() } }
-	}
+    fun getAllAsFlow(): Flow<List<SignedDocumentModel>> =
+        queries
+            .getAll()
+            .asFlow()
+            .mapToList(Dispatchers.IO)
+            .map { entities -> entities.map { entity -> entity.toModel() } }
 
-	fun getById(id: Long): SignedDocumentModel? {
-		return queries.getById(id).executeAsOneOrNull()?.toModel()
-	}
+    fun getById(id: Long): SignedDocumentModel? = queries.getById(id).executeAsOneOrNull()?.toModel()
 
-	fun removeById(id: Long) {
-		queries.transaction {
-			queries.removeById(id)
-		}
-	}
+    fun removeById(id: Long) {
+        queries.transaction {
+            queries.removeById(id)
+        }
+    }
 
-	private fun SignedDocumentEntity.toModel() = SignedDocumentModel(
-		id = this.id,
-		fileName = this.file_name,
-		fileData = this.file_data,
-		transactionId = this.transaction_id,
-		signedDate = this.signed_date
-	)
+    private fun SignedDocumentEntity.toModel() =
+        SignedDocumentModel(
+            id = this.id,
+            fileName = this.file_name,
+            fileData = this.file_data,
+            transactionId = this.transaction_id,
+            signedDate = this.signed_date,
+        )
 }

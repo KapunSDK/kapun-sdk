@@ -20,8 +20,8 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class Tokens(
-	val dpopKeyReference: ByteArray,
-	var accessToken: String? = null,
-	val refreshToken: String? = null,
-	val lastNonce: String? = null
+    val dpopKeyReference: ByteArray,
+    var accessToken: String? = null,
+    val refreshToken: String? = null,
+    val lastNonce: String? = null,
 )

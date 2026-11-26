@@ -27,30 +27,88 @@ import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 sealed interface AttributeValue<T> {
-	val value: T
+    val value: T
 
-	@OptIn(ExperimentalEncodingApi::class, FormatStringsInDatetimeFormats::class)
-	fun asString(): String = when (this) {
-		is Bool -> value.toString()
-		is Date -> value.format(LocalDate.Format { byUnicodePattern("dd.MM.yyyy") })
-		is DateTime -> value.format(LocalDateTime.Format { byUnicodePattern("dd.MM.yyyy HH:mm") })
-		is Image -> Base64.encode(value)
-		is Array<*> -> value.joinToString(",") { it.asString() }
-		is Raw -> value
-		is Text -> value
-		is Timestamp -> value.toLocalDateTime(TimeZone.currentSystemDefault())
-			.format(LocalDateTime.Format { byUnicodePattern("dd.MM.yyyy HH:mm") })
-		is Link -> value
-	}
+    @OptIn(ExperimentalEncodingApi::class, FormatStringsInDatetimeFormats::class)
+    fun asString(): String =
+        when (this) {
+            is Bool -> {
+                value.toString()
+            }
 
-	data class Text(override val value: String) : AttributeValue<String>
-	data class Bool(override val value: Boolean) : AttributeValue<Boolean>
-	data class Image(override val value: ByteArray, val format: String? = null) : AttributeValue<ByteArray>
-	data class Array<T : AttributeValue<*>>(override val value: List<T>) : AttributeValue<List<T>>
-	data class Timestamp(override val value: Instant) : AttributeValue<Instant>
-	data class Date(override val value: LocalDate) : AttributeValue<LocalDate>
-	data class DateTime(override val value: LocalDateTime) : AttributeValue<LocalDateTime>
-	data class Raw(override val value: String, val format: String? = null) : AttributeValue<String>
-	enum class LinkType { Mail, Phone, Web, Download }
-	data class Link(override val value: String, val linkType: LinkType) : AttributeValue<String>
+            is Date -> {
+                value.format(LocalDate.Format { byUnicodePattern("dd.MM.yyyy") })
+            }
+
+            is DateTime -> {
+                value.format(LocalDateTime.Format { byUnicodePattern("dd.MM.yyyy HH:mm") })
+            }
+
+            is Image -> {
+                Base64.encode(value)
+            }
+
+            is Array<*> -> {
+                value.joinToString(",") { it.asString() }
+            }
+
+            is Raw -> {
+                value
+            }
+
+            is Text -> {
+                value
+            }
+
+            is Timestamp -> {
+                value
+                    .toLocalDateTime(TimeZone.currentSystemDefault())
+                    .format(LocalDateTime.Format { byUnicodePattern("dd.MM.yyyy HH:mm") })
+            }
+
+            is Link -> {
+                value
+            }
+        }
+
+    data class Text(
+        override val value: String,
+    ) : AttributeValue<String>
+
+    data class Bool(
+        override val value: Boolean,
+    ) : AttributeValue<Boolean>
+
+    data class Image(
+        override val value: ByteArray,
+        val format: String? = null,
+    ) : AttributeValue<ByteArray>
+
+    data class Array<T : AttributeValue<*>>(
+        override val value: List<T>,
+    ) : AttributeValue<List<T>>
+
+    data class Timestamp(
+        override val value: Instant,
+    ) : AttributeValue<Instant>
+
+    data class Date(
+        override val value: LocalDate,
+    ) : AttributeValue<LocalDate>
+
+    data class DateTime(
+        override val value: LocalDateTime,
+    ) : AttributeValue<LocalDateTime>
+
+    data class Raw(
+        override val value: String,
+        val format: String? = null,
+    ) : AttributeValue<String>
+
+    enum class LinkType { Mail, Phone, Web, Download }
+
+    data class Link(
+        override val value: String,
+        val linkType: LinkType,
+    ) : AttributeValue<String>
 }

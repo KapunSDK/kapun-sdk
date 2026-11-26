@@ -20,30 +20,38 @@ import org.kapunsdk.visualization.oca.model.OcaBundleJson
 import org.kapunsdk.visualization.oca.model.computeBundleDigest
 import org.kapunsdk.visualization.oca.model.computeCesrEncodedDigest
 
-fun OcaBundleJson.verifyIntegrity() : Boolean {
-	val captureBaseDigest = org.kapunsdk.visualization.oca.model.computeCesrEncodedDigest(
-		this.captureBase,
-		digest = this.captureBase.digest.first().toString()
-	)
-	if(captureBaseDigest != this.captureBase.digest) {
-		return false
-	}
-	return this.overlays.all { overlay ->
-		overlay.captureBase == captureBaseDigest && computeCesrEncodedDigest(
-			overlay
-		) == overlay.digest
-	}
-}
-fun OcaBundleJson.calculateSaids() : OcaBundleJson {
-	val captureBaseDigest = org.kapunsdk.visualization.oca.model.computeCesrEncodedDigest(this.captureBase)
-	val newOverlays = this.overlays.map { overlay ->
-		val newOverlay = overlay.updateDigest("", captureBaseDigest)
-		val overlayDigest = computeCesrEncodedDigest(newOverlay)
-		overlay.updateDigest(overlayDigest, captureBaseDigest)
-	}
-	return copy(captureBase = captureBase.copy(digest = captureBaseDigest), overlays = newOverlays)
+fun OcaBundleJson.verifyIntegrity(): Boolean {
+    val captureBaseDigest =
+        org.kapunsdk.visualization.oca.model.computeCesrEncodedDigest(
+            this.captureBase,
+            digest =
+                this.captureBase.digest
+                    .first()
+                    .toString(),
+        )
+    if (captureBaseDigest != this.captureBase.digest) {
+        return false
+    }
+    return this.overlays.all { overlay ->
+        overlay.captureBase == captureBaseDigest && computeCesrEncodedDigest(
+            overlay,
+        ) == overlay.digest
+    }
 }
 
-fun OcaBundleJson.getBundleHash(digest: String = "I") : String {
-	return org.kapunsdk.visualization.oca.model.computeBundleDigest(this, digest)
+fun OcaBundleJson.calculateSaids(): OcaBundleJson {
+    val captureBaseDigest =
+        org.kapunsdk.visualization.oca.model
+            .computeCesrEncodedDigest(this.captureBase)
+    val newOverlays =
+        this.overlays.map { overlay ->
+            val newOverlay = overlay.updateDigest("", captureBaseDigest)
+            val overlayDigest = computeCesrEncodedDigest(newOverlay)
+            overlay.updateDigest(overlayDigest, captureBaseDigest)
+        }
+    return copy(captureBase = captureBase.copy(digest = captureBaseDigest), overlays = newOverlays)
 }
+
+fun OcaBundleJson.getBundleHash(digest: String = "I"): String =
+    org.kapunsdk.visualization.oca.model
+        .computeBundleDigest(this, digest)

@@ -18,13 +18,6 @@ package org.kapunsdk.wallet.credentials.activity
 
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
-import org.kapunsdk.credentials.SdJwt
-import org.kapunsdk.trust.framework.swiss.model.*
-import org.kapunsdk.util.extensions.toBoolean
-import org.kapunsdk.util.extensions.toLong
-import org.kapunsdk.wallet.ActivityEntity
-import org.kapunsdk.wallet.KapunDatabase
-import org.kapunsdk.wallet.credentials.LocalizedKeyValue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.flow.map
@@ -32,201 +25,222 @@ import kotlinx.datetime.*
 import kotlinx.datetime.format.FormatStringsInDatetimeFormats
 import kotlinx.datetime.format.byUnicodePattern
 import kotlinx.serialization.json.Json
+import org.kapunsdk.credentials.SdJwt
+import org.kapunsdk.trust.framework.swiss.model.*
+import org.kapunsdk.util.extensions.toBoolean
+import org.kapunsdk.util.extensions.toLong
+import org.kapunsdk.wallet.ActivityEntity
+import org.kapunsdk.wallet.KapunDatabase
+import org.kapunsdk.wallet.credentials.LocalizedKeyValue
 import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.module
 import uniffi.kapun_crypto_rust.parseEncodedJwtPayload
 import kotlin.time.Clock.*
 import kotlin.time.ExperimentalTime
 
-
 @OptIn(ExperimentalTime::class)
 class ActivityRepository private constructor(
-	db: KapunDatabase,
-	val json: Json
+    db: KapunDatabase,
+    val json: Json,
 ) {
+    companion object {
+        val koinModule =
+            module {
+                singleOf(::ActivityRepository)
+            }
+    }
 
-	companion object {
-		val koinModule = module {
-			singleOf(::ActivityRepository)
-		}
-	}
+    private val queries = db.activityQueries
 
-	private val queries = db.activityQueries
+    fun clear() {
+        queries.clear()
+    }
 
-	fun clear() {
-		queries.clear()
-	}
+    fun getAllEntities() = queries.getAll().executeAsList()
 
-	fun getAllEntities() = queries.getAll().executeAsList()
+    fun fullInsert(
+        id: Long?,
+        type: ActivityType?,
+        content: String,
+        baseUrl: String,
+        frameworkId: String?,
+        identityJwt: String?,
+        issuanceJwt: String?,
+        verificationJwt: String?,
+        isVerified: Long,
+        isTrusted: Long,
+        insertedAt: Long,
+        identityId: Long,
+        credentialId: Long,
+        agentDisplayName: String? = null,
+        agentLogoUri: String? = null,
+    ) = queries.fullInsert(
+        id = id,
+        type = type,
+        content = content,
+        base_url = baseUrl,
+        frameworkId = frameworkId,
+        agent_display_name = agentDisplayName,
+        agent_logo_uri = agentLogoUri,
+        identity_jwt = identityJwt,
+        issuance_jwt = issuanceJwt,
+        verification_jwt = verificationJwt,
+        is_verified = isVerified,
+        is_trusted = isTrusted,
+        inserted_at = insertedAt,
+        identity_id = identityId,
+        credential_id = credentialId,
+    )
 
-	fun fullInsert(
-		id: Long?,
-		type: ActivityType?,
-		content: String,
-		baseUrl: String,
-		frameworkId: String?,
-		identityJwt: String?,
-		issuanceJwt: String?,
-		verificationJwt: String?,
-		isVerified: Long,
-		isTrusted: Long,
-		insertedAt: Long,
-		identityId: Long,
-		credentialId: Long,
-		agentDisplayName: String? = null,
-		agentLogoUri: String? = null,
-	) = queries.fullInsert(
-		id = id,
-		type = type,
-		content = content,
-		base_url = baseUrl,
-		frameworkId = frameworkId,
-		agent_display_name = agentDisplayName,
-		agent_logo_uri = agentLogoUri,
-		identity_jwt = identityJwt,
-		issuance_jwt = issuanceJwt,
-		verification_jwt = verificationJwt,
-		is_verified = isVerified,
-		is_trusted = isTrusted,
-		inserted_at = insertedAt,
-		identity_id = identityId,
-		credential_id = credentialId,
-	)
+    fun insertIssuance(
+        baseUrl: String,
+        identityJwt: String?,
+        issuanceJwt: String?,
+        isVerified: Boolean,
+        isTrusted: Boolean,
+        identityId: Long,
+        credentialId: Long,
+        frameworkId: String?,
+        agentDisplayName: String? = null,
+        agentLogoUri: String? = null,
+    ) = queries.insert(
+        type = ActivityType.ISSUANCE,
+        content = "",
+        base_url = baseUrl,
+        frameworkId,
+        identity_jwt = identityJwt,
+        issuance_jwt = issuanceJwt,
+        verification_jwt = null,
+        is_verified = isVerified.toLong(),
+        is_trusted = isTrusted.toLong(),
+        identity_id = identityId,
+        credential_id = credentialId,
+        inserted_at = System.now().toEpochMilliseconds(),
+        agent_display_name = agentDisplayName,
+        agent_logo_uri = agentLogoUri,
+    )
 
-	fun insertIssuance(
-		baseUrl: String,
-		identityJwt: String?,
-		issuanceJwt: String?,
-		isVerified: Boolean,
-		isTrusted: Boolean,
-		identityId: Long,
-		credentialId: Long,
-		frameworkId: String?,
-		agentDisplayName: String? = null,
-		agentLogoUri: String? = null,
-	) = queries.insert(
-		type = ActivityType.ISSUANCE,
-		content = "",
-		base_url = baseUrl,
-		frameworkId,
-		identity_jwt = identityJwt,
-		issuance_jwt = issuanceJwt,
-		verification_jwt = null,
-		is_verified = isVerified.toLong(),
-		is_trusted = isTrusted.toLong(),
-		identity_id = identityId,
-		credential_id = credentialId,
-		inserted_at = System.now().toEpochMilliseconds(),
-		agent_display_name = agentDisplayName,
-		agent_logo_uri = agentLogoUri,
-	)
+    fun insertVerification(
+        content: String,
+        identityJwt: String?,
+        verificationJwt: String?,
+        isVerified: Boolean,
+        isTrusted: Boolean,
+        identityId: Long,
+        credentialId: Long,
+        frameworkId: String?,
+        baseUrl: String = "",
+        agentDisplayName: String? = null,
+        agentLogoUri: String? = null,
+    ) = queries.insert(
+        type = ActivityType.PROOF,
+        content = content,
+        base_url = baseUrl,
+        frameworkId,
+        identity_jwt = identityJwt,
+        issuance_jwt = null,
+        verification_jwt = verificationJwt,
+        is_verified = isVerified.toLong(),
+        is_trusted = isTrusted.toLong(),
+        identity_id = identityId,
+        credential_id = credentialId,
+        inserted_at = System.now().toEpochMilliseconds(),
+        agent_display_name = agentDisplayName,
+        agent_logo_uri = agentLogoUri,
+    )
 
-	fun insertVerification(
-		content: String,
-		identityJwt: String?,
-		verificationJwt: String?,
-		isVerified: Boolean,
-		isTrusted: Boolean,
-		identityId: Long,
-		credentialId: Long,
-		frameworkId: String?,
-		baseUrl: String = "",
-		agentDisplayName: String? = null,
-		agentLogoUri: String? = null,
-	) = queries.insert(
-		type = ActivityType.PROOF,
-		content = content,
-		base_url = baseUrl,
-		frameworkId,
-		identity_jwt = identityJwt,
-		issuance_jwt = null,
-		verification_jwt = verificationJwt,
-		is_verified = isVerified.toLong(),
-		is_trusted = isTrusted.toLong(),
-		identity_id = identityId,
-		credential_id = credentialId,
-		inserted_at = System.now().toEpochMilliseconds(),
-		agent_display_name = agentDisplayName,
-		agent_logo_uri = agentLogoUri,
-	)
+    fun getById(id: Long) = queries.getById(id).executeAsOneOrNull()?.toModel(json)
 
-	fun getById(id: Long) = queries.getById(id).executeAsOneOrNull()?.toModel(json)
+    fun getByIdentityId(identityId: Long) = queries.getByIdentityId(identityId).executeAsList().map { it.toModel(json) }
 
-	fun getByIdentityId(identityId: Long) =
-		queries.getByIdentityId(identityId).executeAsList().map { it.toModel(json) }
+    fun getActivities(credentialId: Long) =
+        queries.getByCredentialId(credentialId).executeAsList().map { it.toModel(json) }
 
-	fun getActivities(credentialId: Long) =
-		queries.getByCredentialId(credentialId).executeAsList().map { it.toModel(json) }
+    fun getActivities(credentialIds: List<Long>) =
+        queries.getByCredentialIds(credentialIds).executeAsList().map { it.toModel(json) }
 
-	fun getActivities(credentialIds: List<Long>) =
-		queries.getByCredentialIds(credentialIds).executeAsList().map { it.toModel(json) }
+    fun getAll() = queries.getAll().executeAsList().map { it.toModel(json) }
 
-	fun getAll() = queries.getAll().executeAsList().map { it.toModel(json) }
+    fun getAllAsFlow() =
+        queries
+            .getAll()
+            .asFlow()
+            .mapToList(Dispatchers.IO)
+            .map { entities ->
+                entities.map { it.toModel(json) }
+            }
 
-	fun getAllAsFlow() = queries.getAll()
-		.asFlow()
-		.mapToList(Dispatchers.IO)
-		.map { entities ->
-			entities.map { it.toModel(json) }
-		}
-
-	@OptIn(FormatStringsInDatetimeFormats::class)
-	private fun ActivityEntity.toModel(json: Json): ActivityUiModel {
-		val identity = identity_jwt?.let {
-			runCatching { SdJwt.parse(it) }.getOrNull()?.innerJwt?.claims?.let {
-				json.encodeToString(
-					it
-				)
-			} ?: parseEncodedJwtPayload(it)
-		}?.let {
-			kotlin.runCatching { json.decodeFromString<TrustedIdentity>(it) }.getOrNull()
-				?: kotlin.runCatching { json.decodeFromString<TrustedIdentityV2>(it) }.getOrNull()
-					?.let { TrustedIdentity.fromV2(it) }
-		}
-		return if (type == ActivityType.PROOF) {
-			val values = json.decodeFromString<List<LocalizedKeyValue>>(content)
-			ActivityUiModel.Proof(
-				id = id,
-				frameworkId = frameworkId,
-				type = type,
-				insertedAt = Instant.fromEpochMilliseconds(inserted_at)
-					.toLocalDateTime(TimeZone.currentSystemDefault())
-					.format(LocalDateTime.Format { byUnicodePattern("dd.MM.yyyy HH:mm") }),
-				values = values,
-				verificationTrustData = TrustData.Verification(
-					baseUrl = base_url,
-					identity = identity,
-					identityJwt = identity_jwt,
-					verification = verification_jwt?.let { parseEncodedJwtPayload(it) }
-						?.let { runCatching { json.decodeFromString<TrustedVerification>(it) }.getOrNull() },
-					verificationJwt = verification_jwt,
-					isVerified = is_verified.toBoolean(),
-					isTrusted = is_trusted.toBoolean()
-				),
-				agentDisplayName = agent_display_name,
-				agentLogoUri = agent_logo_uri,
-			)
-		} else {
-			ActivityUiModel.Issuance(
-				id = id,
-				type = requireNotNull(type),
-				insertedAt = Instant.fromEpochMilliseconds(inserted_at)
-					.toLocalDateTime(TimeZone.currentSystemDefault())
-					.format(LocalDateTime.Format { byUnicodePattern("dd.MM.yyyy HH:mm") }),
-				frameworkId = frameworkId,
-				issuanceTrustData = TrustData.Issuance(
-					baseUrl = base_url,
-					identity = identity,
-					identityJwt = identity_jwt,
-					issuance = issuance_jwt?.let { parseEncodedJwtPayload(it) }
-						?.let { runCatching { json.decodeFromString<TrustedIssuance>(it) }.getOrNull() },
-					issuanceJwt = issuance_jwt,
-					isTrusted = is_trusted.toBoolean(),
-					isVerified = is_verified.toBoolean()
-				),
-				agentDisplayName = agent_display_name,
-				agentLogoUri = agent_logo_uri,
-			)
-		}
-	}
+    @OptIn(FormatStringsInDatetimeFormats::class)
+    private fun ActivityEntity.toModel(json: Json): ActivityUiModel {
+        val identity =
+            identity_jwt
+                ?.let {
+                    runCatching { SdJwt.parse(it) }.getOrNull()?.innerJwt?.claims?.let {
+                        json.encodeToString(
+                            it,
+                        )
+                    } ?: parseEncodedJwtPayload(it)
+                }?.let {
+                    kotlin.runCatching { json.decodeFromString<TrustedIdentity>(it) }.getOrNull()
+                        ?: kotlin
+                            .runCatching { json.decodeFromString<TrustedIdentityV2>(it) }
+                            .getOrNull()
+                            ?.let { TrustedIdentity.fromV2(it) }
+                }
+        return if (type == ActivityType.PROOF) {
+            val values = json.decodeFromString<List<LocalizedKeyValue>>(content)
+            ActivityUiModel.Proof(
+                id = id,
+                frameworkId = frameworkId,
+                type = type,
+                insertedAt =
+                    Instant
+                        .fromEpochMilliseconds(inserted_at)
+                        .toLocalDateTime(TimeZone.currentSystemDefault())
+                        .format(LocalDateTime.Format { byUnicodePattern("dd.MM.yyyy HH:mm") }),
+                values = values,
+                verificationTrustData =
+                    TrustData.Verification(
+                        baseUrl = base_url,
+                        identity = identity,
+                        identityJwt = identity_jwt,
+                        verification =
+                            verification_jwt
+                                ?.let { parseEncodedJwtPayload(it) }
+                                ?.let { runCatching { json.decodeFromString<TrustedVerification>(it) }.getOrNull() },
+                        verificationJwt = verification_jwt,
+                        isVerified = is_verified.toBoolean(),
+                        isTrusted = is_trusted.toBoolean(),
+                    ),
+                agentDisplayName = agent_display_name,
+                agentLogoUri = agent_logo_uri,
+            )
+        } else {
+            ActivityUiModel.Issuance(
+                id = id,
+                type = requireNotNull(type),
+                insertedAt =
+                    Instant
+                        .fromEpochMilliseconds(inserted_at)
+                        .toLocalDateTime(TimeZone.currentSystemDefault())
+                        .format(LocalDateTime.Format { byUnicodePattern("dd.MM.yyyy HH:mm") }),
+                frameworkId = frameworkId,
+                issuanceTrustData =
+                    TrustData.Issuance(
+                        baseUrl = base_url,
+                        identity = identity,
+                        identityJwt = identity_jwt,
+                        issuance =
+                            issuance_jwt
+                                ?.let { parseEncodedJwtPayload(it) }
+                                ?.let { runCatching { json.decodeFromString<TrustedIssuance>(it) }.getOrNull() },
+                        issuanceJwt = issuance_jwt,
+                        isTrusted = is_trusted.toBoolean(),
+                        isVerified = is_verified.toBoolean(),
+                    ),
+                agentDisplayName = agent_display_name,
+                agentLogoUri = agent_logo_uri,
+            )
+        }
+    }
 }

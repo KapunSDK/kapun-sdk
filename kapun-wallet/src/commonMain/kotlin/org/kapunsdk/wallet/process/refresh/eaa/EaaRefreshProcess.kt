@@ -16,6 +16,10 @@ under the License.
 
 package org.kapunsdk.wallet.process.refresh.eaa
 
+import io.ktor.client.plugins.ResponseException
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.kapunsdk.credentials.SdJwt
 import org.kapunsdk.credentials.W3C
 import org.kapunsdk.credentials.models.credential.CredentialMetadata
@@ -45,10 +49,6 @@ import org.kapunsdk.wallet.crypto.SecureHardwareAccess
 import org.kapunsdk.wallet.crypto.SigningProvider
 import org.kapunsdk.wallet.extensions.asErrorState
 import org.kapunsdk.wallet.keyvalue.KeyValueRepository
-import io.ktor.client.plugins.ResponseException
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import uniffi.kapun_crypto_rust.base64UrlDecode
 import uniffi.kapun_wallet_rust.*
 import kotlin.time.Clock
@@ -57,224 +57,274 @@ import kotlin.time.ExperimentalTime
 
 @OptIn(ExperimentalTime::class)
 class EaaRefreshProcess(
-	private val walletBackend: WalletBackend,
-	private val trustController: TrustFrameworkController,
-	private val credentialsRepository: CredentialsRepository,
-	private val identityRepository: IdentityRepository,
-	private val secureHardwareAccess: SecureHardwareAccess,
-	private val signingProvider: SigningProvider,
-	private val ocaRepository: OcaRepository,
-	private val ocaServiceController: OcaServiceController,
-	private val activityRepository: ActivityRepository,
-	private val keyValueRepository: KeyValueRepository,
+    private val walletBackend: WalletBackend,
+    private val trustController: TrustFrameworkController,
+    private val credentialsRepository: CredentialsRepository,
+    private val identityRepository: IdentityRepository,
+    private val secureHardwareAccess: SecureHardwareAccess,
+    private val signingProvider: SigningProvider,
+    private val ocaRepository: OcaRepository,
+    private val ocaServiceController: OcaServiceController,
+    private val activityRepository: ActivityRepository,
+    private val keyValueRepository: KeyValueRepository,
 ) {
+    suspend fun startEaaRefresh(identityUiModel: IdentityUiModel): EaaRefreshProcessStep {
+        if (identityUiModel !is IdentityUiModel.IdentityUiCredentialModel) {
+            return EaaRefreshProcessStep.Error("Identity not found")
+        }
+        val identity =
+            identityRepository.getById(identityUiModel.id) ?: return EaaRefreshProcessStep.Error("Identity not found")
+        if (identity.tokens.refreshToken == null) {
+            return EaaRefreshProcessStep.Error("Identity cannot be refreshed (no refresh token)")
+        }
+        try {
+            val authorizationServerMetadata =
+                identity.issuer.authorizationServerMetadata?.let {
+                    val json =
+                        Json {
+                            ignoreUnknownKeys = true
+                            explicitNulls = false
+                        }
+                    json.decodeFromString<AuthorizationServerMetadata>(it)
+                }
 
-	suspend fun startEaaRefresh(identityUiModel: IdentityUiModel): EaaRefreshProcessStep {
-		if (identityUiModel !is IdentityUiModel.IdentityUiCredentialModel) {
-			return EaaRefreshProcessStep.Error("Identity not found")
-		}
-		val identity = identityRepository.getById(identityUiModel.id) ?: return EaaRefreshProcessStep.Error("Identity not found")
-		if (identity.tokens.refreshToken == null) {
-			return EaaRefreshProcessStep.Error("Identity cannot be refreshed (no refresh token)")
-		}
-		try {
-			val authorizationServerMetadata = identity.issuer.authorizationServerMetadata?.let {
-				val json = Json {
-					ignoreUnknownKeys = true
-					explicitNulls = false
-				}
-				json.decodeFromString<AuthorizationServerMetadata>(it)
-			}
+            val oidcMetadata =
+                OidcMetadata(
+                    identity.oidcSettings ?: "",
+                    identity.issuer.credentialIssuerMetadata,
+                    identity.issuer.authorizationServerMetadata,
+                    identity.credentialConfigurationIds ?: "",
+                )
+            val credentialIssuerMetadata: CredentialIssuerMetadata =
+                json.decodeFromString(
+                    identity.issuer.credentialIssuerMetadata,
+                )
+            val dpopSigner = secureHardwareAccess.getHardwareSigner(identity.tokens.dpopKeyReference)!!
+            val issuance = Oid4VciIssuance.fromMetadata(oidcMetadata, walletBackend, dpopSigner)
+            val tokens =
+                issuance.refreshToken(
+                    identity.tokens.toNative(),
+                    authorizationServerMetadata?.tokenEndpoint,
+                    authorizationServerMetadata?.tokenEndpointAuthMethodsSupported,
+                    authorizationServerMetadata?.dpopSigningAlgValuesSupported,
+                    null,
+                )
 
-			val oidcMetadata = OidcMetadata(
-				identity.oidcSettings ?: "",
-				identity.issuer.credentialIssuerMetadata,
-				identity.issuer.authorizationServerMetadata,
-				identity.credentialConfigurationIds ?: "",
-			)
-			val credentialIssuerMetadata : CredentialIssuerMetadata = json.decodeFromString(identity.issuer.credentialIssuerMetadata)
-			val dpopSigner = secureHardwareAccess.getHardwareSigner(identity.tokens.dpopKeyReference)!!
-			val issuance = Oid4VciIssuance.fromMetadata(oidcMetadata, walletBackend, dpopSigner)
-			val tokens = issuance.refreshToken(
-				identity.tokens.toNative(),
-				authorizationServerMetadata?.tokenEndpoint,
-				authorizationServerMetadata?.tokenEndpointAuthMethodsSupported,
-				authorizationServerMetadata?.dpopSigningAlgValuesSupported,
-				null,
-			)
+            val agentInformation =
+                trustController
+                    .startIssuanceFlow(
+                        credentialIssuerMetadata.claims.credentialIssuer,
+                        identity.credentialConfigurationIds?.let { json.decodeFromString<List<String>>(it) }
+                            ?: emptyList(),
+                        credentialIssuerMetadata,
+                    ).agentInformation
 
-			val agentInformation = trustController.startIssuanceFlow(
-				credentialIssuerMetadata.claims.credentialIssuer,
-				identity.credentialConfigurationIds?.let { json.decodeFromString<List<String>>(it) } ?: emptyList(),
-				credentialIssuerMetadata
-			).agentInformation
+            identityRepository.updateTokens(identity.id, Tokens.fromNative(tokens))
+            val batchSizeUint =
+                credentialIssuerMetadata.claims.batchCredentialIssuance
+                    ?.batchSize
+                    ?.toUInt()
+            val numberOfCredentials =
+                determineNumberOfCredentialsToRefreshToBatchSize(
+                    identityUiModel.credentials,
+                    batchSizeUint ?: 0u,
+                )
 
-			identityRepository.updateTokens(identity.id, Tokens.fromNative(tokens))
-			val batchSizeUint =
-				credentialIssuerMetadata.claims.batchCredentialIssuance?.batchSize?.toUInt()
-			val numberOfCredentials = determineNumberOfCredentialsToRefreshToBatchSize(identityUiModel.credentials, batchSizeUint ?: 0u)
+            val credentials =
+                issuance.supplementIssuance(
+                    tokens = tokens,
+                    numCredentialsPerType = numberOfCredentials,
+                    dpopSigningAlgValuesSupported = authorizationServerMetadata?.dpopSigningAlgValuesSupported,
+                    signerFactory =
+                        object : SignerFactory {
+                            override fun newSigner(keyType: KeyType) =
+                                requireNotNull(signingProvider.createSigner(keyType))
+                        },
+                    true,
+                )
 
-			val credentials = issuance.supplementIssuance(
-				tokens = tokens,
-				numCredentialsPerType = numberOfCredentials,
-				dpopSigningAlgValuesSupported = authorizationServerMetadata?.dpopSigningAlgValuesSupported,
-				signerFactory = object : SignerFactory {
-					override fun newSigner(keyType: KeyType) = requireNotNull(signingProvider.createSigner(keyType))
-				},
-				true
-			)
+            val insertedCredentialIds =
+                (credentials.credentials() zip credentials.subjects()).mapNotNull { (credential, signer) ->
+                    val credentialMetadata =
+                        if (signer.privateKeyExportable()) {
+                            CredentialMetadata(
+                                keyMaterial =
+                                    KeyMaterial.Local.SoftwareBacked(
+                                        privateKey = signer.privateKey(),
+                                    ),
+                                credentialType = credential.credential.asMetadataFormat(),
+                            )
+                        } else {
+                            CredentialMetadata(
+                                keyMaterial =
+                                    KeyMaterial.Local.HardwareBacked(
+                                        deviceKeyReference = signer.keyReference(),
+                                        publicKey = signer.publicKey(),
+                                    ),
+                                credentialType = credential.credential.asMetadataFormat(),
+                            )
+                        }
 
-			val insertedCredentialIds =
-				(credentials.credentials() zip credentials.subjects()).mapNotNull { (credential, signer) ->
-					val credentialMetadata = if (signer.privateKeyExportable()) {
-						CredentialMetadata(
-							keyMaterial = KeyMaterial.Local.SoftwareBacked(
-								privateKey = signer.privateKey()
-							),
-							credentialType = credential.credential.asMetadataFormat()
-						)
-					} else {
-						CredentialMetadata(
-							keyMaterial = KeyMaterial.Local.HardwareBacked(
-								deviceKeyReference = signer.keyReference(),
-								publicKey = signer.publicKey()
-							),
-							credentialType = credential.credential.asMetadataFormat()
-						)
-					}
+                    val insertedCredential = insertCredential(identity.name, credential, credentialMetadata)
+                    return@mapNotNull insertedCredential?.id
+                }
 
-					val insertedCredential = insertCredential(identity.name, credential, credentialMetadata)
-					return@mapNotNull insertedCredential?.id
-				}
+            if (insertedCredentialIds.isNotEmpty()) {
+                // TODO UBMW: Insert agent information instead of trust data
+                activityRepository.insertIssuance(
+                    baseUrl = agentInformation?.domain ?: "",
+                    identityJwt = agentInformation?.identityTrust,
+                    issuanceJwt = agentInformation?.issuanceTrust,
+                    isVerified = agentInformation?.isVerified ?: false,
+                    isTrusted = agentInformation?.isTrusted ?: false,
+                    identityId = identity.id,
+                    frameworkId = agentInformation?.trustFrameworkId,
+                    credentialId = insertedCredentialIds.last(),
+                    agentDisplayName = agentInformation?.displayName,
+                    agentLogoUri = agentInformation?.logoUri,
+                )
+            } else {
+                Logger.error("No refreshed credentials")
+            }
+        } catch (e: ApiException) {
+            Logger.error("ApiException " + e.asErrorState().code)
+            Logger.error(e.stackTraceToString())
+            val info = e.asErrorState()
+            return EaaRefreshProcessStep.Error(
+                errorMessage = info.messageOrCode,
+                errorCode = info.code,
+                cause = info.cause,
+            )
+        } catch (e: Exception) {
+            Logger.error("Exception: " + (e.message ?: e::class.simpleName))
+            Logger.error(e.stackTraceToString())
+            return EaaRefreshProcessStep.Error(e.message ?: e::class.simpleName ?: "")
+        }
 
-			if (insertedCredentialIds.isNotEmpty()) {
-				// TODO UBMW: Insert agent information instead of trust data
-				activityRepository.insertIssuance(
-					baseUrl = agentInformation?.domain ?: "",
-					identityJwt =  agentInformation?.identityTrust,
-					issuanceJwt = agentInformation?.issuanceTrust,
-					isVerified = agentInformation?.isVerified ?: false,
-					isTrusted = agentInformation?.isTrusted ?: false,
-					identityId = identity.id,
-					frameworkId = agentInformation?.trustFrameworkId,
-					credentialId = insertedCredentialIds.last(),
-					agentDisplayName = agentInformation?.displayName,
-					agentLogoUri = agentInformation?.logoUri
-				)
-			} else {
-				Logger.error("No refreshed credentials")
-			}
-		} catch (e: ApiException) {
-			Logger.error("ApiException " + e.asErrorState().code)
-			Logger.error(e.stackTraceToString())
-			val info = e.asErrorState()
-			return EaaRefreshProcessStep.Error(errorMessage = info.messageOrCode, errorCode = info.code, cause = info.cause)
-		} catch (e: Exception) {
-			Logger.error("Exception: " + (e.message ?: e::class.simpleName))
-			Logger.error(e.stackTraceToString())
-			return EaaRefreshProcessStep.Error(e.message ?: e::class.simpleName ?: "")
-		}
+        return EaaRefreshProcessStep.Success
+    }
 
-		return EaaRefreshProcessStep.Success
-	}
+    private fun determineNumberOfCredentialsToRefreshToBatchSize(
+        credentials: List<CredentialModel>,
+        batchSize: UInt,
+    ): UInt {
+        // Only consider credential types that are actually present in the DB
+        val presentTypes = credentials.map { it.credentialType }.toSet()
+        val unusedCountsPerPresentType =
+            presentTypes.map { type ->
+                credentials.count { it.credentialType == type && !it.isUsed }
+            }
 
-	private fun determineNumberOfCredentialsToRefreshToBatchSize(credentials: List<CredentialModel>, batchSize: UInt): UInt {
-		// Only consider credential types that are actually present in the DB
-		val presentTypes = credentials.map { it.credentialType }.toSet()
-		val unusedCountsPerPresentType = presentTypes.map { type ->
-			credentials.count { it.credentialType == type && !it.isUsed }
-		}
+        // Try to fill up the most used credential type to the batch size.
+        val lowerUnusedCount = unusedCountsPerPresentType.minOrNull()?.toUInt() ?: 0u
 
-		// Try to fill up the most used credential type to the batch size.
-		val lowerUnusedCount = unusedCountsPerPresentType.minOrNull()?.toUInt() ?: 0u
+        if (lowerUnusedCount >= batchSize) {
+            // If we already have enough unused credentials, we just refresh 1 credential
+            return 1u
+        }
 
-		if (lowerUnusedCount >= batchSize) {
-			// If we already have enough unused credentials, we just refresh 1 credential
-			return 1u
-		}
+        val missingCredentials = batchSize - lowerUnusedCount
 
-		val missingCredentials = batchSize - lowerUnusedCount
+        // Request at most batch_size credentials, but bound it with 10 to avoid requesting too many credentials (DOS).
+        val maxNumberToRefresh = minOf(batchSize, 10u)
+        val numberToRefresh = minOf(missingCredentials, maxNumberToRefresh)
 
-		// Request at most batch_size credentials, but bound it with 10 to avoid requesting too many credentials (DOS).
-		val maxNumberToRefresh = minOf(batchSize, 10u)
-		val numberToRefresh = minOf(missingCredentials, maxNumberToRefresh)
+        // Refresh at least 1 credential
+        return maxOf(numberToRefresh, 1u)
+    }
 
-		// Refresh at least 1 credential
-		return maxOf(numberToRefresh, 1u)
-	}
+    private suspend fun loadOcaBundleForCredential(credential: Credential): String? {
+        val credentialFormat = credential.credential
+        if (credentialFormat.asMetadataFormat() == CredentialType.SdJwt) {
+            val sdJwt = SdJwt.parse(credential.credential.getPayload())
+            val renderMetadata = sdJwt.getRenderMetadata()
+            val ocaUrl = renderMetadata?.render?.oca
+            if (ocaUrl != null) {
+                val existing = ocaRepository.getForUrl(ocaUrl)
 
-	private suspend fun loadOcaBundleForCredential(credential: Credential): String? {
-		val credentialFormat = credential.credential
-		if (credentialFormat.asMetadataFormat() == CredentialType.SdJwt) {
-			val sdJwt = SdJwt.parse(credential.credential.getPayload())
-			val renderMetadata = sdJwt.getRenderMetadata()
-			val ocaUrl = renderMetadata?.render?.oca
-			if (ocaUrl != null) {
-				val existing = ocaRepository.getForUrl(ocaUrl)
+                val now = Clock.System.now().toEpochMilliseconds()
+                if (existing == null || now - existing.updatedAt >= 5.minutes.inWholeMilliseconds) {
+                    try {
+                        val ocaBundle = ocaServiceController.getOcaBundleForUrl(ocaUrl)
+                        ocaRepository.insertOrUpdateOca(ocaUrl, ocaBundle)
+                    } catch (e: ResponseException) {
+                        return null
+                    }
+                }
+                return ocaUrl
+            }
+        }
+        return null
+    }
 
-				val now = Clock.System.now().toEpochMilliseconds()
-				if (existing == null || now - existing.updatedAt >= 5.minutes.inWholeMilliseconds) {
-					try {
-						val ocaBundle = ocaServiceController.getOcaBundleForUrl(ocaUrl)
-						ocaRepository.insertOrUpdateOca(ocaUrl, ocaBundle)
-					} catch (e: ResponseException) {
-						return null
-					}
-				}
-				return ocaUrl
-			}
-		}
-		return null
-	}
+    protected suspend fun insertCredential(
+        identityName: String,
+        credential: Credential,
+        metadata: CredentialMetadata,
+    ): CredentialEntity? {
+        val ocaBundleUrl = loadOcaBundleForCredential(credential)
 
-	protected suspend fun insertCredential(
-		identityName: String,
-		credential: Credential,
-		metadata: CredentialMetadata,
-	): CredentialEntity? {
-		val ocaBundleUrl = loadOcaBundleForCredential(credential)
+        val credentialType = credential.credential.asMetadataFormat()
+        val credentialPayload = credential.credential.getPayload()
 
-		val credentialType = credential.credential.asMetadataFormat()
-		val credentialPayload = credential.credential.getPayload()
+        val docType =
+            when (credentialType) {
+                CredentialType.SdJwt -> {
+                    SdJwt.parse(credential.credential.getPayload()).getMetadata().vct
+                }
 
-		val docType = when (credentialType) {
-			CredentialType.SdJwt -> SdJwt.parse(credential.credential.getPayload()).getMetadata().vct
-			CredentialType.Mdoc -> MdocUtils.getDocType(credentialPayload)
-			CredentialType.BbsTermwise -> kotlin.runCatching {
-				val cred = Json.parseToJsonElement(base64UrlDecode(credentialPayload).decodeToString())
-				val document = cred.jsonObject["document"]!!
-				val bbs = Json.parseToJsonElement( bbsJson(base64UrlDecode(document.jsonPrimitive.content).decodeToString()) ?: "{}")
-				bbs.jsonObject["https://www.w3.org/2018/credentials#credentialSubject"]!!.jsonObject["@id"]!!.jsonPrimitive.content
+                CredentialType.Mdoc -> {
+                    MdocUtils.getDocType(credentialPayload)
+                }
 
-			}.getOrNull() ?: return null
-			CredentialType.W3C_VCDM -> W3C.parse(credentialPayload).docType
-            CredentialType.OpenBadge303 -> W3C.OpenBadge303.parseSerialized(credentialPayload).docType
-            CredentialType.Unknown -> {
-				// Don't insert this credential if it's an unknown type
-				return null
-			}
-		}
+                CredentialType.BbsTermwise -> {
+                    kotlin
+                        .runCatching {
+                            val cred = Json.parseToJsonElement(base64UrlDecode(credentialPayload).decodeToString())
+                            val document = cred.jsonObject["document"]!!
+                            val bbs =
+                                Json.parseToJsonElement(
+                                    bbsJson(base64UrlDecode(document.jsonPrimitive.content).decodeToString()) ?: "{}",
+                                )
+                            bbs.jsonObject["https://www.w3.org/2018/credentials#credentialSubject"]!!
+                                .jsonObject["@id"]!!
+                                .jsonPrimitive.content
+                        }.getOrNull() ?: return null
+                }
 
-		val credentialName = RandomGenerator().generateAlphanumericString(12)
-		return credentialsRepository.insertCredential(
-			name = credentialName,
-			metadata = json.encodeToString(metadata),
-			keyMaterialType = metadata.keyMaterial.type,
-			credentialType = credentialType,
-			payload = credentialPayload,
-			docType = docType,
-			ocaBundleUrl = ocaBundleUrl,
-			identityName = identityName,
-		)
-	}
+                CredentialType.W3C_VCDM -> {
+                    W3C.parse(credentialPayload).docType
+                }
 
-	private fun CredentialFormat.getPayload(): String {
-		return when (this) {
-			is CredentialFormat.Mdoc -> this.v1
-			is CredentialFormat.SdJwt -> this.v1
-			is CredentialFormat.BbsTermWise -> this.v1
-			is CredentialFormat.W3c -> this.v1
+                CredentialType.OpenBadge303 -> {
+                    W3C.OpenBadge303.parseSerialized(credentialPayload).docType
+                }
+
+                CredentialType.Unknown -> {
+                    // Don't insert this credential if it's an unknown type
+                    return null
+                }
+            }
+
+        val credentialName = RandomGenerator().generateAlphanumericString(12)
+        return credentialsRepository.insertCredential(
+            name = credentialName,
+            metadata = json.encodeToString(metadata),
+            keyMaterialType = metadata.keyMaterial.type,
+            credentialType = credentialType,
+            payload = credentialPayload,
+            docType = docType,
+            ocaBundleUrl = ocaBundleUrl,
+            identityName = identityName,
+        )
+    }
+
+    private fun CredentialFormat.getPayload(): String =
+        when (this) {
+            is CredentialFormat.Mdoc -> this.v1
+            is CredentialFormat.SdJwt -> this.v1
+            is CredentialFormat.BbsTermWise -> this.v1
+            is CredentialFormat.W3c -> this.v1
             is CredentialFormat.OpenBadge -> this.v1
-		}
-	}
+        }
 }

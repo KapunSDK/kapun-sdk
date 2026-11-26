@@ -22,5 +22,5 @@ import org.koin.core.module.Module
 import org.koin.dsl.bind
 
 actual fun Module.sqliteDriverModule(databaseName: String) {
-	single { IosSqliteDriverFactory(databaseName) }.bind<SqliteDriverFactory>()
+    single { IosSqliteDriverFactory(databaseName) }.bind<SqliteDriverFactory>()
 }

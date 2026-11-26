@@ -19,4 +19,4 @@ package org.kapunsdk.proximity.protocol.openid4vp
 import org.koin.core.module.Module
 
 internal actual val openId4vpModule: Module
-	get() = TODO("Not yet implemented")
+    get() = TODO("Not yet implemented")

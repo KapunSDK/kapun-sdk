@@ -18,40 +18,47 @@ package org.kapunsdk.wallet.keyvalue
 
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToOneOrNull
-import org.kapunsdk.wallet.KapunDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.flow.map
+import org.kapunsdk.wallet.KapunDatabase
 import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.module
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
 @OptIn(ExperimentalTime::class)
-class KeyValueRepository private constructor(db: KapunDatabase) {
-	companion object {
-		val koinModule = module {
-			singleOf(::KeyValueRepository)
-		}
-	}
+class KeyValueRepository private constructor(
+    db: KapunDatabase,
+) {
+    companion object {
+        val koinModule =
+            module {
+                singleOf(::KeyValueRepository)
+            }
+    }
 
-	private val queries = db.keyValueQueries
+    private val queries = db.keyValueQueries
 
-	fun clear() = queries.clear()
+    fun clear() = queries.clear()
 
-	fun getAllEntities() = queries.getAll().executeAsList()
+    fun getAllEntities() = queries.getAll().executeAsList()
 
-	fun fullInsert(
-		key: String,
-		value: String?,
-		updatedAt: Long,
-	) = queries.fullInsert(key, value, updatedAt)
+    fun fullInsert(
+        key: String,
+        value: String?,
+        updatedAt: Long,
+    ) = queries.fullInsert(key, value, updatedAt)
 
-	fun getForFlow(key: KeyValueEntry) = queries.getByKey(key.toString()).asFlow().mapToOneOrNull(Dispatchers.IO).map { it?.value_ }
+    fun getForFlow(key: KeyValueEntry) =
+        queries.getByKey(key.toString()).asFlow().mapToOneOrNull(Dispatchers.IO).map {
+            it?.value_
+        }
 
-	fun getFor(key: KeyValueEntry) = queries.getByKey(key.toString()).executeAsOneOrNull()?.value_
+    fun getFor(key: KeyValueEntry) = queries.getByKey(key.toString()).executeAsOneOrNull()?.value_
 
-	fun setFor(key: KeyValueEntry, value: String?) =
-		queries.setValueForKey(key.toString(), value, Clock.System.now().toEpochMilliseconds())
-
+    fun setFor(
+        key: KeyValueEntry,
+        value: String?,
+    ) = queries.setValueForKey(key.toString(), value, Clock.System.now().toEpochMilliseconds())
 }

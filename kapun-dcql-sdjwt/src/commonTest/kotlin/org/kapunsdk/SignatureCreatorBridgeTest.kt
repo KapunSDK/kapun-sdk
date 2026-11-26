@@ -16,74 +16,83 @@ under the License.
 
 package org.kapunsdk
 
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
 import org.kapunsdk.credentials.SdJwt
 import org.kapunsdk.credentials.registerInvalidAndUndisclosableClaims
 import org.kapunsdk.credentials.toClaimsPointer
 import uniffi.kapun_credential_core_rust.SignatureCreator
 import uniffi.kapun_dcql_sdjwt_rust.SdJwtDecodeException
 import uniffi.kapun_util_rust.Value
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class SignatureCreatorBridgeTest {
-    private val testSigner = object : SignatureCreator {
-        override fun alg(): String = "ES256"
+    private val testSigner =
+        object : SignatureCreator {
+            override fun alg(): String = "ES256"
 
-        override fun sign(bytes: ByteArray): ByteArray = byteArrayOf(1, 2, 3)
-    }
+            override fun sign(bytes: ByteArray): ByteArray = byteArrayOf(1, 2, 3)
+        }
 
     private fun issueSdJwt(claimName: String): String {
-        val claims = Value.Object(
-            mapOf(
-                "vct" to Value.String("test-type"),
-                claimName to Value.String("test-value"),
-            ),
-        )
-        val credential = SdJwt.create(
-            claims = claims,
-            disclosures = listOf(listOf(claimName).toClaimsPointer()!!),
-            keyId = "test-key",
-            key = testSigner,
-            pubKeyJwk = null,
-        )
+        val claims =
+            Value.Object(
+                mapOf(
+                    "vct" to Value.String("test-type"),
+                    claimName to Value.String("test-value"),
+                ),
+            )
+        val credential =
+            SdJwt.create(
+                claims = claims,
+                disclosures = listOf(listOf(claimName).toClaimsPointer()!!),
+                keyId = "test-key",
+                key = testSigner,
+                pubKeyJwk = null,
+            )
         return assertNotNull(credential).innerJwt.originalSdjwt
     }
 
     private fun assertInvalidDisclosure(jwt: String) {
-        val failure = assertFailsWith<Throwable> {
-            SdJwt.parse(jwt)
-        }
+        val failure =
+            assertFailsWith<Throwable> {
+                SdJwt.parse(jwt)
+            }
         assertTrue(failure is SdJwtDecodeException.InvalidDisclosure)
     }
 
     @Test
     fun signerCallbackIsRegisteredWithTheSdJwtLibrary() {
         var signedPayload: ByteArray? = null
-        val signer = object : SignatureCreator {
-            override fun alg(): String = "ES256"
+        val signer =
+            object : SignatureCreator {
+                override fun alg(): String = "ES256"
 
-            override fun sign(bytes: ByteArray): ByteArray {
-                signedPayload = bytes
-                return byteArrayOf(1, 2, 3)
+                override fun sign(bytes: ByteArray): ByteArray {
+                    signedPayload = bytes
+                    return byteArrayOf(1, 2, 3)
+                }
             }
-        }
 
-        val credential = assertNotNull(
-            SdJwt.create(
-                claims = Value.Object(mapOf("vct" to Value.String("test-type"))),
-                disclosures = emptyList(),
-                keyId = "test-key",
-                key = signer,
-                pubKeyJwk = Value.Object(emptyMap()),
-            ),
-        )
-        val presentation = credential.presentation().apply {
-            withNonce("nonce")
-            withAudience("audience")
-        }.build(signer.asNativeSdJwtSignatureCreator())
+        val credential =
+            assertNotNull(
+                SdJwt.create(
+                    claims = Value.Object(mapOf("vct" to Value.String("test-type"))),
+                    disclosures = emptyList(),
+                    keyId = "test-key",
+                    key = signer,
+                    pubKeyJwk = Value.Object(emptyMap()),
+                ),
+            )
+        val presentation =
+            credential
+                .presentation()
+                .apply {
+                    withNonce("nonce")
+                    withAudience("audience")
+                }.build(signer.asNativeSdJwtSignatureCreator())
 
         assertTrue(presentation.endsWith(".AQID"))
         assertTrue(assertNotNull(signedPayload).isNotEmpty())

@@ -18,83 +18,135 @@ package org.kapunsdk.credentials
 
 import org.kapunsdk.credentials.sdjwt.SdJwtVcMetadata
 import org.kapunsdk.credentials.sdjwt.SdJwtVcSignatureResolver
-import uniffi.kapun_crypto_rust.base64UrlEncode
+import org.kapunsdk.util.extensions.*
 import uniffi.kapun_credential_core_rust.*
 import uniffi.kapun_credential_core_rust.SignatureCreator
+import uniffi.kapun_crypto_rust.base64UrlEncode
 import uniffi.kapun_dcql_sdjwt_rust.*
+import uniffi.kapun_util_rust.JsonNumber
 import uniffi.kapun_util_rust.Value
 import kotlin.collections.set
-import org.kapunsdk.util.extensions.*
-import uniffi.kapun_util_rust.JsonNumber
 
 sealed interface SdJwtErrors {
-    data class InvalidFormat(val msg: String) : SdJwtErrors, Throwable(msg)
-    data class InvalidDisclosurePath(val path: List<PointerPart>): SdJwtErrors, Throwable(message = "Path: $path invalid")
+    data class InvalidFormat(
+        val msg: String,
+    ) : Throwable(msg),
+        SdJwtErrors
+
+    data class InvalidDisclosurePath(
+        val path: List<PointerPart>,
+    ) : Throwable(message = "Path: $path invalid"),
+        SdJwtErrors
 }
-val UNDISCLOSABLE_CLAIMS : List<ClaimsPointer>  = listOf(
-    listOf("vct").toClaimsPointer()!!,
-    listOf("iss").toClaimsPointer()!!,
-    listOf("nbf").toClaimsPointer()!!,
-    listOf("iat").toClaimsPointer()!!,
-    listOf("exp").toClaimsPointer()!!
+
+val UNDISCLOSABLE_CLAIMS: List<ClaimsPointer> =
+    listOf(
+        listOf("vct").toClaimsPointer()!!,
+        listOf("iss").toClaimsPointer()!!,
+        listOf("nbf").toClaimsPointer()!!,
+        listOf("iat").toClaimsPointer()!!,
+        listOf("exp").toClaimsPointer()!!,
+    )
+
+data class SdjwtDisclosure(
+    val disclosedObject: Value,
+    val disclosure: List<String>,
 )
-data class SdjwtDisclosure(val disclosedObject: Value, val disclosure: List<String>)
 
 sealed interface IssuanceError {
-    data class ElementNotDisclosable(val parent: Value, val paths: List<ClaimsPointer>) : IssuanceError, Throwable("$parent cannot disclose ${paths.joinToString(",")}")
-    data class DisclosurePathNotResolved(val path: ClaimsPointer) : IssuanceError, Throwable("Slicing does not make sense: $path")
-    data class KeyShouldBeString(val path: ClaimsPointer) : IssuanceError, Throwable("Key should be a string $path")
-    data class ArrayMustRevealAll(val path: List<ClaimsPointer>) : IssuanceError, Throwable("We must disclose an array in its full: ${path.joinToString(",")}")
+    data class ElementNotDisclosable(
+        val parent: Value,
+        val paths: List<ClaimsPointer>,
+    ) : Throwable("$parent cannot disclose ${paths.joinToString(",")}"),
+        IssuanceError
+
+    data class DisclosurePathNotResolved(
+        val path: ClaimsPointer,
+    ) : Throwable("Slicing does not make sense: $path"),
+        IssuanceError
+
+    data class KeyShouldBeString(
+        val path: ClaimsPointer,
+    ) : Throwable("Key should be a string $path"),
+        IssuanceError
+
+    data class ArrayMustRevealAll(
+        val path: List<ClaimsPointer>,
+    ) : Throwable("We must disclose an array in its full: ${path.joinToString(",")}"),
+        IssuanceError
 }
-fun createDisclosureForObject(claims: Value.Object, objectDisclosures: List<ClaimsPointer>, currentDepth: Int, sdJwtHasher: SdJwtHasher) : Result<SdjwtDisclosure > {
+
+fun createDisclosureForObject(
+    claims: Value.Object,
+    objectDisclosures: List<ClaimsPointer>,
+    currentDepth: Int,
+    sdJwtHasher: SdJwtHasher,
+): Result<SdjwtDisclosure> {
     val sd = mutableListOf<Value>()
     val disclosures = mutableListOf<String>()
-    //filter disclosures for illegal ones
-    val objectDisclosures = objectDisclosures.filter { oc -> !UNDISCLOSABLE_CLAIMS.any { forbidden ->
-        forbidden.isSubPath(oc)
-    } }
+    // filter disclosures for illegal ones
+    val objectDisclosures =
+        objectDisclosures.filter { oc ->
+            !UNDISCLOSABLE_CLAIMS.any { forbidden ->
+                forbidden.isSubPath(oc)
+            }
+        }
     // find all disclosures on our level
-    val thisObject = objectDisclosures.filter { it.depth() == currentDepth}
+    val thisObject = objectDisclosures.filter { it.depth() == currentDepth }
     // find all disclosures only disclosable on a deeper level
-    val otherObjects = objectDisclosures.filter { thisObject.all { other -> !other.isSubPath(it)} && it.depth() > currentDepth }
+    val otherObjects =
+        objectDisclosures.filter {
+            thisObject.all { other -> !other.isSubPath(it) } &&
+                it.depth() > currentDepth
+        }
 
     val obj = claims.v1.toMutableMap()
     // we don't have anything on this level
 //    if(thisObject.isEmpty() && deeperNestedObjects.isNotEmpty()) {
     val alreadyVisited = mutableListOf<ClaimsPointer>()
-        for(otherO in otherObjects) {
-            val ptr = otherO.toDepth(currentDepth)
-            if(alreadyVisited.contains(ptr)) {
-                continue
-            }
-            val claimName = ptr.key()
-            alreadyVisited.add(ptr)
+    for (otherO in otherObjects) {
+        val ptr = otherO.toDepth(currentDepth)
+        if (alreadyVisited.contains(ptr)) {
+            continue
+        }
+        val claimName = ptr.key()
+        alreadyVisited.add(ptr)
 
-            val claimPointer = ClaimsPointer(listOf(claimName))
-            if(claimName !is PointerPart.String) {
-                continue
+        val claimPointer = ClaimsPointer(listOf(claimName))
+        if (claimName !is PointerPart.String) {
+            continue
+        }
+        val element = claims[claimPointer]
+        if (element.isEmpty()) {
+            // it might be an optional claim, so skip it
+            continue
+        }
+        val innerValue = element[0]
+        val nested = otherObjects.filter { ptr.isSubPath(it) && it.depth() > currentDepth }
+        when (innerValue) {
+            is Value.Object -> {
+                val objs =
+                    createDisclosureForObject(innerValue, nested, currentDepth + 1, sdJwtHasher).getOrElse {
+                        return Result.failure(it)
+                    }
+                obj.put(claimName.v1, objs.disclosedObject)
+                disclosures.addAll(objs.disclosure)
             }
-            val element = claims[claimPointer]
-            if(element.isEmpty()) {
-                // it might be an optional claim, so skip it
-                continue
+
+            is Value.Array -> {
+                val objs =
+                    createDisclosureForArray(innerValue, nested, currentDepth + 1, sdJwtHasher).getOrElse {
+                        return Result.failure(it)
+                    }
+                obj.put(claimName.v1, objs.disclosedObject)
+                disclosures.addAll(objs.disclosure)
             }
-            val innerValue = element[0]
-            val nested = otherObjects.filter { ptr.isSubPath(it) && it.depth() > currentDepth }
-            when (innerValue) {
-                is Value.Object -> {
-                    val objs = createDisclosureForObject(innerValue, nested, currentDepth + 1, sdJwtHasher).getOrElse { return Result.failure(it) }
-                    obj.put(claimName.v1, objs.disclosedObject)
-                    disclosures.addAll(objs.disclosure)
-                }
-                is Value.Array -> {
-                    val objs = createDisclosureForArray(innerValue, nested, currentDepth + 1, sdJwtHasher).getOrElse { return Result.failure(it) }
-                    obj.put(claimName.v1, objs.disclosedObject)
-                    disclosures.addAll(objs.disclosure)
-                }
-                else -> {continue}
+
+            else -> {
+                continue
             }
         }
+    }
 //    }
     var comLinks = mutableMapOf<String, Value>()
     for (to in thisObject) {
@@ -102,41 +154,52 @@ fun createDisclosureForObject(claims: Value.Object, objectDisclosures: List<Clai
         // we have nested disclosures, so do that first
         val results = claims[to.fromDepth(currentDepth)]
         // it must be single entry
-        if(results.size != 1) {
+        if (results.size != 1) {
             return Result.failure(IssuanceError.DisclosurePathNotResolved(to))
         }
         val element = results[0]
         // get this property's name
         val key = to.key()
         // it needs to be a string (otherwise we should be in array or somewhere else)
-        if(key !is PointerPart.String) {
+        if (key !is PointerPart.String) {
             return Result.failure(IssuanceError.KeyShouldBeString(to))
         }
         var replace = false
-        val d = if(nestedDislcosure.isNotEmpty()) {
-            val obj = when (element) {
-                is Value.Object -> createDisclosureForObject(element, nestedDislcosure, currentDepth + 1, sdJwtHasher)
-                is Value.Array -> {
-                    // if we need a disclosure for the array parts, dont remove
+        val d =
+            if (nestedDislcosure.isNotEmpty()) {
+                val obj =
+                    when (element) {
+                        is Value.Object -> {
+                            createDisclosureForObject(element, nestedDislcosure, currentDepth + 1, sdJwtHasher)
+                        }
+
+                        is Value.Array -> {
+                            // if we need a disclosure for the array parts, dont remove
 //                    replace = true
-                    createDisclosureForArray(element, nestedDislcosure, currentDepth + 1, sdJwtHasher)
-                }
-                else -> {
-                    Result.failure<SdjwtDisclosure>(IssuanceError.ElementNotDisclosable(element, nestedDislcosure))
-                }
-            }.getOrElse { return Result.failure(it) }
-            disclosures.addAll(obj.disclosure)
-            obj.disclosedObject
-        } else {
-           element
-        }
+                            createDisclosureForArray(element, nestedDislcosure, currentDepth + 1, sdJwtHasher)
+                        }
+
+                        else -> {
+                            Result.failure<SdjwtDisclosure>(
+                                IssuanceError.ElementNotDisclosable(element, nestedDislcosure),
+                            )
+                        }
+                    }.getOrElse { return Result.failure(it) }
+                disclosures.addAll(obj.disclosure)
+                obj.disclosedObject
+            } else {
+                element
+            }
         // value is disclosable
         // generate random nonce for salting
         val nonceStr = sdJwtHasher.generatedBlinding(generateNonce(32UL))
         val nonce = Value.String(nonceStr)
         // encode to string and base64
 
-        val disclosure = base64UrlEncode(json.encodeToString(Value.Array(listOf(nonce, Value.String(key.v1), d))).encodeToByteArray())
+        val disclosure =
+            base64UrlEncode(
+                json.encodeToString(Value.Array(listOf(nonce, Value.String(key.v1), d))).encodeToByteArray(),
+            )
 
         // calculate the hash from the base64encoded string
         val hash = sdJwtHasher.hash(disclosure, nonceStr, key.v1, d)
@@ -145,55 +208,69 @@ fun createDisclosureForObject(claims: Value.Object, objectDisclosures: List<Clai
         disclosures.add(disclosure)
         val index = sd.size - 1
         comLinks.put(key.v1, Value.Number(JsonNumber.Integer(index.toLong())))
-        if(replace) {
+        if (replace) {
             obj.put(key.v1, d)
         } else {
             obj.remove(key.v1)
         }
     }
-    if(sd.isNotEmpty()) {
+    if (sd.isNotEmpty()) {
         obj["_sd"] = Value.Array(sd)
     }
-    if(sdJwtHasher.sdAlgParams() != Value.Null && currentDepth == 1) {
+    if (sdJwtHasher.sdAlgParams() != Value.Null && currentDepth == 1) {
         obj["_sd_alg_param"] = sdJwtHasher.sdAlgParams()
     }
-    if(currentDepth == 1) {
+    if (currentDepth == 1) {
         obj["_sd_alg"] = sdJwtHasher.sdAlg()
     }
     // for ec_pedersen we also need com_link
-    if(sdJwtHasher.sdAlg() == Value.String("ec_pedersen")) {
+    if (sdJwtHasher.sdAlg() == Value.String("ec_pedersen")) {
         obj["com_link"] = Value.Object(comLinks)
     }
     return Result.success(SdjwtDisclosure(Value.Object(obj), disclosures))
 }
-fun createDisclosureForArray(array: Value.Array, objectDisclosures: List<ClaimsPointer>, currentDepth: Int, sdJwtHasher: SdJwtHasher) : Result<SdjwtDisclosure> {
+
+fun createDisclosureForArray(
+    array: Value.Array,
+    objectDisclosures: List<ClaimsPointer>,
+    currentDepth: Int,
+    sdJwtHasher: SdJwtHasher,
+): Result<SdjwtDisclosure> {
     // find all disclosures on our level
-    val thisObject = objectDisclosures.filter { it.depth() == currentDepth}
-    val restObject = objectDisclosures.filter { it.depth() > currentDepth}
+    val thisObject = objectDisclosures.filter { it.depth() == currentDepth }
+    val restObject = objectDisclosures.filter { it.depth() > currentDepth }
     // for array disclosure we only support NULL (slicing == all arguments)
     if (thisObject.size != 1) {
         return Result.failure(IssuanceError.ArrayMustRevealAll(thisObject))
     }
     val thisPtr = thisObject[0].key()
-    if(thisPtr !is PointerPart.Null) {
+    if (thisPtr !is PointerPart.Null) {
         return Result.failure(IssuanceError.ArrayMustRevealAll(thisObject))
     }
     var disclosures = mutableListOf<String>()
     var obj = mutableListOf<Value>()
-    for(element in array.v1) {
-        val dis = when(element) {
-            is Value.Object -> createDisclosureForObject(element, restObject, currentDepth + 1, sdJwtHasher)
-            is Value.Array -> createDisclosureForArray(element, restObject, currentDepth + 1, sdJwtHasher)
-            else -> {
-                Result.success(SdjwtDisclosure(element, listOf()))
-            }
-        }.getOrElse { return Result.failure(it) }
+    for (element in array.v1) {
+        val dis =
+            when (element) {
+                is Value.Object -> {
+                    createDisclosureForObject(element, restObject, currentDepth + 1, sdJwtHasher)
+                }
+
+                is Value.Array -> {
+                    createDisclosureForArray(element, restObject, currentDepth + 1, sdJwtHasher)
+                }
+
+                else -> {
+                    Result.success(SdjwtDisclosure(element, listOf()))
+                }
+            }.getOrElse { return Result.failure(it) }
         disclosures.addAll(dis.disclosure)
-        val nonceStr =  sdJwtHasher.generatedBlinding(generateNonce(32UL))
+        val nonceStr = sdJwtHasher.generatedBlinding(generateNonce(32UL))
         val nonce = Value.String(nonceStr)
         Value.Array(listOf(nonce, element))
         // encode to string and base64
-        val disclosure = base64UrlEncode(json.encodeToString(Value.Array(listOf(nonce, dis.disclosedObject))).encodeToByteArray())
+        val disclosure =
+            base64UrlEncode(json.encodeToString(Value.Array(listOf(nonce, dis.disclosedObject))).encodeToByteArray())
         // calculate the hash from the base64encoded string
         val hash = sdJwtHasher.hash(disclosure, nonceStr, null, dis.disclosedObject)
         disclosures.add(disclosure)
@@ -202,30 +279,39 @@ fun createDisclosureForArray(array: Value.Array, objectDisclosures: List<ClaimsP
     return Result.success(SdjwtDisclosure(Value.Array(obj), disclosures))
 }
 
-class SdJwt(val innerJwt: SdJwtRust) : ClaimGetter {
+class SdJwt(
+    val innerJwt: SdJwtRust,
+) : ClaimGetter {
     companion object {
-        val SD_JWT_FORMATS : Array<String> = arrayOf("dc+sd-jwt", "vc+sd-jwt")
-        fun parse(str: String): SdJwt {
-            return SdJwt(decodeSdjwt(str))
-        }
-        fun create(claims: Value, disclosures: List<ClaimsPointer>, keyId: String?, key: SignatureCreator, pubKeyJwk: Value?, hashAlg: String = "sha-256") : SdJwt? {
+        val SD_JWT_FORMATS: Array<String> = arrayOf("dc+sd-jwt", "vc+sd-jwt")
+
+        fun parse(str: String): SdJwt = SdJwt(decodeSdjwt(str))
+
+        fun create(
+            claims: Value,
+            disclosures: List<ClaimsPointer>,
+            keyId: String?,
+            key: SignatureCreator,
+            pubKeyJwk: Value?,
+            hashAlg: String = "sha-256",
+        ): SdJwt? {
             val sdjwtHasher = SdJwtHasher.fromStr(hashAlg)
             val header = Header(typ = "dc+sd-jwt", alg = key.alg(), kid = keyId)
             if (!claims.isObject()) {
                 return null
             }
             val keyClaims = claims.asObject()!!.toMutableMap()
-            if(pubKeyJwk != null) {
+            if (pubKeyJwk != null) {
                 val cnf = mutableMapOf("jwk" to pubKeyJwk)
                 keyClaims.put("cnf", Value.Object(cnf))
             }
             val claimObject = Value.Object(keyClaims)
             // we start at level 1
             val sdjwt = createDisclosureForObject(claimObject, disclosures, 1, sdjwtHasher)
-            if(sdjwt.isFailure) {
+            if (sdjwt.isFailure) {
                 return null
             }
-            val headerEncoded = base64UrlEncode(json.encodeToString(Header.serializer(),header).encodeToByteArray())
+            val headerEncoded = base64UrlEncode(json.encodeToString(Header.serializer(), header).encodeToByteArray())
             val sdjwtDisclosure = sdjwt.getOrThrow()
             val bodyEncoded = base64UrlEncode(json.encodeToString(sdjwtDisclosure.disclosedObject).encodeToByteArray())
             val msgPayload = "$headerEncoded.$bodyEncoded"
@@ -237,18 +323,14 @@ class SdJwt(val innerJwt: SdJwtRust) : ClaimGetter {
     }
 
     // We need to optimize this currently we have way too many calls to select
-    fun resolvePointer(ptr: List<PointerPart>) : List<List<PointerPart>> {
+    fun resolvePointer(ptr: List<PointerPart>): List<List<PointerPart>> {
         val p = ClaimsPointer(ptr)
         return p.resolvePtr(this.innerJwt.claims)
     }
 
-    fun presentation(): SdJwtBuilder {
-        return SdJwtBuilder.fromSdjwt(this.innerJwt)
-    }
+    fun presentation(): SdJwtBuilder = SdJwtBuilder.fromSdjwt(this.innerJwt)
 
-    override fun get(pointer: Selector): List<Value> {
-        return this.innerJwt.claims[pointer]
-    }
+    override fun get(pointer: Selector): List<Value> = this.innerJwt.claims[pointer]
 
     fun getMetadata(): SdJwtVcMetadata {
         val claims = innerJwt.claims
@@ -260,7 +342,7 @@ class SdJwt(val innerJwt: SdJwtRust) : ClaimGetter {
             notBefore = claims["nbf"].let { it.asLong() ?: it.asString()?.toLongOrNull() },
             confirmation = claims["cnf"].asString(),
             status = claims["status"].asString(),
-            subject = claims["sub"].asString()
+            subject = claims["sub"].asString(),
         )
     }
 
@@ -284,26 +366,15 @@ class SdJwt(val innerJwt: SdJwtRust) : ClaimGetter {
         return helper(innerJwt.claims)
     }
 
-    fun getNumDisclosed(): Int {
-        return innerJwt.disclosuresMap.size
-    }
+    fun getNumDisclosed(): Int = innerJwt.disclosuresMap.size
 
-    fun isSignatureValid(): Boolean {
-        return SdJwtVcSignatureResolver.isSignatureValid(innerJwt.originalJwt)
-    }
+    fun isSignatureValid(): Boolean = SdJwtVcSignatureResolver.isSignatureValid(innerJwt.originalJwt)
 }
 
-fun SdJwtRust.toKt() : SdJwt {
-    return SdJwt(this)
-}
-fun SdJwt.toJson() : String? {
-    return this.innerJwt.toJson()
-}
+fun SdJwtRust.toKt(): SdJwt = SdJwt(this)
 
-fun SdJwtRust.toJson() : String? {
-    return encodeToJson(this)
-}
+fun SdJwt.toJson(): String? = this.innerJwt.toJson()
 
-operator fun SdJwt.get(s: Selector) : List<Value> {
-    return this.get(s)
-}
+fun SdJwtRust.toJson(): String? = encodeToJson(this)
+
+operator fun SdJwt.get(s: Selector): List<Value> = this.get(s)
