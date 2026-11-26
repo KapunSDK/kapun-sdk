@@ -18,4 +18,7 @@ package org.kapunsdk.wallet.crypto
 
 import java.security.KeyPair
 
-internal data class KeyPairBundle(val keyPair: KeyPair, val alias: String)
+internal data class KeyPairBundle(
+    val keyPair: KeyPair,
+    val alias: String,
+)

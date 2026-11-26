@@ -19,9 +19,7 @@ package org.kapunsdk.visualization
 import org.kapunsdk.visualization.di.KapunVisualizationKoinContext
 
 actual class KapunVisualization {
-
-	actual fun initialize() {
-		KapunVisualizationKoinContext.initialize()
-	}
-
+    actual fun initialize() {
+        KapunVisualizationKoinContext.initialize()
+    }
 }

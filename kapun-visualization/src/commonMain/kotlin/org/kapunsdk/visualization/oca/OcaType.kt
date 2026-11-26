@@ -17,11 +17,17 @@ under the License.
 package org.kapunsdk.visualization.oca
 
 sealed interface OcaType {
-	data class Reference(val url: String) : OcaType
+    data class Reference(
+        val url: String,
+    ) : OcaType
 
-	sealed interface BuiltIn : OcaType {
-		data object EuPid : BuiltIn
-		data object SwissBetaId : BuiltIn
-		data class FromMetadata(val url: String) : BuiltIn
-	}
+    sealed interface BuiltIn : OcaType {
+        data object EuPid : BuiltIn
+
+        data object SwissBetaId : BuiltIn
+
+        data class FromMetadata(
+            val url: String,
+        ) : BuiltIn
+    }
 }

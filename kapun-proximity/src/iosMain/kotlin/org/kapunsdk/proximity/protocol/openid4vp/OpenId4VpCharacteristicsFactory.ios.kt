@@ -11,7 +11,7 @@ software distributed under the License is distributed on an
 "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
-under the License.   
+under the License.
  */
 package org.kapunsdk.proximity.protocol.openid4vp
 
@@ -20,58 +20,55 @@ import platform.CoreBluetooth.*
 import kotlin.toString
 
 internal actual class OpenId4VpCharacteristicsFactory {
-
-	internal actual fun createServerCharacteristics(): List<BleGattCharacteristic> {
-		return listOf(
-			CBMutableCharacteristic(
-				CBUUID.UUIDWithString(OpenId4VpTransportProtocol.charRequestSizeUuid.toString()),
-				CBCharacteristicPropertyRead,
-				null,
-				CBAttributePermissionsReadable
-			),
-			CBMutableCharacteristic(
-				CBUUID.UUIDWithString(OpenId4VpTransportProtocol.charRequestUuid.toString()),
-				CBCharacteristicPropertyRead,
-				null,
-				CBAttributePermissionsReadable
-			),
-			CBMutableCharacteristic(
-				CBUUID.UUIDWithString(OpenId4VpTransportProtocol.charIdentifyUuid.toString()),
-				CBCharacteristicPropertyWrite or CBCharacteristicPropertyWriteWithoutResponse,
-				null,
-				CBAttributePermissionsWriteable
-			),
-			CBMutableCharacteristic(
-				CBUUID.UUIDWithString(OpenId4VpTransportProtocol.charContentSizeUuid.toString()),
-				CBCharacteristicPropertyWrite or CBCharacteristicPropertyWriteWithoutResponse,
-				null,
-				CBAttributePermissionsWriteable
-			),
-			CBMutableCharacteristic(
-				CBUUID.UUIDWithString(OpenId4VpTransportProtocol.charSubmitVcUuid.toString()),
-				CBCharacteristicPropertyWrite or CBCharacteristicPropertyWriteWithoutResponse,
-				null,
-				CBAttributePermissionsWriteable
-			),
-			CBMutableCharacteristic(
-				CBUUID.UUIDWithString(OpenId4VpTransportProtocol.charTransferSummaryRequestUuid.toString()),
-				CBCharacteristicPropertyWrite or CBCharacteristicPropertyWriteWithoutResponse,
-				null,
-				CBAttributePermissionsWriteable
-			),
-			CBMutableCharacteristic(
-				CBUUID.UUIDWithString(OpenId4VpTransportProtocol.charTransferSummaryReportUuid.toString()),
-				CBCharacteristicPropertyNotify,
-				null,
-				CBAttributePermissionsReadable
-			),
-			CBMutableCharacteristic(
-				CBUUID.UUIDWithString(OpenId4VpTransportProtocol.charDisconnectUuid.toString()),
-				CBCharacteristicPropertyNotify,
-				null,
-				CBAttributePermissionsReadable
-			),
-		).map { BleGattCharacteristic(it) }
-	}
-
+    internal actual fun createServerCharacteristics(): List<BleGattCharacteristic> =
+        listOf(
+            CBMutableCharacteristic(
+                CBUUID.UUIDWithString(OpenId4VpTransportProtocol.charRequestSizeUuid.toString()),
+                CBCharacteristicPropertyRead,
+                null,
+                CBAttributePermissionsReadable,
+            ),
+            CBMutableCharacteristic(
+                CBUUID.UUIDWithString(OpenId4VpTransportProtocol.charRequestUuid.toString()),
+                CBCharacteristicPropertyRead,
+                null,
+                CBAttributePermissionsReadable,
+            ),
+            CBMutableCharacteristic(
+                CBUUID.UUIDWithString(OpenId4VpTransportProtocol.charIdentifyUuid.toString()),
+                CBCharacteristicPropertyWrite or CBCharacteristicPropertyWriteWithoutResponse,
+                null,
+                CBAttributePermissionsWriteable,
+            ),
+            CBMutableCharacteristic(
+                CBUUID.UUIDWithString(OpenId4VpTransportProtocol.charContentSizeUuid.toString()),
+                CBCharacteristicPropertyWrite or CBCharacteristicPropertyWriteWithoutResponse,
+                null,
+                CBAttributePermissionsWriteable,
+            ),
+            CBMutableCharacteristic(
+                CBUUID.UUIDWithString(OpenId4VpTransportProtocol.charSubmitVcUuid.toString()),
+                CBCharacteristicPropertyWrite or CBCharacteristicPropertyWriteWithoutResponse,
+                null,
+                CBAttributePermissionsWriteable,
+            ),
+            CBMutableCharacteristic(
+                CBUUID.UUIDWithString(OpenId4VpTransportProtocol.charTransferSummaryRequestUuid.toString()),
+                CBCharacteristicPropertyWrite or CBCharacteristicPropertyWriteWithoutResponse,
+                null,
+                CBAttributePermissionsWriteable,
+            ),
+            CBMutableCharacteristic(
+                CBUUID.UUIDWithString(OpenId4VpTransportProtocol.charTransferSummaryReportUuid.toString()),
+                CBCharacteristicPropertyNotify,
+                null,
+                CBAttributePermissionsReadable,
+            ),
+            CBMutableCharacteristic(
+                CBUUID.UUIDWithString(OpenId4VpTransportProtocol.charDisconnectUuid.toString()),
+                CBCharacteristicPropertyNotify,
+                null,
+                CBAttributePermissionsReadable,
+            ),
+        ).map { BleGattCharacteristic(it) }
 }

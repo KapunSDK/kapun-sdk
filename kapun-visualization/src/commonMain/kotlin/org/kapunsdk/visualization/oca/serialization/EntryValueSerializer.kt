@@ -16,7 +16,6 @@ under the License.
 
 package org.kapunsdk.visualization.oca.serialization
 
-import org.kapunsdk.visualization.oca.model.content.EntryValue
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
@@ -26,31 +25,44 @@ import kotlinx.serialization.json.JsonDecoder
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonPrimitive
+import org.kapunsdk.visualization.oca.model.content.EntryValue
 
 internal object EntryValueSerializer : KSerializer<EntryValue> {
+    override val descriptor = PrimitiveSerialDescriptor("EntryValue", PrimitiveKind.STRING)
 
-	override val descriptor = PrimitiveSerialDescriptor("EntryValue", PrimitiveKind.STRING)
+    override fun deserialize(decoder: Decoder): EntryValue {
+        val jsonDecoder =
+            decoder as? JsonDecoder ?: throw IllegalArgumentException("This class can only be deserialized from JSON")
+        return when (val jsonElement = jsonDecoder.decodeJsonElement()) {
+            is JsonPrimitive -> {
+                EntryValue.Reference(jsonElement.content)
+            }
 
-	override fun deserialize(decoder: Decoder): EntryValue {
-		val jsonDecoder = decoder as? JsonDecoder ?: throw IllegalArgumentException("This class can only be deserialized from JSON")
-		return when (val jsonElement = jsonDecoder.decodeJsonElement()) {
-			is JsonPrimitive -> EntryValue.Reference(jsonElement.content)
-			is JsonObject -> {
-				EntryValue.Predefined(jsonElement.toMap().mapValues { it.value.jsonPrimitive.content })
-			}
-			else -> throw IllegalArgumentException("Excpected either JsonPrimitive or JsonArray but was $jsonElement")
-		}
-	}
+            is JsonObject -> {
+                EntryValue.Predefined(jsonElement.toMap().mapValues { it.value.jsonPrimitive.content })
+            }
 
-	override fun serialize(encoder: Encoder, value: EntryValue) {
-		val serialized = when (value) {
-			is EntryValue.Predefined -> {
-				val mappings = value.mapping.map { "${it.key}:${it.value}" }.joinToString(",")
-				"{$mappings}"
-			}
-			is EntryValue.Reference -> value.reference
-		}
-		encoder.encodeString(serialized)
-	}
+            else -> {
+                throw IllegalArgumentException("Excpected either JsonPrimitive or JsonArray but was $jsonElement")
+            }
+        }
+    }
 
+    override fun serialize(
+        encoder: Encoder,
+        value: EntryValue,
+    ) {
+        val serialized =
+            when (value) {
+                is EntryValue.Predefined -> {
+                    val mappings = value.mapping.map { "${it.key}:${it.value}" }.joinToString(",")
+                    "{$mappings}"
+                }
+
+                is EntryValue.Reference -> {
+                    value.reference
+                }
+            }
+        encoder.encodeString(serialized)
+    }
 }

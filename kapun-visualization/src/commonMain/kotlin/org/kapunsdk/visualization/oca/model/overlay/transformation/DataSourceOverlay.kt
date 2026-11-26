@@ -15,13 +15,13 @@ under the License.
  */
 package org.kapunsdk.visualization.oca.model.overlay.transformation
 
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 import org.kapunsdk.visualization.oca.model.SAID_HASH_PLACEHOLDER
 import org.kapunsdk.visualization.oca.model.content.AttributeName
 import org.kapunsdk.visualization.oca.model.content.SAID
 import org.kapunsdk.visualization.oca.model.overlay.Overlay
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonElement
 
 /**
  * Where an attribute's value comes from in a credential of [format] (e.g. `dc+sd-jwt`): a claims path pointer
@@ -30,13 +30,16 @@ import kotlinx.serialization.json.JsonElement
  */
 @Serializable
 data class DataSourceOverlay(
-	@SerialName("format") val format: String? = null,
-	@SerialName("attribute_sources") val attributeSources: Map<AttributeName, List<JsonElement>>,
-	@SerialName("capture_base") override val captureBase: SAID,
-	@SerialName("type") override val type: String = "extend/overlays/data_source/2.0",
-	@SerialName("digest") override val digest: SAID = SAID_HASH_PLACEHOLDER,
+    @SerialName("format") val format: String? = null,
+    @SerialName("attribute_sources") val attributeSources: Map<AttributeName, List<JsonElement>>,
+    @SerialName("capture_base") override val captureBase: SAID,
+    @SerialName("type") override val type: String = "extend/overlays/data_source/2.0",
+    @SerialName("digest") override val digest: SAID = SAID_HASH_PLACEHOLDER,
 ) : TransformationOverlay {
+    fun getSource(attributeName: AttributeName) = attributeSources[attributeName]
 
-	fun getSource(attributeName: AttributeName) = attributeSources[attributeName]
-	override fun updateDigest(digest: SAID, captureBase: SAID): Overlay = copy(digest = digest, captureBase = captureBase)
+    override fun updateDigest(
+        digest: SAID,
+        captureBase: SAID,
+    ): Overlay = copy(digest = digest, captureBase = captureBase)
 }

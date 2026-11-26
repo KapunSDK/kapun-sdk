@@ -10,10 +10,12 @@ data class WitnessParam(
 )
 
 @Serializable
-data class WitnessRef(val id: String)
+data class WitnessRef(
+    val id: String,
+)
 
 @Serializable
 data class WitnessProof(
     val versionId: String,
-    val proof: List<Value>
+    val proof: List<Value>,
 )

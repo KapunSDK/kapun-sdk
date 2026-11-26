@@ -25,48 +25,48 @@ import uniffi.kapun_crypto_rust.getX509FromJwt
 import uniffi.kapun_crypto_rust.validateJwtWithPubKey
 
 interface TrustFramework {
-	val frameworkId : String
+    val frameworkId: String
 
-	suspend fun getIssuerInformation(
-		baseUrl: String,
-		credentialConfigurationIds: List<String>,
-		credentialIssuerMetadata: CredentialIssuerMetadata
-	): AgentInformation?
+    suspend fun getIssuerInformation(
+        baseUrl: String,
+        credentialConfigurationIds: List<String>,
+        credentialIssuerMetadata: CredentialIssuerMetadata,
+    ): AgentInformation?
 
-	suspend fun getVerifierInformation(
-		requestUri: String,
-		presentationRequest: PresentationRequest,
-		originalRequest: String?
-	): AgentInformation?
+    suspend fun getVerifierInformation(
+        requestUri: String,
+        presentationRequest: PresentationRequest,
+        originalRequest: String?,
+    ): AgentInformation?
 
-	suspend fun validatePresentationRequest(
-		presentationRequest: PresentationRequest,
-	): org.kapunsdk.trust.framework.ValidationInfo
+    suspend fun validatePresentationRequest(
+        presentationRequest: PresentationRequest,
+    ): org.kapunsdk.trust.framework.ValidationInfo
 
-	suspend fun getAllowedDocuments(
-		presentationRequest: PresentationRequest,
-		includeUsedCredentials: Boolean,
-	): List<CredentialModel>
+    suspend fun getAllowedDocuments(
+        presentationRequest: PresentationRequest,
+        includeUsedCredentials: Boolean,
+    ): List<CredentialModel>
 
-	/** Saves a trust anchor after explicit user approval. Trust frameworks may ignore this. */
-	fun saveTrustAnchor(trustAnchor: TrustAnchorInfo) = Unit
+    /** Saves a trust anchor after explicit user approval. Trust frameworks may ignore this. */
+    fun saveTrustAnchor(trustAnchor: TrustAnchorInfo) = Unit
 
-	/** Returns the configured trust anchors exposed by this framework. */
-	fun getTrustAnchors(): List<TrustAnchorInfo> = emptyList()
+    /** Returns the configured trust anchors exposed by this framework. */
+    fun getTrustAnchors(): List<TrustAnchorInfo> = emptyList()
 
-	/** Removes a user-managed trust anchor. Trust frameworks may ignore this. */
-	fun removeTrustAnchor(trustAnchor: TrustAnchorInfo) = Unit
-
+    /** Removes a user-managed trust anchor. Trust frameworks may ignore this. */
+    fun removeTrustAnchor(trustAnchor: TrustAnchorInfo) = Unit
 
     fun isMetadataSignatureTrustedX509(
-		metadataJwt: String,
-	    trustAnchorProvider: org.kapunsdk.trust.framework.X509TrustAnchorProvider,
+        metadataJwt: String,
+        trustAnchorProvider: org.kapunsdk.trust.framework.X509TrustAnchorProvider,
     ): Boolean {
         val certs = getX509FromJwt(metadataJwt)
-        val isChainValid = certs?.let { trustAnchorProvider.verifyChain(it)  } ?: false
-        val isSigned = certs?.getOrNull(0)?.publicKey?.let {
-            validateJwtWithPubKey(metadataJwt, it)
-        } ?: false
+        val isChainValid = certs?.let { trustAnchorProvider.verifyChain(it) } ?: false
+        val isSigned =
+            certs?.getOrNull(0)?.publicKey?.let {
+                validateJwtWithPubKey(metadataJwt, it)
+            } ?: false
         val isTrusted = isSigned and isChainValid
         return isTrusted
     }

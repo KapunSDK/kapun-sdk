@@ -32,21 +32,22 @@ import org.kapunsdk.wallet.credentials.signeddocument.SignedDocumentsController
 import org.kapunsdk.wallet.credentials.signeddocument.SignedDocumentsRepository
 import org.koin.dsl.module
 
-internal fun credentialsModule() = module {
-	includes(
-		ActivityRepository.koinModule,
-		CredentialsController.koinModule,
-		CredentialsRepository.koinModule,
-		DeferredCredentialsRepository.koinModule,
-		IdentityRepository.koinModule,
-		IssuerRepository.koinModule,
-		OcaIdentityMapper.koinModule,
-		FallbackIdentityMapper.koinModule,
-		OcaRepository.koinModule,
-		OcaServiceController.koinModule,
-		CredentialStore.koinModule,
-		ViewModelFactory.koinModule,
-		SignedDocumentsRepository.koinModule,
-		SignedDocumentsController.koinModule,
-	)
-}
+internal fun credentialsModule() =
+    module {
+        includes(
+            ActivityRepository.koinModule,
+            CredentialsController.koinModule,
+            CredentialsRepository.koinModule,
+            DeferredCredentialsRepository.koinModule,
+            IdentityRepository.koinModule,
+            IssuerRepository.koinModule,
+            OcaIdentityMapper.koinModule,
+            FallbackIdentityMapper.koinModule,
+            OcaRepository.koinModule,
+            OcaServiceController.koinModule,
+            CredentialStore.koinModule,
+            ViewModelFactory.koinModule,
+            SignedDocumentsRepository.koinModule,
+            SignedDocumentsController.koinModule,
+        )
+    }

@@ -16,24 +16,27 @@ under the License.
 
 package org.kapunsdk.visualization.oca.model.overlay.semantic
 
-import org.kapunsdk.visualization.oca.model.SAID_HASH_PLACEHOLDER
-import org.kapunsdk.visualization.oca.model.content.AttributeName
-import org.kapunsdk.visualization.oca.model.content.SAID
-import org.kapunsdk.visualization.oca.model.overlay.Overlay
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonNames
+import org.kapunsdk.visualization.oca.model.SAID_HASH_PLACEHOLDER
+import org.kapunsdk.visualization.oca.model.content.AttributeName
+import org.kapunsdk.visualization.oca.model.content.SAID
+import org.kapunsdk.visualization.oca.model.overlay.Overlay
 
 @OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class StandardOverlay(
-	@JsonNames("attribute_standards", "attr_standards") val attributeStandards: Map<AttributeName, String>,
-	@SerialName("capture_base") override val captureBase: SAID,
-	@SerialName("type") override val type: String = "spec/overlays/standard/1.0",
-	@SerialName("digest") override val digest: SAID = SAID_HASH_PLACEHOLDER,
+    @JsonNames("attribute_standards", "attr_standards") val attributeStandards: Map<AttributeName, String>,
+    @SerialName("capture_base") override val captureBase: SAID,
+    @SerialName("type") override val type: String = "spec/overlays/standard/1.0",
+    @SerialName("digest") override val digest: SAID = SAID_HASH_PLACEHOLDER,
 ) : SemanticOverlay {
+    fun getStandard(attributeName: AttributeName) = attributeStandards[attributeName]
 
-	fun getStandard(attributeName: AttributeName) = attributeStandards[attributeName]
-	override fun updateDigest(digest: SAID, captureBase: SAID): Overlay = copy(digest = digest, captureBase = captureBase)
+    override fun updateDigest(
+        digest: SAID,
+        captureBase: SAID,
+    ): Overlay = copy(digest = digest, captureBase = captureBase)
 }

@@ -11,7 +11,7 @@ software distributed under the License is distributed on an
 "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
-under the License.   
+under the License.
  */
 package org.kapunsdk.proximity.ble.client
 
@@ -21,17 +21,15 @@ import org.kapunsdk.proximity.ble.gatt.BleGattCharacteristicDescriptor
 import org.kapunsdk.proximity.ble.gatt.BleGattService
 
 internal interface BleGattClientListener : BleGattListener {
+    fun onServicesDiscovered(services: List<BleGattService>): List<BleGattCharacteristic>
 
-	fun onServicesDiscovered(services: List<BleGattService>): List<BleGattCharacteristic>
+    fun onCharacteristicRead(characteristic: BleGattCharacteristic) {}
 
-	fun onCharacteristicRead(characteristic: BleGattCharacteristic) {}
+    fun onCharacteristicWrite(characteristic: BleGattCharacteristic) {}
 
-	fun onCharacteristicWrite(characteristic: BleGattCharacteristic) {}
+    fun onCharacteristicChanged(characteristic: BleGattCharacteristic) {}
 
-	fun onCharacteristicChanged(characteristic: BleGattCharacteristic) {}
+    fun onDescriptorRead(descriptor: BleGattCharacteristicDescriptor) {}
 
-	fun onDescriptorRead(descriptor: BleGattCharacteristicDescriptor) {}
-
-	fun onDescriptorWrite(descriptor: BleGattCharacteristicDescriptor) {}
-
+    fun onDescriptorWrite(descriptor: BleGattCharacteristicDescriptor) {}
 }

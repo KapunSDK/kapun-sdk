@@ -25,73 +25,78 @@ import org.kapunsdk.trust.model.TrustAnchorInfo
 import org.kapunsdk.util.log.Logger
 
 class TrustFrameworkController(
-	private val frameworks: List<org.kapunsdk.trust.framework.TrustFramework>,
+    private val frameworks: List<org.kapunsdk.trust.framework.TrustFramework>,
 ) {
-	private companion object {
-		private const val TAG = "TrustFramework"
-	}
+    private companion object {
+        private const val TAG = "TrustFramework"
+    }
 
-	suspend fun startIssuanceFlow(
-		baseUrl: String,
-		credentialConfigurationIds: List<String>,
-		credentialIssuerMetadata: CredentialIssuerMetadata
-	): TrustFlow {
-		return startFlow { framework ->
-			framework.getIssuerInformation(baseUrl, credentialConfigurationIds, credentialIssuerMetadata)
-		} ?: createUntrustedFlow(baseUrl, AgentType.ISSUER)
-	}
+    suspend fun startIssuanceFlow(
+        baseUrl: String,
+        credentialConfigurationIds: List<String>,
+        credentialIssuerMetadata: CredentialIssuerMetadata,
+    ): TrustFlow =
+        startFlow { framework ->
+            framework.getIssuerInformation(baseUrl, credentialConfigurationIds, credentialIssuerMetadata)
+        } ?: createUntrustedFlow(baseUrl, AgentType.ISSUER)
 
-	suspend fun startVerificationFlow(
-		requestUri: String,
-		presentationRequest: PresentationRequest,
-		originalRequest: String?
-	): TrustFlow {
-		return startFlow { framework ->
-			framework.getVerifierInformation(requestUri, presentationRequest, originalRequest)
-		} ?: createUntrustedFlow(requestUri, AgentType.VERIFIER)
-	}
+    suspend fun startVerificationFlow(
+        requestUri: String,
+        presentationRequest: PresentationRequest,
+        originalRequest: String?,
+    ): TrustFlow =
+        startFlow { framework ->
+            framework.getVerifierInformation(requestUri, presentationRequest, originalRequest)
+        } ?: createUntrustedFlow(requestUri, AgentType.VERIFIER)
 
-	fun saveTrustAnchor(trustAnchor: TrustAnchorInfo) {
-		frameworks.firstOrNull { it.frameworkId == trustAnchor.trustFrameworkId }
-			?.saveTrustAnchor(trustAnchor)
-	}
+    fun saveTrustAnchor(trustAnchor: TrustAnchorInfo) {
+        frameworks
+            .firstOrNull { it.frameworkId == trustAnchor.trustFrameworkId }
+            ?.saveTrustAnchor(trustAnchor)
+    }
 
-	fun getTrustAnchors(): List<TrustAnchorInfo> = frameworks.flatMap { it.getTrustAnchors() }
+    fun getTrustAnchors(): List<TrustAnchorInfo> = frameworks.flatMap { it.getTrustAnchors() }
 
-	fun removeTrustAnchor(trustAnchor: TrustAnchorInfo) {
-		frameworks.firstOrNull { it.frameworkId == trustAnchor.trustFrameworkId }
-			?.removeTrustAnchor(trustAnchor)
-	}
+    fun removeTrustAnchor(trustAnchor: TrustAnchorInfo) {
+        frameworks
+            .firstOrNull { it.frameworkId == trustAnchor.trustFrameworkId }
+            ?.removeTrustAnchor(trustAnchor)
+    }
 
-	private suspend fun startFlow(agentProvider: suspend (org.kapunsdk.trust.framework.TrustFramework) -> AgentInformation?): TrustFlow? {
-		// Each framework may resolve DIDs / trust statements over the network, so log per attempt:
-		// this is what turns an opaque "trust resolution" block into a per-framework breakdown.
-		frameworks.forEach { framework ->
-			val name = framework::class.simpleName ?: "unknown"
-			Logger(TAG).debug("resolution started: framework=$name")
-			val agentInformation = agentProvider.invoke(framework)
-			if (agentInformation != null) {
-				Logger(TAG).debug("resolution matched: framework=$name")
-				return TrustFlow(agentInformation, framework)
-			}
-			Logger(TAG).debug("resolution no match: framework=$name")
-		}
+    private suspend fun startFlow(
+        agentProvider: suspend (org.kapunsdk.trust.framework.TrustFramework) -> AgentInformation?,
+    ): TrustFlow? {
+        // Each framework may resolve DIDs / trust statements over the network, so log per attempt:
+        // this is what turns an opaque "trust resolution" block into a per-framework breakdown.
+        frameworks.forEach { framework ->
+            val name = framework::class.simpleName ?: "unknown"
+            Logger(TAG).debug("resolution started: framework=$name")
+            val agentInformation = agentProvider.invoke(framework)
+            if (agentInformation != null) {
+                Logger(TAG).debug("resolution matched: framework=$name")
+                return TrustFlow(agentInformation, framework)
+            }
+            Logger(TAG).debug("resolution no match: framework=$name")
+        }
 
-		Logger(TAG).debug("resolution exhausted: no framework matched")
-		return null
-	}
+        Logger(TAG).debug("resolution exhausted: no framework matched")
+        return null
+    }
 
-	private fun createUntrustedFlow(baseUrl: String, agentType: AgentType) = TrustFlow(
-		agentInformation = AgentInformation(
-			type = agentType,
-			domain = baseUrl,
-			displayName = baseUrl,
-			logoUri = null,
-			isTrusted = false,
-			isVerified = false,
-			trustFrameworkId = null,
-		),
-		framework = null,
-	)
-
+    private fun createUntrustedFlow(
+        baseUrl: String,
+        agentType: AgentType,
+    ) = TrustFlow(
+        agentInformation =
+            AgentInformation(
+                type = agentType,
+                domain = baseUrl,
+                displayName = baseUrl,
+                logoUri = null,
+                isTrusted = false,
+                isVerified = false,
+                trustFrameworkId = null,
+            ),
+        framework = null,
+    )
 }

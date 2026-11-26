@@ -18,10 +18,6 @@ under the License.
 
 package org.kapunsdk.presentation.request
 
-import org.kapunsdk.presentation.request.model.OID4VPVersion
-import org.kapunsdk.util.extensions.*
-import org.kapunsdk.util.extensions.get
-import org.kapunsdk.wallet.process.presentation.models.TransactionDataWrapper
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -29,9 +25,13 @@ import kotlinx.serialization.json.JsonNames
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import org.kapunsdk.presentation.request.model.OID4VPVersion
+import org.kapunsdk.util.extensions.*
+import org.kapunsdk.util.extensions.get
+import org.kapunsdk.wallet.process.presentation.models.TransactionDataWrapper
+import uniffi.kapun_credential_core_rust.generateNonce
 import uniffi.kapun_dcql_rust.DcqlQuery
 import uniffi.kapun_util_rust.Value
-import uniffi.kapun_credential_core_rust.generateNonce
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
@@ -39,248 +39,268 @@ import kotlin.io.encoding.ExperimentalEncodingApi
  * Data class to hold both the OID4VP draft version and the parsed PresentationRequest
  */
 data class VersionedPresentationRequest(
-	val version: OID4VPVersion,
-	val request: PresentationRequest,
+    val version: OID4VPVersion,
+    val request: PresentationRequest,
 )
 
 @Serializable
 data class ZkpInfo(
-	val definition: String,
-	@JsonNames("proving_key") val provingKey: String,
-	@JsonNames("issuer_pk") val issuerPk: String,
-	@JsonNames("issuer_id") val issuerId: String,
-	@JsonNames("issuer_key_id") val issuerKeyId: String,
+    val definition: String,
+    @JsonNames("proving_key") val provingKey: String,
+    @JsonNames("issuer_pk") val issuerPk: String,
+    @JsonNames("issuer_id") val issuerId: String,
+    @JsonNames("issuer_key_id") val issuerKeyId: String,
 ) {
-	companion object {
-		fun fromValue(value: Value): ZkpInfo? {
-			fun stringValue(camelCaseName: String, snakeCaseName: String): String? =
-				value[camelCaseName].asString() ?: value[snakeCaseName].asString()
+    companion object {
+        fun fromValue(value: Value): ZkpInfo? {
+            fun stringValue(
+                camelCaseName: String,
+                snakeCaseName: String,
+            ): String? = value[camelCaseName].asString() ?: value[snakeCaseName].asString()
 
-			return ZkpInfo(
-				definition = value["definition"].asString() ?: return null,
-				provingKey = stringValue("provingKey", "proving_key") ?: return null,
-				issuerPk = stringValue("issuerPk", "issuer_pk") ?: return null,
-				issuerId = stringValue("issuerId", "issuer_id") ?: return null,
-				issuerKeyId = stringValue("issuerKeyId", "issuer_key_id") ?: return null,
-			)
-		}
-	}
+            return ZkpInfo(
+                definition = value["definition"].asString() ?: return null,
+                provingKey = stringValue("provingKey", "proving_key") ?: return null,
+                issuerPk = stringValue("issuerPk", "issuer_pk") ?: return null,
+                issuerId = stringValue("issuerId", "issuer_id") ?: return null,
+                issuerKeyId = stringValue("issuerKeyId", "issuer_key_id") ?: return null,
+            )
+        }
+    }
 }
 
 @Serializable
 data class PresentationRequest constructor(
-	@SerialName("client_id")
-	val clientId: String,
-	@EncodeDefault
-	@SerialName("response_type")
-	val responseType: String = "vp_token",
-	@EncodeDefault
-	@SerialName("nonce")
-	val nonce: String = generateNonce(32UL),
-	@EncodeDefault
-	@SerialName("response_mode")
-	val responseMode: String = "direct_post.jwt",
-	@SerialName("client_id_scheme")
-	val clientIdScheme: String? = null,
-	@SerialName("presentation_definition")
-	val presentationDefinition: Value? = null,
-	@SerialName("presentation_definition_uri")
-	val presentationDefinitionUri: Value? = null,
-	@SerialName("dcql_query")
-	val dcqlQuery: DcqlQuery? = null,
-	/**
-	 * A space separated list of presentation scopes.  In the Swiss profile a
-	 * scope identifies the DCQL query embedded in a verifier-info vqPS JWT.
-	 */
-	@SerialName("scope")
-	val scope: String? = null,
-	@SerialName("transaction_data")
-	val transactionData: TransactionDataWrapper? = null,
-	@SerialName("client_metadata")
-	val clientMetadata: ClientMetadata? = null,
-	@SerialName("verifier_attestations")
-	val verifierAttestations: List<Value>? = null,
-	@SerialName("verifier_info")
-	val verifierInfo: List<Value>? = null,
-	@SerialName("expected_origins")
-	val expectedOrigins: List<String>? = null,
-	val zkp: ZkpInfo? = null,
+    @SerialName("client_id")
+    val clientId: String,
+    @EncodeDefault
+    @SerialName("response_type")
+    val responseType: String = "vp_token",
+    @EncodeDefault
+    @SerialName("nonce")
+    val nonce: String = generateNonce(32UL),
+    @EncodeDefault
+    @SerialName("response_mode")
+    val responseMode: String = "direct_post.jwt",
+    @SerialName("client_id_scheme")
+    val clientIdScheme: String? = null,
+    @SerialName("presentation_definition")
+    val presentationDefinition: Value? = null,
+    @SerialName("presentation_definition_uri")
+    val presentationDefinitionUri: Value? = null,
+    @SerialName("dcql_query")
+    val dcqlQuery: DcqlQuery? = null,
+    /**
+     * A space separated list of presentation scopes.  In the Swiss profile a
+     * scope identifies the DCQL query embedded in a verifier-info vqPS JWT.
+     */
+    @SerialName("scope")
+    val scope: String? = null,
+    @SerialName("transaction_data")
+    val transactionData: TransactionDataWrapper? = null,
+    @SerialName("client_metadata")
+    val clientMetadata: ClientMetadata? = null,
+    @SerialName("verifier_attestations")
+    val verifierAttestations: List<Value>? = null,
+    @SerialName("verifier_info")
+    val verifierInfo: List<Value>? = null,
+    @SerialName("expected_origins")
+    val expectedOrigins: List<String>? = null,
+    val zkp: ZkpInfo? = null,
 ) {
-	@Serializable
-	data class ClientMetadata(
-		@JsonNames("logo_uri") val logoUri: String? = null,
-		@JsonNames("client_name") val clientName: String? = null,
-	)
+    @Serializable
+    data class ClientMetadata(
+        @JsonNames("logo_uri") val logoUri: String? = null,
+        @JsonNames("client_name") val clientName: String? = null,
+    )
 
-	companion object {
-		/**
-		 * For backward compatibility, calls detectVersionAndParse and returns just the PresentationRequest
-		 */
-		fun fromValue(value: Value): PresentationRequest? {
-			return detectProtocolVersionAndParse(value)?.request
-		}
+    companion object {
+        /**
+         * For backward compatibility, calls detectVersionAndParse and returns just the PresentationRequest
+         */
+        fun fromValue(value: Value): PresentationRequest? = detectProtocolVersionAndParse(value)?.request
 
-		/**
-		 * Detects the OID4VP version from the Value object and returns both the version and the parsed PresentationRequest
-		 */
-		fun detectProtocolVersionAndParse(value: Value): VersionedPresentationRequest? {
-			// Detect version in priority order: 21, 26, 24
-			val clientIdScheme = value["client_id_scheme"].takeIf { it != Value.Null }?.asString()
+        /**
+         * Detects the OID4VP version from the Value object and returns both the version and the parsed PresentationRequest
+         */
+        fun detectProtocolVersionAndParse(value: Value): VersionedPresentationRequest? {
+            // Detect version in priority order: 21, 26, 24
+            val clientIdScheme = value["client_id_scheme"].takeIf { it != Value.Null }?.asString()
 
-			// Version 21 detection: presence of clientIdScheme
-			val version = if (clientIdScheme != null) {
-				OID4VPVersion.DRAFT_21
-			} else {
+            // Version 21 detection: presence of clientIdScheme
+            val version =
+                if (clientIdScheme != null) {
+                    OID4VPVersion.DRAFT_21
+                } else {
+                    // Version 1.0 detection: presence of verifier_info
+                    // Version 28 detection: presence of expected_origins in value and presence of vp_formats_supported field in client_metadata
+                    // Version 26 detection: absence of purpose element in credential_sets and/or presence of multiple field
+                    val dcqlQueryValue = value["dcql_query"].takeIf { it != Value.Null }
 
-				// Version 1.0 detection: presence of verifier_info
-				// Version 28 detection: presence of expected_origins in value and presence of vp_formats_supported field in client_metadata
-				// Version 26 detection: absence of purpose element in credential_sets and/or presence of multiple field
-				val dcqlQueryValue = value["dcql_query"].takeIf { it != Value.Null }
+                    if (dcqlQueryValue != null) {
+                        // Check for absence of purpose in credential_sets
+                        val credentialSets = dcqlQueryValue["credential_sets"].takeIf { it != Value.Null }
+                        val hasPurposeInCredentialSets =
+                            if (credentialSets != null && credentialSets.isArray()) {
+                                credentialSets.asArray()?.any {
+                                    it["purpose"].takeIf { purpose -> purpose != Value.Null } != null
+                                } ?: false
+                            } else {
+                                false
+                            }
 
-				if (dcqlQueryValue != null) {
-					// Check for absence of purpose in credential_sets
-					val credentialSets = dcqlQueryValue["credential_sets"].takeIf { it != Value.Null }
-					val hasPurposeInCredentialSets = if (credentialSets != null && credentialSets.isArray()) {
-						credentialSets.asArray()?.any {
-							it["purpose"].takeIf { purpose -> purpose != Value.Null } != null
-						} ?: false
-					} else {
-						false
-					}
+                        // Check for presence of multiple field in credentials
+                        val credentials = dcqlQueryValue["credentials"].takeIf { it != Value.Null }
+                        val hasMultipleInCredentials =
+                            if (credentials != null && credentials.isArray()) {
+                                credentials.asArray()?.any {
+                                    it["multiple"].takeIf { multiple -> multiple != Value.Null } != null
+                                } ?: false
+                            } else {
+                                false
+                            }
 
-					// Check for presence of multiple field in credentials
-					val credentials = dcqlQueryValue["credentials"].takeIf { it != Value.Null }
-					val hasMultipleInCredentials = if (credentials != null && credentials.isArray()) {
-						credentials.asArray()?.any {
-							it["multiple"].takeIf { multiple -> multiple != Value.Null } != null
-						} ?: false
-					} else {
-						false
-					}
+                        val hasExpectedOrigins =
+                            value["expected_origins"].takeIf { it != Value.Null }?.isArray() == true
+                        val hasVpFormatsSupported =
+                            value["client_metadata"]["vp_formats_supported"].takeIf { it != Value.Null }?.isObject() ==
+                                true
 
-					val hasExpectedOrigins = value["expected_origins"].takeIf { it != Value.Null }?.isArray() == true
-					val hasVpFormatsSupported =
-						value["client_metadata"]["vp_formats_supported"].takeIf { it != Value.Null }?.isObject() == true
+                        val hasVerifierInfo = value["verifier_info"].takeIf { it != Value.Null }?.isArray() == true
 
-					val hasVerifierInfo = value["verifier_info"].takeIf { it != Value.Null }?.isArray() == true
+                        if (hasVerifierInfo) {
+                            OID4VPVersion.VERSION_ONE_DOT_ZERO
+                        } else if (hasExpectedOrigins || hasVpFormatsSupported) {
+                            OID4VPVersion.DRAFT_28
+                        } else if (!hasPurposeInCredentialSets || hasMultipleInCredentials) {
+                            OID4VPVersion.DRAFT_26
+                        } else {
+                            // Version 24 is the fallback
+                            OID4VPVersion.DRAFT_24
+                        }
+                    } else {
+                        // If no dcqlQuery is present, default to version 24
+                        OID4VPVersion.DRAFT_24
+                    }
+                }
+            // Parse the client_id based on the draft version
+            val rawClientId = value["client_id"].asString() ?: "dc_api"
+            val clientId = rawClientId
 
-					if (hasVerifierInfo) {
-						OID4VPVersion.VERSION_ONE_DOT_ZERO
-					} else if (hasExpectedOrigins || hasVpFormatsSupported) {
-						OID4VPVersion.DRAFT_28
-					} else if (!hasPurposeInCredentialSets || hasMultipleInCredentials) {
-						OID4VPVersion.DRAFT_26
-					} else {
-						// Version 24 is the fallback
-						OID4VPVersion.DRAFT_24
-					}
-				} else {
-					// If no dcqlQuery is present, default to version 24
-					OID4VPVersion.DRAFT_24
-				}
-			}
-			// Parse the client_id based on the draft version
-			val rawClientId = value["client_id"].asString() ?: "dc_api"
-			val clientId = rawClientId
+            val presentationDefinition = value["presentation_definition"]
+            val directDcqlQuery: DcqlQuery? =
+                value["dcql_query"]
+                    .takeIf { it != Value.Null }
+                    ?.let {
+                        it.asString()?.let {
+                            try {
+                                json.decodeFromString(it)
+                            } catch (ex: Exception) {
+                                null
+                            }
+                        } ?: it.transform<DcqlQuery>()
+                    }
+            val scope = value["scope"].takeIf { it != Value.Null }?.asString()
+            val verifierInfo = value["verifier_info"].transform<List<Value>>()
+            val dcqlQuery = scopeBasedDcqlQuery(scope, verifierInfo) ?: directDcqlQuery
 
-			val presentationDefinition = value["presentation_definition"]
-			val directDcqlQuery: DcqlQuery? = value["dcql_query"]
-				.takeIf { it != Value.Null }?.let {
-					it.asString()?.let {
-						try {
-							json.decodeFromString(it)
-						} catch (ex: Exception) {
-							null
-						}
-					} ?: it.transform<DcqlQuery>()
-				}
-			val scope = value["scope"].takeIf { it != Value.Null }?.asString()
-			val verifierInfo = value["verifier_info"].transform<List<Value>>()
-			val dcqlQuery = scopeBasedDcqlQuery(scope, verifierInfo) ?: directDcqlQuery
+            val responseType = value["response_type"].takeIf { it != Value.Null }?.asString() ?: "vp_token"
 
-			val responseType = value["response_type"].takeIf { it != Value.Null }?.asString() ?: "vp_token"
+            val request =
+                PresentationRequest(
+                    clientId,
+                    responseType = responseType,
+                    clientIdScheme = clientIdScheme,
+                    presentationDefinition =
+                        if (presentationDefinition is Value.Null) {
+                            null
+                        } else {
+                            presentationDefinition
+                        },
+                    dcqlQuery = dcqlQuery,
+                    scope = scope,
+                    transactionData = TransactionDataWrapper.fromValue(value),
+                    clientMetadata = value["client_metadata"].transform(),
+                    verifierAttestations = value["verifier_attestations"].transform(),
+                    verifierInfo = value["verifier_info"].transform(),
+                    expectedOrigins = value["expected_origins"].transform(),
+                    zkp = value["zkp"].takeIf { it != Value.Null }?.let(ZkpInfo::fromValue),
+                )
 
-			val request = PresentationRequest(
-				clientId,
-				responseType = responseType,
-				clientIdScheme = clientIdScheme,
-				presentationDefinition = if (presentationDefinition is Value.Null) {
-					null
-				} else {
-					presentationDefinition
-				},
-				dcqlQuery = dcqlQuery,
-				scope = scope,
-				transactionData = TransactionDataWrapper.fromValue(value),
-				clientMetadata = value["client_metadata"].transform(),
-				verifierAttestations = value["verifier_attestations"].transform(),
-				verifierInfo = value["verifier_info"].transform(),
-				expectedOrigins = value["expected_origins"].transform(),
-				zkp = value["zkp"].takeIf { it != Value.Null }?.let(ZkpInfo::fromValue),
-			)
+            return VersionedPresentationRequest(version, request)
+        }
 
-			return VersionedPresentationRequest(version, request)
-		}
+        /**
+         * Resolves the Swiss Profile Verification vqPS query for the request's
+         * active scope.  The embedded query is authoritative when available;
+         * callers can fall back to the top-level dcql_query for older requests.
+         */
+        internal fun scopeBasedDcqlQuery(
+            scope: String?,
+            verifierInfo: List<Value>?,
+        ): DcqlQuery? {
+            val requestedScopes =
+                scope
+                    ?.split(Regex("\\s+"))
+                    ?.filter(String::isNotBlank)
+                    ?.toSet()
+                    ?: return null
+            if (requestedScopes.isEmpty()) return null
 
-		/**
-		 * Resolves the Swiss Profile Verification vqPS query for the request's
-		 * active scope.  The embedded query is authoritative when available;
-		 * callers can fall back to the top-level dcql_query for older requests.
-		 */
-		internal fun scopeBasedDcqlQuery(
-			scope: String?,
-			verifierInfo: List<Value>?
-		): DcqlQuery? {
-			val requestedScopes = scope
-				?.split(Regex("\\s+"))
-				?.filter(String::isNotBlank)
-				?.toSet()
-				?: return null
-			if (requestedScopes.isEmpty()) return null
+            return verifierInfo
+                .orEmpty()
+                .asSequence()
+                .filter {
+                    it["format"].asString() == "jwt" &&
+                        it["credential_ids"] == Value.Null
+                }.mapNotNull { it["data"].asString() }
+                .filter { jwt ->
+                    runCatching {
+                        val header = jwtPart(jwt, 0) ?: return@runCatching false
+                        val headerObject = json.decodeFromString<kotlinx.serialization.json.JsonObject>(header)
+                        headerObject["typ"]?.jsonPrimitive?.content ==
+                            "swiyu-verification-query-public-statement+jwt"
+                    }.getOrDefault(false)
+                }.mapNotNull { jwt ->
+                    val payload = jwtPart(jwt, 1) ?: return@mapNotNull null
+                    runCatching {
+                        val request =
+                            json
+                                .parseToJsonElement(payload)
+                                .jsonObject["request"]
+                                ?.jsonObject
+                                ?: return@runCatching null
+                        if (request["type"]?.jsonPrimitive?.content != "DCQL") {
+                            return@runCatching null
+                        }
+                        val statementScope = request["scope"]?.jsonPrimitive?.content
+                        if (statementScope == null || statementScope !in requestedScopes) {
+                            return@runCatching null
+                        }
+                        request["query"]?.let { json.decodeFromJsonElement<DcqlQuery>(it) }
+                    }.getOrNull()
+                }.firstOrNull()
+        }
 
-			return verifierInfo.orEmpty().asSequence()
-				.filter {
-					it["format"].asString() == "jwt" &&
-						it["credential_ids"] == Value.Null
-				}
-				.mapNotNull { it["data"].asString() }
-				.filter { jwt ->
-					runCatching {
-						val header = jwtPart(jwt, 0) ?: return@runCatching false
-						val headerObject = json.decodeFromString<kotlinx.serialization.json.JsonObject>(header)
-						headerObject["typ"]?.jsonPrimitive?.content ==
-							"swiyu-verification-query-public-statement+jwt"
-					}.getOrDefault(false)
-				}
-				.mapNotNull { jwt ->
-					val payload = jwtPart(jwt, 1) ?: return@mapNotNull null
-					runCatching {
-						val request = json.parseToJsonElement(payload)
-							.jsonObject["request"]?.jsonObject
-							?: return@runCatching null
-						if (request["type"]?.jsonPrimitive?.content != "DCQL") {
-							return@runCatching null
-						}
-						val statementScope = request["scope"]?.jsonPrimitive?.content
-						if (statementScope == null || statementScope !in requestedScopes) {
-							return@runCatching null
-						}
-						request["query"]?.let { json.decodeFromJsonElement<DcqlQuery>(it) }
-					}.getOrNull()
-				}
-				.firstOrNull()
-		}
-
-		@OptIn(ExperimentalEncodingApi::class)
-		private fun jwtPart(jwt: String, index: Int): String? {
-			val encoded = jwt.split('.').getOrNull(index) ?: return null
-			return runCatching {
-				Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT).decode(encoded).decodeToString()
-			}.getOrElse {
-				runCatching {
-					Base64.UrlSafe.withPadding(Base64.PaddingOption.PRESENT).decode(encoded).decodeToString()
-				}.getOrNull()
-			}
-		}
-	}
+        @OptIn(ExperimentalEncodingApi::class)
+        private fun jwtPart(
+            jwt: String,
+            index: Int,
+        ): String? {
+            val encoded = jwt.split('.').getOrNull(index) ?: return null
+            return runCatching {
+                Base64.UrlSafe
+                    .withPadding(Base64.PaddingOption.ABSENT)
+                    .decode(encoded)
+                    .decodeToString()
+            }.getOrElse {
+                runCatching {
+                    Base64.UrlSafe
+                        .withPadding(Base64.PaddingOption.PRESENT)
+                        .decode(encoded)
+                        .decodeToString()
+                }.getOrNull()
+            }
+        }
+    }
 }

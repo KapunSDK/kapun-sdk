@@ -17,9 +17,9 @@ under the License.
 package org.kapunsdk.wallet.process.legacy
 
 enum class ProcessType {
-	PRESENTATION,
-	EAA_ISSUANCE,
-	EID_ISSUANCE,
-	PROXIMITY,
-	UNKNOWN
+    PRESENTATION,
+    EAA_ISSUANCE,
+    EID_ISSUANCE,
+    PROXIMITY,
+    UNKNOWN,
 }

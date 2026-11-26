@@ -18,6 +18,10 @@ under the License.
 
 package org.kapunsdk.wallet.process.presentation.remote
 
+import io.ktor.client.HttpClient
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNames
 import org.kapunsdk.trust.TrustFrameworkController
 import org.kapunsdk.util.extensions.asString
 import org.kapunsdk.util.extensions.transform
@@ -31,37 +35,59 @@ import org.kapunsdk.wallet.keyvalue.KeyValueRepository
 import org.kapunsdk.wallet.process.ProcessEvent
 import org.kapunsdk.wallet.process.ProcessHandler
 import org.kapunsdk.wallet.process.ProcessStep
-import io.ktor.client.HttpClient
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonNames
 import uniffi.kapun_util_rust.Value
 import uniffi.kapun_wallet_rust.WalletBackend
- 
-@Serializable
-data class DCRequests constructor(@JsonNames("requests", "providers") val providers: List<DCProvider>) {
-	@Serializable
-	data class DCProvider(val request: String? = null, val data: Value? = null, val protocol : String?) {
-		fun getInnerRequest(json: Json) : String? {
-			val request = request ?: data ?: return null
-			val wrappedRequest: WrappedRequest? = when(request) {
-				is String ->  kotlin.runCatching { json.decodeFromString<WrappedRequest>(request)}.getOrNull()
-				is Value.String ->  kotlin.runCatching { json.decodeFromString<WrappedRequest>(request.v1)}.getOrNull()
-				is Value.Object -> request.transform()
-				else -> return null
-			}
-			wrappedRequest?.let {
-				return it.request
-			} ?: return when(request) {
-				is String ->  request
-				is Value -> request.asString()
-				else -> return null
-			}
-		}
-	}
-	@Serializable
-	data class WrappedRequest constructor(@JsonNames("client_id") val clientId: String? = null, val request: String)
 
+@Serializable
+data class DCRequests constructor(
+    @JsonNames("requests", "providers") val providers: List<DCProvider>,
+) {
+    @Serializable
+    data class DCProvider(
+        val request: String? = null,
+        val data: Value? = null,
+        val protocol: String?,
+    ) {
+        fun getInnerRequest(json: Json): String? {
+            val request = request ?: data ?: return null
+            val wrappedRequest: WrappedRequest? =
+                when (request) {
+                    is String -> {
+                        kotlin.runCatching { json.decodeFromString<WrappedRequest>(request) }.getOrNull()
+                    }
+
+                    is Value.String -> {
+                        kotlin
+                            .runCatching {
+                                json.decodeFromString<WrappedRequest>(
+                                    request.v1,
+                                )
+                            }.getOrNull()
+                    }
+
+                    is Value.Object -> {
+                        request.transform()
+                    }
+
+                    else -> {
+                        return null
+                    }
+                }
+            wrappedRequest?.let {
+                return it.request
+            } ?: return when (request) {
+                is String -> request
+                is Value -> request.asString()
+                else -> return null
+            }
+        }
+    }
+
+    @Serializable
+    data class WrappedRequest constructor(
+        @JsonNames("client_id") val clientId: String? = null,
+        val request: String,
+    )
 }
 
 class RemotePresentationProcessHandler(
@@ -77,92 +103,144 @@ class RemotePresentationProcessHandler(
     private val credentialStore: CredentialStore,
     private val json: Json,
 ) : ProcessHandler {
+    private var currentProcess: RemotePresentationProcess? = null
 
-	private var currentProcess: RemotePresentationProcess? = null
+    override suspend fun handleProcessStep(
+        current: ProcessStep?,
+        inputEvent: ProcessEvent,
+    ): ProcessStep? =
+        when {
+            // A new remote presentation process is started
+            inputEvent is RemotePresentationProcessEvent.PresentationRequested -> {
+                currentProcess =
+                    RemotePresentationProcess(
+                        client,
+                        walletBackend,
+                        signingProvider,
+                        trustController,
+                        identityRepository,
+                        credentialsRepository,
+                        activityRepository,
+                        keyValueRepository,
+                        viewModelFactory,
+                        json,
+                    )
+                val data =
+                    if (inputEvent.isDCApi) {
+                        val element: DCRequests? =
+                            runCatching {
+                                json.decodeFromString<DCRequests>(inputEvent.qrCodeData)
+                            }.getOrNull()
+                        element?.providers?.firstOrNull()?.getInnerRequest(json) ?: ""
+                    } else {
+                        inputEvent.qrCodeData
+                    }
+                currentProcess?.startPresentationProcess(
+                    data,
+                    inputEvent.presentationScope,
+                    inputEvent.authSession,
+                    inputEvent.isDCApi,
+                    inputEvent.selectedId,
+                    inputEvent.origin,
+                    inputEvent.useLegacyVpToken,
+                    inputEvent.zkpDeviceBindingType,
+                )
+            }
 
-	override suspend fun handleProcessStep(current: ProcessStep?, inputEvent: ProcessEvent): ProcessStep? {
-		return when {
-			// A new remote presentation process is started
-			inputEvent is RemotePresentationProcessEvent.PresentationRequested -> {
-				currentProcess = RemotePresentationProcess(
-					client,
-					walletBackend,
-					signingProvider,
-					trustController,
-					identityRepository,
-					credentialsRepository,
-					activityRepository,
-					keyValueRepository,
-					viewModelFactory,
-					json,
-				)
-				val data = if(inputEvent.isDCApi) {
-					val element: DCRequests? = runCatching {
-						json.decodeFromString<DCRequests>(inputEvent.qrCodeData)
-					}.getOrNull()
-					element?.providers?.firstOrNull()?.getInnerRequest(json) ?: ""
-				} else {
-					inputEvent.qrCodeData
-				}
-				currentProcess?.startPresentationProcess(
-					data,
-					inputEvent.presentationScope,
-					inputEvent.authSession,
-					inputEvent.isDCApi,
-					inputEvent.selectedId,
-					inputEvent.origin,
-					inputEvent.useLegacyVpToken,
-					inputEvent.zkpDeviceBindingType,
-				)
-			}
+            // Current step is part of the remote presentation process
+            current is RemotePresentationProcessStep -> {
+                when (current) {
+                    is RemotePresentationProcessStep.ConnectionDetails -> {
+                        currentProcess?.continueAfterConnectionTrust()
+                    }
 
-			// Current step is part of the remote presentation process
-			current is RemotePresentationProcessStep -> when (current) {
-				is RemotePresentationProcessStep.ConnectionDetails -> currentProcess?.continueAfterConnectionTrust()
-				is RemotePresentationProcessStep.CredentialSelection -> {
-					if (inputEvent is RemotePresentationProcessEvent.CredentialSelected) {
-						currentProcess?.continueWithSelectedCredential(inputEvent.credentialMapping)
-					} else null
-				}
-				is RemotePresentationProcessStep.OutOfTokens -> when (inputEvent) {
-					is RemotePresentationProcessEvent.RefreshRequested -> currentProcess?.refreshAndReSelect(current.identityIdsToRefresh)
-					is RemotePresentationProcessEvent.FallbackRandomRequested -> currentProcess?.continueWithCredentialSelection(allowUsedCredentials = true)
-					else -> null
-				}
-				is RemotePresentationProcessStep.EnterPin -> {
-					if (inputEvent is RemotePresentationProcessEvent.PinEntered) {
-						currentProcess?.continueWithPinOrPassphrase(
-							inputEvent.credentialsWithPin.toMutableList(),
-							inputEvent.credentialsWithFrost.toMutableList(),
-							inputEvent.viewModel,
-							pin = inputEvent.pin,
-						)
-					} else null
-				}
-				is RemotePresentationProcessStep.EnterPassphrase -> {
-					if (inputEvent is RemotePresentationProcessEvent.PassphraseEntered) {
-						currentProcess?.continueWithPinOrPassphrase(
-							mutableListOf(),
-							inputEvent.credentialsWithFrost.toMutableList(),
-							inputEvent.viewModel,
-							passphrase = inputEvent.passphrase,
-						)
-					} else null
-				}
-				is RemotePresentationProcessStep.Error -> TODO("How to handle event for error step?")
-				is RemotePresentationProcessStep.Success, is RemotePresentationProcessStep.DcApiSuccess -> null
-			}
-			current is RemotePresentationProcessStep.QesProcessStep -> when (current) {
-				is RemotePresentationProcessStep.QesProcessStep.Preview -> currentProcess?.continueWithCredentialSelection()
-				is RemotePresentationProcessStep.QesProcessStep.CreationAcceptance -> currentProcess?.continueAfterCreationAcceptance()
-				is RemotePresentationProcessStep.QesProcessStep.SignDocument -> currentProcess?.finalize()
-			}
+                    is RemotePresentationProcessStep.CredentialSelection -> {
+                        if (inputEvent is RemotePresentationProcessEvent.CredentialSelected) {
+                            currentProcess?.continueWithSelectedCredential(inputEvent.credentialMapping)
+                        } else {
+                            null
+                        }
+                    }
 
-			else -> null
-		}
-	}
+                    is RemotePresentationProcessStep.OutOfTokens -> {
+                        when (inputEvent) {
+                            is RemotePresentationProcessEvent.RefreshRequested -> {
+                                currentProcess?.refreshAndReSelect(
+                                    current.identityIdsToRefresh,
+                                )
+                            }
 
-	override suspend fun cleanupHandler() {
-		currentProcess = null
-	}
+                            is RemotePresentationProcessEvent.FallbackRandomRequested -> {
+                                currentProcess?.continueWithCredentialSelection(
+                                    allowUsedCredentials = true,
+                                )
+                            }
+
+                            else -> {
+                                null
+                            }
+                        }
+                    }
+
+                    is RemotePresentationProcessStep.EnterPin -> {
+                        if (inputEvent is RemotePresentationProcessEvent.PinEntered) {
+                            currentProcess?.continueWithPinOrPassphrase(
+                                inputEvent.credentialsWithPin.toMutableList(),
+                                inputEvent.credentialsWithFrost.toMutableList(),
+                                inputEvent.viewModel,
+                                pin = inputEvent.pin,
+                            )
+                        } else {
+                            null
+                        }
+                    }
+
+                    is RemotePresentationProcessStep.EnterPassphrase -> {
+                        if (inputEvent is RemotePresentationProcessEvent.PassphraseEntered) {
+                            currentProcess?.continueWithPinOrPassphrase(
+                                mutableListOf(),
+                                inputEvent.credentialsWithFrost.toMutableList(),
+                                inputEvent.viewModel,
+                                passphrase = inputEvent.passphrase,
+                            )
+                        } else {
+                            null
+                        }
+                    }
+
+                    is RemotePresentationProcessStep.Error -> {
+                        TODO("How to handle event for error step?")
+                    }
+
+                    is RemotePresentationProcessStep.Success, is RemotePresentationProcessStep.DcApiSuccess -> {
+                        null
+                    }
+                }
+            }
+
+            current is RemotePresentationProcessStep.QesProcessStep -> {
+                when (current) {
+                    is RemotePresentationProcessStep.QesProcessStep.Preview -> {
+                        currentProcess?.continueWithCredentialSelection()
+                    }
+
+                    is RemotePresentationProcessStep.QesProcessStep.CreationAcceptance -> {
+                        currentProcess
+                            ?.continueAfterCreationAcceptance()
+                    }
+
+                    is RemotePresentationProcessStep.QesProcessStep.SignDocument -> {
+                        currentProcess?.finalize()
+                    }
+                }
+            }
+
+            else -> {
+                null
+            }
+        }
+
+    override suspend fun cleanupHandler() {
+        currentProcess = null
+    }
 }

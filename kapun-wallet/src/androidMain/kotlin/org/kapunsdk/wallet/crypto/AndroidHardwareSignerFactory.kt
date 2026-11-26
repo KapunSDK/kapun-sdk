@@ -20,16 +20,16 @@ import android.content.Context
 import org.kapunsdk.wallet.crypto.factories.HardwareSignerFactory
 import uniffi.kapun_wallet_rust.NativeSigner
 
-internal class AndroidHardwareSignerFactory(private val context: Context) : HardwareSignerFactory {
+internal class AndroidHardwareSignerFactory(
+    private val context: Context,
+) : HardwareSignerFactory {
+    override fun getHardwareSigner(dataRepresenation: ByteArray): NativeSigner? {
+        val alias = dataRepresenation.decodeToString()
+        val keyPair = KeyRepository.getKeyPair(alias)
 
-	override fun getHardwareSigner(dataRepresenation: ByteArray): NativeSigner? {
-		val alias = dataRepresenation.decodeToString()
-		val keyPair = KeyRepository.getKeyPair(alias)
+        return keyPair?.let { Signer(it, alias) }
+    }
 
-		return keyPair?.let { Signer(it, alias) }
-	}
-
-	override fun newHardwareSigner(accessControl: SecureHardwareAccessControl): NativeSigner {
-		return Signer.createHardwareBound(context, accessControl)
-	}
+    override fun newHardwareSigner(accessControl: SecureHardwareAccessControl): NativeSigner =
+        Signer.createHardwareBound(context, accessControl)
 }

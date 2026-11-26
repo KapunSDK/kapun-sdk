@@ -21,25 +21,33 @@ import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.ptr
 import platform.darwin.*
 
-actual fun platformConsoleLogSink(): LogSink = object : LogSink {
-	override fun log(severity: LogSeverity, tag: String, message: String, throwable: Throwable?) {
-		val osLogType = when (severity) {
-			LogSeverity.DEBUG -> OS_LOG_TYPE_DEBUG
-			LogSeverity.INFO -> OS_LOG_TYPE_INFO
-			LogSeverity.WARN -> OS_LOG_TYPE_DEFAULT
-			LogSeverity.ERROR -> OS_LOG_TYPE_ERROR
-		}
-		val fullMessage = if (throwable != null) {
-			"$message / Exception: ${throwable.message ?: throwable::class.simpleName}"
-		} else {
-			message
-		}
-		_os_log_internal(
-			__dso_handle.ptr,
-			OS_LOG_DEFAULT,
-			osLogType,
-			"%{public}s",
-			fullMessage
-		)
-	}
-}
+actual fun platformConsoleLogSink(): LogSink =
+    object : LogSink {
+        override fun log(
+            severity: LogSeverity,
+            tag: String,
+            message: String,
+            throwable: Throwable?,
+        ) {
+            val osLogType =
+                when (severity) {
+                    LogSeverity.DEBUG -> OS_LOG_TYPE_DEBUG
+                    LogSeverity.INFO -> OS_LOG_TYPE_INFO
+                    LogSeverity.WARN -> OS_LOG_TYPE_DEFAULT
+                    LogSeverity.ERROR -> OS_LOG_TYPE_ERROR
+                }
+            val fullMessage =
+                if (throwable != null) {
+                    "$message / Exception: ${throwable.message ?: throwable::class.simpleName}"
+                } else {
+                    message
+                }
+            _os_log_internal(
+                __dso_handle.ptr,
+                OS_LOG_DEFAULT,
+                osLogType,
+                "%{public}s",
+                fullMessage,
+            )
+        }
+    }

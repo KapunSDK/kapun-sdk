@@ -17,6 +17,6 @@ under the License.
 package org.kapunsdk.wallet.credentials.signature
 
 data class Signature(
-	val validationState: SignatureValidationState,
-	val issuer: String,
+    val validationState: SignatureValidationState,
+    val issuer: String,
 )

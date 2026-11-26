@@ -26,26 +26,29 @@ import uniffi.kapun_dcql_bbs_rust.bbsPresentationGetClaims
 import uniffi.kapun_dcql_bbs_rust.decodeBbs
 import uniffi.kapun_util_rust.Value
 
-class Bbs(val inner: BbsRust) {
+class Bbs(
+    val inner: BbsRust,
+) {
     companion object {
         val BBS_TERMWISE_FORMATS: Array<String> = arrayOf("bbs-termwise")
 
-        fun parse(str: String): Bbs {
-            return Bbs(decodeBbs(str))
-        }
-    }
-    fun body() : Value {
-        return bbsGetBody(this.inner)
+        fun parse(str: String): Bbs = Bbs(decodeBbs(str))
     }
 
-    fun presentation(issuerPk: String, issuerId: String, issuerKeyId: String): BbsBuilderObject =
-        BbsBuilderObject(inner, issuerPk, issuerId, issuerKeyId)
+    fun body(): Value = bbsGetBody(this.inner)
+
+    fun presentation(
+        issuerPk: String,
+        issuerId: String,
+        issuerKeyId: String,
+    ): BbsBuilderObject = BbsBuilderObject(inner, issuerPk, issuerId, issuerKeyId)
 }
 
-class BbsPresentation(val inner: BbsPresentationRust) {
+class BbsPresentation(
+    val inner: BbsPresentationRust,
+) {
     companion object {
-        fun parse(vpToken: String): BbsPresentation =
-            BbsPresentation(BbsPresentationRust.parse(vpToken))
+        fun parse(vpToken: String): BbsPresentation = BbsPresentation(BbsPresentationRust.parse(vpToken))
     }
 
     fun claims(): Value = bbsPresentationGetClaims(inner)
@@ -66,25 +69,28 @@ class BbsPresentation(val inner: BbsPresentationRust) {
         dbSecpLabel: ByteArray,
         dbTomLabel: ByteArray,
         dbBlsLabel: ByteArray,
-        dbBppSetupLabel: ByteArray
+        dbBppSetupLabel: ByteArray,
     ): String {
-        val claims = inner.verify(
-            definition,
-            verifyingKeys,
-            issuerPk,
-            issuerId,
-            issuerKeyId,
-            dbMessage,
-            dbSecpLabel,
-            dbTomLabel,
-            dbBlsLabel,
-            dbBppSetupLabel
-        )
+        val claims =
+            inner.verify(
+                definition,
+                verifyingKeys,
+                issuerPk,
+                issuerId,
+                issuerKeyId,
+                dbMessage,
+                dbSecpLabel,
+                dbTomLabel,
+                dbBlsLabel,
+                dbBppSetupLabel,
+            )
         return Json.encodeToString(claims)
     }
 }
 
-class BbsClaimBasedPresentation(val inner: BbsClaimBasedPresentationRust) {
+class BbsClaimBasedPresentation(
+    val inner: BbsClaimBasedPresentationRust,
+) {
     companion object {
         fun parse(
             vpToken: String,
@@ -97,25 +103,27 @@ class BbsClaimBasedPresentation(val inner: BbsClaimBasedPresentationRust) {
             issuerId: String,
             issuerKeyId: String,
         ): BbsClaimBasedPresentation =
-            BbsClaimBasedPresentation(BbsClaimBasedPresentationRust.parse(
-                vpToken = vpToken,
-                dbMessage = dbMessage,
-                dbSecpLabel = dbSecpLabel,
-                dbTomLabel = dbTomLabel,
-                dbBlsLabel = dbBlsLabel,
-                dbBppSetupLabel = dbBppSetupLabel,
-                issuerPk = issuerPk,
-                issuerId = issuerId,
-                issuerKeyId = issuerKeyId
-            ))
+            BbsClaimBasedPresentation(
+                BbsClaimBasedPresentationRust.parse(
+                    vpToken = vpToken,
+                    dbMessage = dbMessage,
+                    dbSecpLabel = dbSecpLabel,
+                    dbTomLabel = dbTomLabel,
+                    dbBlsLabel = dbBlsLabel,
+                    dbBppSetupLabel = dbBppSetupLabel,
+                    issuerPk = issuerPk,
+                    issuerId = issuerId,
+                    issuerKeyId = issuerKeyId,
+                ),
+            )
     }
 
-    fun addDisclosureRequirements(requirements: List<String>) =
-        inner.addDisclosureRequirement(requirements)
+    fun addDisclosureRequirements(requirements: List<String>) = inner.addDisclosureRequirement(requirements)
 
-    fun addEqualClaimsRequirement(key1: String, key2: String) =
-        inner.addEqualClaimsRequirement(key1, key2)
+    fun addEqualClaimsRequirement(
+        key1: String,
+        key2: String,
+    ) = inner.addEqualClaimsRequirement(key1, key2)
 
-    fun verify() =
-        inner.verify(2U)
+    fun verify() = inner.verify(2U)
 }

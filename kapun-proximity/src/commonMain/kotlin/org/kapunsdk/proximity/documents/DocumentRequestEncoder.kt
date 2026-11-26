@@ -11,29 +11,24 @@ software distributed under the License is distributed on an
 "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
-under the License.   
+under the License.
  */
 package org.kapunsdk.proximity.documents
 
 internal interface DocumentRequestEncoder {
+    companion object {
+        fun create(request: DocumentRequest): DocumentRequestEncoder =
+            when (request) {
+                is DocumentRequest.Mdl -> TODO("Not yet supported")
+                is DocumentRequest.OpenId4Vp -> OpenId4VpDocumentRequestEncoder(request)
+            }
+    }
 
-	companion object {
-		fun create(request: DocumentRequest): DocumentRequestEncoder {
-			return when (request) {
-				is DocumentRequest.Mdl -> TODO("Not yet supported")
-				is DocumentRequest.OpenId4Vp -> OpenId4VpDocumentRequestEncoder(request)
-			}
-		}
-	}
-
-	fun encodeDocumentRequest(): ByteArray
-
+    fun encodeDocumentRequest(): ByteArray
 }
 
-internal class OpenId4VpDocumentRequestEncoder(private val request: DocumentRequest.OpenId4Vp) : DocumentRequestEncoder {
-
-	override fun encodeDocumentRequest(): ByteArray {
-		return request.parJwt.encodeToByteArray()
-	}
-
+internal class OpenId4VpDocumentRequestEncoder(
+    private val request: DocumentRequest.OpenId4Vp,
+) : DocumentRequestEncoder {
+    override fun encodeDocumentRequest(): ByteArray = request.parJwt.encodeToByteArray()
 }

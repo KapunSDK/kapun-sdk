@@ -18,10 +18,10 @@ package org.kapunsdk.trust.did
 private const val DECENTRALIZED_IDENTIFIER_PREFIX = "decentralized_identifier:"
 
 internal fun getDidFromAbsoluteKid(kid: String): String? {
-	val normalizedKid = kid.removePrefix(DECENTRALIZED_IDENTIFIER_PREFIX)
-	val parts = normalizedKid.split('#', limit = 2)
-	if (parts.size != 2 || parts[0].isBlank() || parts[1].isBlank() || parts[1].contains('#')) {
-		return null
-	}
-	return parts[0].takeIf { it.startsWith("did:") }
+    val normalizedKid = kid.removePrefix(DECENTRALIZED_IDENTIFIER_PREFIX)
+    val parts = normalizedKid.split('#', limit = 2)
+    if (parts.size != 2 || parts[0].isBlank() || parts[1].isBlank() || parts[1].contains('#')) {
+        return null
+    }
+    return parts[0].takeIf { it.startsWith("did:") }
 }

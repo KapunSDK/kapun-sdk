@@ -25,9 +25,13 @@ import uniffi.kapun_util_rust.Value
 import uniffi.kapun_util_rust.decodeCbor
 import uniffi.kapun_util_rust.encodeCbor
 
-data class MdlSessionEstablishment(val eReaderKey: Value, val data: ByteArray, val dcApiSelected: Boolean?) {
+data class MdlSessionEstablishment(
+    val eReaderKey: Value,
+    val data: ByteArray,
+    val dcApiSelected: Boolean?,
+) {
     companion object {
-        fun fromCbor(data: ByteArray) : MdlSessionEstablishment? {
+        fun fromCbor(data: ByteArray): MdlSessionEstablishment? {
             val decoded = kotlin.runCatching { decodeCbor(data) }.getOrNull() ?: return null
             val eReaderKey = decoded.get("eReaderKey").asTag() ?: return null
             val d = decoded.get("data").asBytes() ?: return null
@@ -35,12 +39,15 @@ data class MdlSessionEstablishment(val eReaderKey: Value, val data: ByteArray, v
             return MdlSessionEstablishment(eReaderKey, d, dcApiSelected)
         }
     }
-    fun asCbor() : ByteArray {
+
+    fun asCbor(): ByteArray {
         val isDcApi = dcApiSelected ?: false
-        return encodeCbor(mapOf(
-            "eReaderKey" to eReaderKey,
-            "data" to data,
-            "dcApiSelected" to isDcApi
-        ).toCbor())
+        return encodeCbor(
+            mapOf(
+                "eReaderKey" to eReaderKey,
+                "data" to data,
+                "dcApiSelected" to isDcApi,
+            ).toCbor(),
+        )
     }
 }

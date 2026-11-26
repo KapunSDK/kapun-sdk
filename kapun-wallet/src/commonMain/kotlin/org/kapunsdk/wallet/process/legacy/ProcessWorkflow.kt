@@ -19,20 +19,22 @@ package org.kapunsdk.wallet.process.legacy
 import org.kapunsdk.wallet.credentials.identity.IdentityUiModel
 import uniffi.kapun_wallet_rust.ApiException
 
-//TODO: How can we have such common errors in the sealed interfaces of issuance and/or presentation?
+// TODO: How can we have such common errors in the sealed interfaces of issuance and/or presentation?
 @Deprecated("Deprecated with the new ProcessStep pipeline")
 interface ProcessWorkflow {
-	data class Idle(
-		val startEidIssuance: (String?) -> Unit,
-		val startPresentation: () -> Unit,
-		val startRegisterEmergencyPass: (IdentityUiModel) -> Unit
-	) : ProcessWorkflow
+    data class Idle(
+        val startEidIssuance: (String?) -> Unit,
+        val startPresentation: () -> Unit,
+        val startRegisterEmergencyPass: (IdentityUiModel) -> Unit,
+    ) : ProcessWorkflow
 
-	data class Loading(val previous: ProcessWorkflow) : ProcessWorkflow
+    data class Loading(
+        val previous: ProcessWorkflow,
+    ) : ProcessWorkflow
 
-	data class Error(
-		val code : String,
-		val error : ApiException? = null,
-		val retry: (() -> Unit)? = null
-	) : ProcessWorkflow
+    data class Error(
+        val code: String,
+        val error: ApiException? = null,
+        val retry: (() -> Unit)? = null,
+    ) : ProcessWorkflow
 }

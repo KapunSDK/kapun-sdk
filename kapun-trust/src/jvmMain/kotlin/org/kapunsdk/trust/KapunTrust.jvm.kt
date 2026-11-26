@@ -20,18 +20,18 @@ import org.kapunsdk.trust.di.KapunTrustKoinContext
 import org.kapunsdk.util.network.KapunNetworkConfiguration
 
 actual class KapunTrust {
-	actual fun initialize() {
-		initialize(KapunNetworkConfiguration())
-	}
+    actual fun initialize() {
+        initialize(KapunNetworkConfiguration())
+    }
 
-	actual fun initialize(networkConfiguration: KapunNetworkConfiguration) {
-		uniffi.kapun_trust_rust.setUntrustedTls(networkConfiguration.allowUntrustedCertificates)
-		uniffi.kapun_trust_rust.setUserAgent(networkConfiguration.userAgent)
-		uniffi.kapun_util_rust.setUserAgent(networkConfiguration.userAgent)
-		KapunTrustKoinContext.initialize(networkConfiguration)
-	}
+    actual fun initialize(networkConfiguration: KapunNetworkConfiguration) {
+        uniffi.kapun_trust_rust.setUntrustedTls(networkConfiguration.allowUntrustedCertificates)
+        uniffi.kapun_trust_rust.setUserAgent(networkConfiguration.userAgent)
+        uniffi.kapun_util_rust.setUserAgent(networkConfiguration.userAgent)
+        KapunTrustKoinContext.initialize(networkConfiguration)
+    }
 
-	actual fun setUntrustedCertificatesAllowed(allow: Boolean) {
-		uniffi.kapun_trust_rust.setUntrustedTls(allow)
-	}
+    actual fun setUntrustedCertificatesAllowed(allow: Boolean) {
+        uniffi.kapun_trust_rust.setUntrustedTls(allow)
+    }
 }

@@ -16,35 +16,40 @@ under the License.
 
 package org.kapunsdk.wallet.process.presentation
 
-import org.kapunsdk.util.log.Logger
 import org.kapunsdk.presentation.request.model.DocumentDigest
 import org.kapunsdk.presentation.request.model.TransactionData
+import org.kapunsdk.util.log.Logger
 import uniffi.kapun_crypto_rust.base64UrlDecodePad
 import uniffi.kapun_crypto_rust.sha256Rs
 
 @OptIn(ExperimentalStdlibApi::class)
-private fun validateHash(data: ByteArray, hash: String?, hashAlgorithmOID: String?): Boolean {
-	if (hash == null) return false
+private fun validateHash(
+    data: ByteArray,
+    hash: String?,
+    hashAlgorithmOID: String?,
+): Boolean {
+    if (hash == null) return false
 
-	val hashString = when (hashAlgorithmOID) {
-		"2.16.840.1.101.3.4.2.1" -> sha256Rs(data).toHexString() // SHA-256
-		else -> {
-			Logger.error("Unsupported hash algorithm OID: $hashAlgorithmOID")
-			return false
-		}
-	}
+    val hashString =
+        when (hashAlgorithmOID) {
+            "2.16.840.1.101.3.4.2.1" -> {
+                sha256Rs(data).toHexString()
+            }
 
-	Logger.debug("Document hash: $hashString")
+            // SHA-256
+            else -> {
+                Logger.error("Unsupported hash algorithm OID: $hashAlgorithmOID")
+                return false
+            }
+        }
 
-	val documentHash = base64UrlDecodePad(hash).decodeToString()
-	return hashString == documentHash
+    Logger.debug("Document hash: $hashString")
+
+    val documentHash = base64UrlDecodePad(hash).decodeToString()
+    return hashString == documentHash
 }
 
+fun DocumentDigest.validate(data: ByteArray): Boolean =
+    validateHash(data, hash, hashAlgorithmOID) || validateHash(data, dtbs, dtbsHashAlgorithmOid)
 
-fun DocumentDigest.validate(data: ByteArray): Boolean {
-	return validateHash(data, hash, hashAlgorithmOID) || validateHash(data, dtbs, dtbsHashAlgorithmOid)
-}
-
-fun TransactionData.validate(data: ByteArray): Boolean {
-	return validateHash(data, qcHash, qcHashAlgorithmOid)
-}
+fun TransactionData.validate(data: ByteArray): Boolean = validateHash(data, qcHash, qcHashAlgorithmOid)

@@ -21,31 +21,28 @@ import org.kapunsdk.trust.model.AgentInformation
 import uniffi.kapun_wallet_rust.AgentInfo
 
 enum class LoA {
-	Low,
-	Medium,
-	High
+    Low,
+    Medium,
+    High,
 }
 
-inline fun AgentInfo.getRequestedLoa(): LoA {
-	return if (this.domain.contains("bund")) {
-		LoA.High
-	} else {
-		LoA.Low
-	}
-}
+inline fun AgentInfo.getRequestedLoa(): LoA =
+    if (this.domain.contains("bund")) {
+        LoA.High
+    } else {
+        LoA.Low
+    }
 
-inline fun TrustData.getRequestedLoa(): LoA {
-	return if (this.baseUrl.contains("bund")) {
-		LoA.High
-	} else {
-		LoA.Low
-	}
-}
+inline fun TrustData.getRequestedLoa(): LoA =
+    if (this.baseUrl.contains("bund")) {
+        LoA.High
+    } else {
+        LoA.Low
+    }
 
-inline fun AgentInformation.getRequestedLoa(): LoA {
-	return if (this.domain.contains("bund")) {
-		LoA.High
-	} else {
-		LoA.Low
-	}
-}
+inline fun AgentInformation.getRequestedLoa(): LoA =
+    if (this.domain.contains("bund")) {
+        LoA.High
+    } else {
+        LoA.Low
+    }

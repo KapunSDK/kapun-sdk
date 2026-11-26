@@ -22,44 +22,42 @@ import org.kapunsdk.wallet.process.ProcessStep
 import uniffi.kapun_wallet_rust.CredentialOfferAuthType
 
 sealed interface EaaIssuanceProcessStep : ProcessStep {
+    data class Error(
+        val errorMessage: String,
+        val errorCode: String? = null,
+        val cause: Exception? = null,
+        val retry: (() -> Unit)? = null,
+    ) : EaaIssuanceProcessStep
 
-	data class Error(
-		val errorMessage: String,
-		val errorCode: String? = null,
-		val cause: Exception? = null,
-		val retry: (() -> Unit)? = null,
-	) : EaaIssuanceProcessStep
+    data class ConnectionDetails(
+        val agentInformation: AgentInformation,
+    ) : EaaIssuanceProcessStep
 
-	data class ConnectionDetails(
-		val agentInformation: AgentInformation,
-	) : EaaIssuanceProcessStep
+    data class CredentialOfferPreview(
+        val agentInformation: AgentInformation,
+        val authType: CredentialOfferAuthType,
+    ) : EaaIssuanceProcessStep
 
-	data class CredentialOfferPreview(
-		val agentInformation: AgentInformation,
-		val authType: CredentialOfferAuthType,
-	) : EaaIssuanceProcessStep
+    data class Presentation(
+        val presentationData: String,
+        val presentationScope: String,
+        val authSession: String,
+    ) : EaaIssuanceProcessStep
 
-	data class Presentation(
-		val presentationData: String,
-		val presentationScope: String,
-		val authSession: String,
-	) : EaaIssuanceProcessStep
+    data class TransactionCode(
+        val isNumeric: Boolean,
+        val length: Int? = null,
+        val description: String? = null,
+    ) : EaaIssuanceProcessStep
 
-	data class TransactionCode(
-		val isNumeric: Boolean,
-		val length: Int? = null,
-		val description: String? = null,
-	) : EaaIssuanceProcessStep
+    data class PushedAuthorization(
+        val url: String,
+    ) : EaaIssuanceProcessStep
 
-	data class PushedAuthorization(
-		val url: String,
-	) : EaaIssuanceProcessStep
+    data class CredentialOffer(
+        val agentInformation: AgentInformation,
+        val viewModel: IdentityUiModel,
+    ) : EaaIssuanceProcessStep
 
-	data class CredentialOffer(
-		val agentInformation: AgentInformation,
-		val viewModel: IdentityUiModel,
-	) : EaaIssuanceProcessStep
-
-	data object Success : EaaIssuanceProcessStep
-
+    data object Success : EaaIssuanceProcessStep
 }

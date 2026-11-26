@@ -19,8 +19,9 @@ package org.kapunsdk.wallet.resources.di
 import org.koin.core.module.Module
 import org.koin.dsl.module
 
-internal fun resourcesModule() = module {
-	stringResourceProviderModule()
-}
+internal fun resourcesModule() =
+    module {
+        stringResourceProviderModule()
+    }
 
 expect fun Module.stringResourceProviderModule()

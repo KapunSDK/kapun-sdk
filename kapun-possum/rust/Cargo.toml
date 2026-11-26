@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [lib]
-crate-type = ["cdylib", "staticlib", "lib"]
 name = "kapun_possum_rust"
 
 [dependencies]
@@ -13,6 +12,7 @@ serde_json.workspace = true
 # Possum, with its JsonLogic engine: it evaluates CertLogic operations such as date comparisons.
 jlc = { git = "https://github.com/heidiverse/possum.git" }
 kapun-util-rust = { path = "../../kapun-util/rust" }
+workspace-hack = { version = "0.1", path = "../../workspace-hack" }
 
 [features]
 default = ["uniffi"]

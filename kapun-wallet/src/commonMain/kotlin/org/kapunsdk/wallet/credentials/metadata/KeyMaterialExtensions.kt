@@ -22,41 +22,73 @@ import org.kapunsdk.wallet.crypto.SecureHardwareAccess
 import org.kapunsdk.wallet.extensions.toFrostBackup
 import uniffi.kapun_wallet_rust.SoftwareKeyPair
 
-inline fun KeyMaterial.toKeyAssurance() : KeyAssurance {
-	return when(this) {
-		is KeyMaterial.Frost -> KeyAssurance.EmergencyHigh
-		is KeyMaterial.Local.HardwareBacked -> KeyAssurance.HardwareMedium
-		is KeyMaterial.Local.SoftwareBacked -> KeyAssurance.SoftwareLow
-		is KeyMaterial.Cloud -> KeyAssurance.CloudHigh
-		is KeyMaterial.Unusable -> KeyAssurance.CloudHigh
-		is KeyMaterial.Local.ClaimBased -> KeyAssurance.SoftwareLow
-	}
+inline fun KeyMaterial.toKeyAssurance(): KeyAssurance =
+    when (this) {
+        is KeyMaterial.Frost -> KeyAssurance.EmergencyHigh
+        is KeyMaterial.Local.HardwareBacked -> KeyAssurance.HardwareMedium
+        is KeyMaterial.Local.SoftwareBacked -> KeyAssurance.SoftwareLow
+        is KeyMaterial.Cloud -> KeyAssurance.CloudHigh
+        is KeyMaterial.Unusable -> KeyAssurance.CloudHigh
+        is KeyMaterial.Local.ClaimBased -> KeyAssurance.SoftwareLow
+    }
+
+inline fun KeyMaterial.isImportable(secureHardwareAccess: SecureHardwareAccess): Boolean {
+    return when (this) {
+        is KeyMaterial.Local.HardwareBacked -> {
+            val signer = secureHardwareAccess.getHardwareSigner(this.deviceKeyReference)
+            return signer != null
+        }
+
+        is KeyMaterial.Local.SoftwareBacked -> {
+            true
+        }
+
+        is KeyMaterial.Cloud -> {
+            val signer = secureHardwareAccess.getHardwareSigner(this.deviceKeyReference)
+            return signer != null
+        }
+
+        is KeyMaterial.Frost -> {
+            true
+        }
+
+        is KeyMaterial.Unusable -> {
+            false
+        }
+
+        is KeyMaterial.Local.ClaimBased -> {
+            true
+        }
+    }
 }
 
-inline fun KeyMaterial.isImportable(secureHardwareAccess: SecureHardwareAccess) : Boolean {
-	return when (this) {
-		is KeyMaterial.Local.HardwareBacked -> {
-			val signer = secureHardwareAccess.getHardwareSigner(this.deviceKeyReference)
-			return signer != null
-		}
-		is KeyMaterial.Local.SoftwareBacked -> true
-		is KeyMaterial.Cloud -> {
-			val signer = secureHardwareAccess.getHardwareSigner(this.deviceKeyReference)
-			return signer != null
-		}
-		is KeyMaterial.Frost -> true
-		is KeyMaterial.Unusable -> false
-		is KeyMaterial.Local.ClaimBased -> true
-	}
-}
+inline fun KeyMaterial.getPublicKey(frostBlob: String? = null): ByteArray? =
+    when (this) {
+        is KeyMaterial.Local.HardwareBacked -> {
+            publicKey
+        }
 
-inline fun KeyMaterial.getPublicKey(frostBlob: String? = null) : ByteArray? {
-	return when (this) {
-		is KeyMaterial.Local.HardwareBacked -> publicKey
-		is KeyMaterial.Frost -> frostBlob?.toFrostBackup()?.pubKeyPackage
-		is KeyMaterial.Local.SoftwareBacked -> SoftwareKeyPair.fromPrivateKey(this.privateKey).asNativeSigner().publicKey()
-		is KeyMaterial.Cloud -> this.hsmReference.batchPublicKey ?: this.hsmReference.publicKey
-		is KeyMaterial.Unusable -> null
-		is KeyMaterial.Local.ClaimBased -> null
-	}
-}
+        is KeyMaterial.Frost -> {
+            frostBlob?.toFrostBackup()?.pubKeyPackage
+        }
+
+        is KeyMaterial.Local.SoftwareBacked -> {
+            SoftwareKeyPair
+                .fromPrivateKey(
+                    this.privateKey,
+                ).asNativeSigner()
+                .publicKey()
+        }
+
+        is KeyMaterial.Cloud -> {
+            this.hsmReference.batchPublicKey ?: this.hsmReference.publicKey
+        }
+
+        is KeyMaterial.Unusable -> {
+            null
+        }
+
+        is KeyMaterial.Local.ClaimBased -> {
+            null
+        }
+    }

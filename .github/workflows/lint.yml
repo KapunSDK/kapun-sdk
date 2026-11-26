@@ -1,0 +1,53 @@
+name: Lint
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  ktlint:
+    name: Kotlin lint
+    runs-on: ["macOS"]
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - name: Set up JDK
+        uses: actions/setup-java@v6.0.1
+        with:
+          distribution: "zulu"
+          java-version: "17"
+
+      - name: Ensure gradlew is executable
+        run: chmod +x gradlew
+
+      - name: Check Kotlin formatting
+        run: ./gradlew ktlintCheck --console=plain
+
+  hakari:
+    name: workspace-hack up to date
+    runs-on: ["macOS"]
+    env:
+      # Same Git setup as the build workflow: resolving the workspace fetches the Git dependencies.
+      CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+      GIT_CONFIG_COUNT: "1"
+      GIT_CONFIG_KEY_0: "credential.helper"
+      GIT_CONFIG_VALUE_0: ""
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      # Pin the version: other versions can generate a different workspace-hack. Cargo skips the
+      # install when this version is already installed on the runner.
+      - name: Install cargo-hakari
+        run: cargo install cargo-hakari --version 0.9.39 --locked
+
+      # Both fail if a Cargo.toml changed without updating workspace-hack. The README says how.
+      - name: Check workspace-hack contents
+        run: cargo hakari generate --diff
+
+      - name: Check workspace-hack dependencies
+        run: cargo hakari manage-deps --dry-run

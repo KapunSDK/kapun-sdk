@@ -16,7 +16,6 @@ under the License.
 
 package org.kapunsdk.trust.networking.di
 
-import org.kapunsdk.util.network.KapunNetworkConfiguration
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.cache.HttpCache
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -24,19 +23,21 @@ import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.request.header
 import io.ktor.http.HttpHeaders
 import io.ktor.serialization.kotlinx.json.json
+import org.kapunsdk.util.network.KapunNetworkConfiguration
 import org.koin.dsl.module
 
-internal fun networkModule(networkConfiguration: KapunNetworkConfiguration) = module {
-	single {
-		networkConfiguration.httpClient ?: HttpClient {
-			expectSuccess = true
-			defaultRequest {
-				networkConfiguration.userAgent?.let { header(HttpHeaders.UserAgent, it) }
-			}
-			install(HttpCache)
-			install(ContentNegotiation) {
-				json(get())
-			}
-		}
-	}
-}
+internal fun networkModule(networkConfiguration: KapunNetworkConfiguration) =
+    module {
+        single {
+            networkConfiguration.httpClient ?: HttpClient {
+                expectSuccess = true
+                defaultRequest {
+                    networkConfiguration.userAgent?.let { header(HttpHeaders.UserAgent, it) }
+                }
+                install(HttpCache)
+                install(ContentNegotiation) {
+                    json(get())
+                }
+            }
+        }
+    }

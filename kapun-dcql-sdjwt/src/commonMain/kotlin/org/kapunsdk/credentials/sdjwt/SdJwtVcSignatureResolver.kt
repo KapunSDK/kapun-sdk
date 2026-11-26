@@ -16,18 +16,17 @@ under the License.
 
 package org.kapunsdk.credentials.sdjwt
 
-import org.kapunsdk.util.extensions.asString
-import org.kapunsdk.util.extensions.get
 import io.ktor.http.URLBuilder
 import io.ktor.http.Url
 import io.ktor.http.path
 import io.ktor.http.takeFrom
 import kotlinx.serialization.json.Json
+import org.kapunsdk.util.extensions.asString
+import org.kapunsdk.util.extensions.get
 import uniffi.kapun_crypto_rust.parseEncodedJwtPayload
 import uniffi.kapun_util_rust.Value
 
 object SdJwtVcSignatureResolver {
-
     /**
      * JWT VC issuer metadata is an HTTP(S) discovery mechanism.  An issuer may
      * also be identified by a DID, but a DID is not an issuer-metadata URL and
@@ -47,8 +46,7 @@ object SdJwtVcSignatureResolver {
                 .apply {
                     val path = arrayOf(".well-known", "jwt-vc-issuer") + encodedPathSegments
                     path(*path)
-                }
-                .build()
+                }.build()
         }.getOrNull()
     }
 
@@ -56,10 +54,11 @@ object SdJwtVcSignatureResolver {
         // Issuer metadata is optional.  Failure to parse or resolve it must
         // not prevent callers from receiving/processing the credential; it is
         // only relevant when signature verification is explicitly requested.
-        val issuer = runCatching {
-            parseEncodedJwtPayload(jwt)
-                ?.let { Json.decodeFromString<Value>(it)["iss"].asString() }
-        }.getOrNull() ?: return null
+        val issuer =
+            runCatching {
+                parseEncodedJwtPayload(jwt)
+                    ?.let { Json.decodeFromString<Value>(it)["iss"].asString() }
+            }.getOrNull() ?: return null
 
         // A DID (or any other non-HTTP identifier) is not a URL for this
         // discovery mechanism.  In particular, do not turn a DID into a
@@ -83,10 +82,11 @@ object SdJwtVcSignatureResolver {
     }
 
     fun isSignatureValid(jwt: String): Boolean {
-        val pk = retrievePkUsingJwtVcIssuerMetadata(jwt)
-            ?: retrievePkUsingX509Cert()
-            ?: retrievePkUsingDidWeb()
-            ?: return false
+        val pk =
+            retrievePkUsingJwtVcIssuerMetadata(jwt)
+                ?: retrievePkUsingX509Cert()
+                ?: retrievePkUsingDidWeb()
+                ?: return false
 
         // TODO: "Verify the jwt using the public key"
 

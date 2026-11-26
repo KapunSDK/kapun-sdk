@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [lib]
-crate-type = ["cdylib", "staticlib", "lib"]
 name = "kapun_dcql_mdoc_rust"
 
 [dependencies]
@@ -15,6 +14,7 @@ base64.workspace = true
 rand.workspace = true
 kapun-util-rust = { path = "../../kapun-util/rust" }
 kapun-credential-core-rust = { path = "../../kapun-credential-core/rust" }
+workspace-hack = { version = "0.1", path = "../../workspace-hack" }
 
 [features]
 default = ["uniffi"]

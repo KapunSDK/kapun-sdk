@@ -16,8 +16,6 @@ under the License.
 
 package org.kapunsdk.trust.framework.oid4vp
 
-import org.kapunsdk.trust.framework.DidWebTrustAnchorProvider
-import org.kapunsdk.trust.di.KapunTrustKoinContext
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
@@ -26,35 +24,39 @@ import io.ktor.http.Url
 import io.ktor.http.appendPathSegments
 import io.ktor.http.takeFrom
 import kotlinx.serialization.json.Json
+import org.kapunsdk.trust.di.KapunTrustKoinContext
+import org.kapunsdk.trust.framework.DidWebTrustAnchorProvider
 import uniffi.kapun_crypto_rust.getKidFromJwt
 import uniffi.kapun_crypto_rust.parseDidVerificationDocument
 import uniffi.kapun_crypto_rust.validateJwtWithDidDocument
 import uniffi.kapun_util_rust.Value
 
 class StaticDidWebTrustAnchorProvider(
-    private val trustedDomains: List<String> = listOf()
+    private val trustedDomains: List<String> = listOf(),
 ) : DidWebTrustAnchorProvider {
     private val json = Json { ignoreUnknownKeys = true }
     private val httpClient by lazy { KapunTrustKoinContext.koin.get<HttpClient>() }
 
-    private fun resolveUrl(kid: String): Url? = runCatching {
-        if (!kid.startsWith("did:web:")) {
-            return null
-        }
-        val kid = kid.removePrefix("did:web:")
-            .replace(':', '/')
-            .replace("%3A", ":", ignoreCase = true)
-
-        URLBuilder()
-            .takeFrom("https://$kid")
-            .apply {
-                if (pathSegments.none { it.isNotBlank() }) {
-                    appendPathSegments(".well-known")
-                }
-                appendPathSegments("did.json")
+    private fun resolveUrl(kid: String): Url? =
+        runCatching {
+            if (!kid.startsWith("did:web:")) {
+                return null
             }
-            .build()
-    }.getOrNull()
+            val kid =
+                kid
+                    .removePrefix("did:web:")
+                    .replace(':', '/')
+                    .replace("%3A", ":", ignoreCase = true)
+
+            URLBuilder()
+                .takeFrom("https://$kid")
+                .apply {
+                    if (pathSegments.none { it.isNotBlank() }) {
+                        appendPathSegments(".well-known")
+                    }
+                    appendPathSegments("did.json")
+                }.build()
+        }.getOrNull()
 
     override fun isTrusted(kid: String): Boolean {
         val url = resolveUrl(kid) ?: return false
@@ -63,15 +65,17 @@ class StaticDidWebTrustAnchorProvider(
 
     override suspend fun verifyJwt(jwt: String): Boolean {
         val kid = getKidFromJwt(jwt) ?: return false
-        val url = resolveUrl(kid) ?: return false;
+        val url = resolveUrl(kid) ?: return false
 
-        val resp = httpClient.get(url)
-            .bodyAsText()
+        val resp =
+            httpClient
+                .get(url)
+                .bodyAsText()
 
-        val doc = parseDidVerificationDocument(json.decodeFromString<Value>(resp))
-            ?: return false
+        val doc =
+            parseDidVerificationDocument(json.decodeFromString<Value>(resp))
+                ?: return false
 
         return validateJwtWithDidDocument(jwt, doc, validateAud = false)
     }
-
 }

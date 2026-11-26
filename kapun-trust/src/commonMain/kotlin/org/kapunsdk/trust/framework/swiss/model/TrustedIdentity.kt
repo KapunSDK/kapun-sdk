@@ -23,22 +23,22 @@ import kotlinx.serialization.json.JsonNames
 
 @Serializable
 class TrustedIdentity(
-	val vct: String?,
-	val iss: String?,
-	val sub: String?,
-	val iat: Long?,
-	val nbf: Long?,
-	val exp: Long?,
-	val status: String?,
-	@JsonNames("orgName")
-	val entityName: Map<String, String>,
-	val registryIds: List<Registry>?,
-	val logoUri: Map<String, String>?,
-	val prefLang: String?
+    val vct: String?,
+    val iss: String?,
+    val sub: String?,
+    val iat: Long?,
+    val nbf: Long?,
+    val exp: Long?,
+    val status: String?,
+    @JsonNames("orgName")
+    val entityName: Map<String, String>,
+    val registryIds: List<Registry>?,
+    val logoUri: Map<String, String>?,
+    val prefLang: String?,
 )
 
-fun TrustedIdentity.Companion.fromV2(v2: TrustedIdentityV2) : TrustedIdentity {
-	return TrustedIdentity(
+fun TrustedIdentity.Companion.fromV2(v2: TrustedIdentityV2): TrustedIdentity =
+    TrustedIdentity(
         vct = v2.vct,
         iss = v2.iss,
         sub = v2.sub,
@@ -51,24 +51,23 @@ fun TrustedIdentity.Companion.fromV2(v2: TrustedIdentityV2) : TrustedIdentity {
         logoUri = v2.logoUri,
         prefLang = v2.prefLang,
     )
-}
 
 @Serializable
 class Registry(
-	val type: String,
-	val value: String,
+    val type: String,
+    val value: String,
 )
 
 @Serializable
 class TrustedIdentityV2(
-	val vct: String,
-	val iss: String,
-	val sub: String,
-	val iat: Long,
-	val nbf: Long?,
-	val exp: Long?,
-	@JsonNames("orgName")
-	val entityName: Map<String, String>,
-	val logoUri: Map<String, String>?,
-	val prefLang: String?
+    val vct: String,
+    val iss: String,
+    val sub: String,
+    val iat: Long,
+    val nbf: Long?,
+    val exp: Long?,
+    @JsonNames("orgName")
+    val entityName: Map<String, String>,
+    val logoUri: Map<String, String>?,
+    val prefLang: String?,
 )

@@ -22,20 +22,17 @@ import org.koin.dsl.module
 import uniffi.kapun_wallet_rust.NativeSigner
 
 class SecureHardwareAccess(
-	private val factory: HardwareSignerFactory,
+    private val factory: HardwareSignerFactory,
 ) {
+    companion object {
+        val koinModule =
+            module {
+                singleOf(::SecureHardwareAccess)
+            }
+    }
 
-	companion object {
-		val koinModule = module {
-			singleOf(::SecureHardwareAccess)
-		}
-	}
+    fun getHardwareSigner(dataRepresenation: ByteArray): NativeSigner? = factory.getHardwareSigner(dataRepresenation)
 
-	fun getHardwareSigner(dataRepresenation: ByteArray) : NativeSigner? {
-		return factory.getHardwareSigner(dataRepresenation)
-	}
-
-	fun newHardwareSigner(accessControl: SecureHardwareAccessControl) : NativeSigner {
-		return factory.newHardwareSigner(accessControl)
-	}
+    fun newHardwareSigner(accessControl: SecureHardwareAccessControl): NativeSigner =
+        factory.newHardwareSigner(accessControl)
 }

@@ -4,6 +4,5 @@ data class VersionId(
     val version: Int,
     val entryHash: String,
 ) {
-    override fun toString(): String =
-        "$version-$entryHash"
+    override fun toString(): String = "$version-$entryHash"
 }

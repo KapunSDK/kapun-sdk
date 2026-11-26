@@ -22,48 +22,46 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class LocaleMatcherTest {
+    @Test
+    fun testExactMatch() {
+        val inputLocale = "de-CH"
+        val userLocale = "de-CH"
+        assertTrue { LocaleMatcher.matches(inputLocale, userLocale) }
+    }
 
-	@Test
-	fun testExactMatch() {
-		val inputLocale = "de-CH"
-		val userLocale = "de-CH"
-		assertTrue { LocaleMatcher.matches(inputLocale, userLocale) }
-	}
+    @Test
+    fun testUserRegionFallback() {
+        val inputLocale = "de"
+        val userLocale = "de-CH"
+        assertTrue { LocaleMatcher.matches(inputLocale, userLocale) }
+    }
 
-	@Test
-	fun testUserRegionFallback() {
-		val inputLocale = "de"
-		val userLocale = "de-CH"
-		assertTrue { LocaleMatcher.matches(inputLocale, userLocale) }
-	}
+    @Test
+    fun testOverlayRegionFallback() {
+        val inputLocale = "de-CH"
+        val userLocale = "de"
+        assertFalse { LocaleMatcher.matches(inputLocale, userLocale) }
+        assertTrue { LocaleMatcher.matches(inputLocale, userLocale, allowLanguageOnlyMatch = true) }
+    }
 
-	@Test
-	fun testOverlayRegionFallback() {
-		val inputLocale = "de-CH"
-		val userLocale = "de"
-		assertFalse { LocaleMatcher.matches(inputLocale, userLocale) }
-		assertTrue { LocaleMatcher.matches(inputLocale, userLocale, allowLanguageOnlyMatch = true) }
-	}
+    @Test
+    fun testLanguageMisMatch() {
+        val inputLocale = "de-CH"
+        val userLocale = "fr-CH"
+        assertFalse { LocaleMatcher.matches(inputLocale, userLocale) }
+    }
 
-	@Test
-	fun testLanguageMisMatch() {
-		val inputLocale = "de-CH"
-		val userLocale = "fr-CH"
-		assertFalse { LocaleMatcher.matches(inputLocale, userLocale) }
-	}
+    @Test
+    fun testRegionMismatch() {
+        val inputLocale = "de-CH"
+        val userLocale = "de-DE"
+        assertFalse { LocaleMatcher.matches(inputLocale, userLocale) }
+    }
 
-	@Test
-	fun testRegionMismatch() {
-		val inputLocale = "de-CH"
-		val userLocale = "de-DE"
-		assertFalse { LocaleMatcher.matches(inputLocale, userLocale) }
-	}
-
-	@Test
-	fun testCompleteMismatch() {
-		val inputLocale = "de-CH"
-		val userLocale = "en-GB"
-		assertFalse { LocaleMatcher.matches(inputLocale, userLocale) }
-	}
-
+    @Test
+    fun testCompleteMismatch() {
+        val inputLocale = "de-CH"
+        val userLocale = "en-GB"
+        assertFalse { LocaleMatcher.matches(inputLocale, userLocale) }
+    }
 }

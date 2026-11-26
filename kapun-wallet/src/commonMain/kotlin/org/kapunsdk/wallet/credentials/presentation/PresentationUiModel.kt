@@ -25,28 +25,30 @@ import uniffi.kapun_dcql_rust.DcqlQuery
 import uniffi.kapun_dcql_rust.DcqlQueryMismatch
 
 data class CredentialUseCaseUiModel(
-	val purpose: String?,
-	val credentials:  Map<String, List<CredentialSelectionUiModel>>,
-	val credentialSelection : org.kapunsdk.wallet.process.presentation.CredentialSelection,
-	val optional: Boolean = false,
-	val zkpInfo: ZkpUiModel? = null,
+    val purpose: String?,
+    val credentials: Map<String, List<CredentialSelectionUiModel>>,
+    val credentialSelection: org.kapunsdk.wallet.process.presentation.CredentialSelection,
+    val optional: Boolean = false,
+    val zkpInfo: ZkpUiModel? = null,
 )
 
 data class PresentationUiModel(
     val clientId: String,
-    val credentialUseCases:  List<CredentialUseCaseUiModel>,
-    val purpose : String?,
-    val name : String?,
+    val credentialUseCases: List<CredentialUseCaseUiModel>,
+    val purpose: String?,
+    val name: String?,
     val loA: LoA,
     val authorizationRequestForDiagnostics: AuthorizationRequestDiagnostics?,
 )
 
 data class ZkpUiModel(
-    val equalityProofs: List<String>
+    val equalityProofs: List<String>,
 )
 
 sealed interface AuthorizationRequestDiagnostics {
-    data class Generic(val request: String) : AuthorizationRequestDiagnostics
+    data class Generic(
+        val request: String,
+    ) : AuthorizationRequestDiagnostics
 
     data class Dcql(
         val info: DcqlMismatchInfo,
@@ -56,41 +58,60 @@ sealed interface AuthorizationRequestDiagnostics {
 data class DcqlMismatchInfo(
     val query: DcqlQuery,
     val mismatches: List<DcqlQueryMismatch>,
-    val identityMap: Map<String, Pair<Long, CredentialType>>
+    val identityMap: Map<String, Pair<Long, CredentialType>>,
 )
 
+// TODO: how do we decide LoA? Is SD-JWT and MDOC the smae or is one preferred?
+fun PresentationUiModel.bestCredentialFor(
+    useCaseIndex: Int,
+    responseId: String,
+    identityName: String,
+    loa: LoA,
+    preferSdJwt: Boolean,
+): CredentialSelectionUiModel? =
+    this.credentialUseCases[useCaseIndex].bestCredentialFor(responseId, identityName, loa, preferSdJwt)
 
-//TODO: how do we decide LoA? Is SD-JWT and MDOC the smae or is one preferred?
-fun PresentationUiModel.bestCredentialFor(useCaseIndex: Int, responseId: String, identityName: String, loa: LoA, preferSdJwt: Boolean) : CredentialSelectionUiModel? {
-    return this.credentialUseCases[useCaseIndex].bestCredentialFor(responseId,identityName,loa,preferSdJwt)
-}
+fun CredentialUseCaseUiModel.bestCredentialFor(
+    responseId: String,
+    identityName: String,
+    loa: LoA,
+    preferSdJwt: Boolean,
+): CredentialSelectionUiModel? = this.credentials[responseId]?.bestCredentialFor(identityName, loa, preferSdJwt)
 
-fun CredentialUseCaseUiModel.bestCredentialFor(responseId: String, identityName: String, loa: LoA, preferSdJwt: Boolean) : CredentialSelectionUiModel? {
-    return this.credentials[responseId]?.bestCredentialFor(identityName,loa,preferSdJwt)
-}
-fun List<CredentialSelectionUiModel>.bestCredentialFor(identityName: String, loa: LoA, preferSdJwt: Boolean) : CredentialSelectionUiModel? {
-    val credentialsForIdentity = this.filter { it.identityUiModel is IdentityUiModel.IdentityUiCredentialModel && it.identityUiModel.name == identityName }
-        .let { credentials ->
-            if (preferSdJwt) credentials.sortedByDescending { it.format == CredentialType.SdJwt } else credentials
+fun List<CredentialSelectionUiModel>.bestCredentialFor(
+    identityName: String,
+    loa: LoA,
+    preferSdJwt: Boolean,
+): CredentialSelectionUiModel? {
+    val credentialsForIdentity =
+        this
+            .filter {
+                it.identityUiModel is IdentityUiModel.IdentityUiCredentialModel &&
+                    it.identityUiModel.name == identityName
+            }.let { credentials ->
+                if (preferSdJwt) credentials.sortedByDescending { it.format == CredentialType.SdJwt } else credentials
+            }
+
+    val loaHigh =
+        credentialsForIdentity.filter {
+            it.keyAssurance == KeyAssurance.CloudHigh
+        }
+    val emergency =
+        credentialsForIdentity.filter {
+            it.keyAssurance == KeyAssurance.EmergencyHigh
+        }
+    val loaMedium =
+        credentialsForIdentity.filter {
+            it.keyAssurance == KeyAssurance.HardwareMedium
+        }
+    val loaLow =
+        credentialsForIdentity.filter {
+            it.keyAssurance == KeyAssurance.SoftwareLow
         }
 
-    val loaHigh = credentialsForIdentity.filter {
-        it.keyAssurance == KeyAssurance.CloudHigh
-    }
-    val emergency = credentialsForIdentity.filter {
-        it.keyAssurance == KeyAssurance.EmergencyHigh
-    }
-    val loaMedium = credentialsForIdentity.filter {
-        it.keyAssurance == KeyAssurance.HardwareMedium
-    }
-    val loaLow = credentialsForIdentity.filter {
-        it.keyAssurance == KeyAssurance.SoftwareLow
-    }
-
-    return when(loa) {
+    return when (loa) {
         LoA.Low -> loaLow.firstOrNull() ?: loaMedium.firstOrNull() ?: loaHigh.firstOrNull() ?: emergency.first()
         LoA.Medium -> loaMedium.firstOrNull() ?: loaHigh.firstOrNull() ?: emergency.firstOrNull()
         LoA.High -> loaHigh.firstOrNull() ?: emergency.firstOrNull()
     }
 }
-

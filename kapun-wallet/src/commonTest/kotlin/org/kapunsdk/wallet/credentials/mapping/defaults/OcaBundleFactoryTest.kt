@@ -31,82 +31,92 @@ import kotlin.test.assertNotNull
 class OcaBundleFactoryTest {
     @Test
     fun testBbsMetadataDisplayIsUsedForOca() {
-        val metadata = Json { ignoreUnknownKeys = true }.decodeFromString<CredentialIssuerMetadataClaims>(
-            """
-            {
-              "credential_issuer": "https://issuer.example",
-              "credential_endpoint": "https://issuer.example/credential",
-              "credential_configurations_supported": {
-                "bbs": {
-                  "format": "zkp_vc",
-                  "vct": "urn:example:bbs",
-                  "credential_metadata": {
-                    "display": [
-                      { "name": "BBS credential", "locale": "en-US" }
-                    ]
+        val metadata =
+            Json { ignoreUnknownKeys = true }.decodeFromString<CredentialIssuerMetadataClaims>(
+                """
+                {
+                  "credential_issuer": "https://issuer.example",
+                  "credential_endpoint": "https://issuer.example/credential",
+                  "credential_configurations_supported": {
+                    "bbs": {
+                      "format": "zkp_vc",
+                      "vct": "urn:example:bbs",
+                      "credential_metadata": {
+                        "display": [
+                          { "name": "BBS credential", "locale": "en-US" }
+                        ]
+                      }
+                    }
                   }
                 }
-              }
-            }
-            """.trimIndent()
-        )
+                """.trimIndent(),
+            )
 
-        val bundle = OcaBundleFactory.createOcaFromDisplayMetadata(
-            locale = "en-US",
-            stringResourceProvider = object : StringResourceProvider {
-                override fun getString(stringName: String) = stringName
-            },
-            backgroundImage = null,
-            metadata = metadata,
-            vct = "urn:example:bbs",
-            jsonContent = "{\"name\":\"Alice\"}",
-        )
+        val bundle =
+            OcaBundleFactory.createOcaFromDisplayMetadata(
+                locale = "en-US",
+                stringResourceProvider =
+                    object : StringResourceProvider {
+                        override fun getString(stringName: String) = stringName
+                    },
+                backgroundImage = null,
+                metadata = metadata,
+                vct = "urn:example:bbs",
+                jsonContent = "{\"name\":\"Alice\"}",
+            )
 
-        val style = assertNotNull(bundle)
-            .overlays
-            .filterIsInstance<UbiqueStyleJsonOverlay>()
-            .single()
+        val style =
+            assertNotNull(bundle)
+                .overlays
+                .filterIsInstance<UbiqueStyleJsonOverlay>()
+                .single()
         assertEquals("BBS credential", style.title)
     }
 
     @Test
     fun testClaimLabelsAreLocalizedFromMetadata() {
-        val metadata = Json { ignoreUnknownKeys = true }.decodeFromString<CredentialIssuerMetadataClaims>(
-            """
-            {
-              "credential_issuer": "https://issuer.example",
-              "credential_endpoint": "https://issuer.example/credential",
-              "credential_configurations_supported": {
-                "sdjwt": {
-                  "format": "dc+sd-jwt",
-                  "vct": "urn:example:sdjwt",
-                  "credential_metadata": {
-                    "claims": [
-                      { "path": ["given_name"], "display": [{ "name": "Given name", "locale": "en" }, { "name": "Vorname", "locale": "de" }] },
-                      { "path": ["family_name"], "display": [{ "name": "Nachname", "locale": "de" }] },
-                      { "path": ["address", "street_address"], "display": [{ "name": "Street", "locale": "en" }, { "name": "Strasse", "locale": "de-CH" }] },
-                      { "path": ["nationalities", null], "display": [{ "name": "Nationalities", "locale": "en" }, { "name": "Nationalitäten", "locale": "de" }] }
-                    ]
+        val metadata =
+            Json { ignoreUnknownKeys = true }.decodeFromString<CredentialIssuerMetadataClaims>(
+                """
+                {
+                  "credential_issuer": "https://issuer.example",
+                  "credential_endpoint": "https://issuer.example/credential",
+                  "credential_configurations_supported": {
+                    "sdjwt": {
+                      "format": "dc+sd-jwt",
+                      "vct": "urn:example:sdjwt",
+                      "credential_metadata": {
+                        "claims": [
+                          { "path": ["given_name"], "display": [{ "name": "Given name", "locale": "en" }, { "name": "Vorname", "locale": "de" }] },
+                          { "path": ["family_name"], "display": [{ "name": "Nachname", "locale": "de" }] },
+                          { "path": ["address", "street_address"], "display": [{ "name": "Street", "locale": "en" }, { "name": "Strasse", "locale": "de-CH" }] },
+                          { "path": ["nationalities", null], "display": [{ "name": "Nationalities", "locale": "en" }, { "name": "Nationalitäten", "locale": "de" }] }
+                        ]
+                      }
+                    }
                   }
                 }
-              }
-            }
-            """.trimIndent()
-        )
-        val payload = """{"given_name":"Alice","family_name":"Muster","nickname":"Ali","address":{"street_address":"Main St"},"nationalities":["CH"]}"""
-
-        val bundle = assertNotNull(
-            OcaBundleFactory.createOcaFromDisplayMetadata(
-                locale = "en",
-                stringResourceProvider = object : StringResourceProvider {
-                    override fun getString(stringName: String) = "builtin:$stringName"
-                },
-                backgroundImage = null,
-                metadata = metadata,
-                vct = "urn:example:sdjwt",
-                jsonContent = payload,
+                """.trimIndent(),
             )
-        )
+        val payload =
+            """
+            {"given_name":"Alice","family_name":"Muster","nickname":"Ali","address":{"street_address":"Main St"},"nationalities":["CH"]}
+            """.trimIndent()
+
+        val bundle =
+            assertNotNull(
+                OcaBundleFactory.createOcaFromDisplayMetadata(
+                    locale = "en",
+                    stringResourceProvider =
+                        object : StringResourceProvider {
+                            override fun getString(stringName: String) = "builtin:$stringName"
+                        },
+                    backgroundImage = null,
+                    metadata = metadata,
+                    vct = "urn:example:sdjwt",
+                    jsonContent = payload,
+                ),
+            )
 
         val labelOverlays = bundle.overlays.filterIsInstance<LabelOverlay>().associateBy { it.language }
         // Device locale first, followed by the issuer locales
@@ -128,8 +138,11 @@ class OcaBundleFactoryTest {
 
         // The stored bundle picks the label matching the current user language
         val storedBundle = json.decodeFromString<OcaBundleJson>(json.encodeToString(bundle))
-        fun label(userLanguage: String, attributeName: String) =
-            OcaProcessor(userLanguage, payload, storedBundle).processAttribute(attributeName)?.label
+
+        fun label(
+            userLanguage: String,
+            attributeName: String,
+        ) = OcaProcessor(userLanguage, payload, storedBundle).processAttribute(attributeName)?.label
 
         assertEquals("Given name", label("en-US", "/given_name"))
         assertEquals("Vorname", label("de-CH", "/given_name"))
@@ -139,38 +152,41 @@ class OcaBundleFactoryTest {
 
     @Test
     fun testClusterOrderingUsesFullAttributePathAndLocalizedClusterLabels() {
-        val metadata = Json { ignoreUnknownKeys = true }.decodeFromString<CredentialIssuerMetadataClaims>(
-            """
-            {
-              "credential_issuer": "https://issuer.example",
-              "credential_endpoint": "https://issuer.example/credential",
-              "credential_configurations_supported": {
-                "sdjwt": { "format": "dc+sd-jwt", "vct": "urn:example:sdjwt" }
-              },
-              "credential_metadata": {
-                "claims": [
-                  { "path": ["address"], "display": [{ "name": "Address", "locale": "en" }, { "name": "Adresse", "locale": "de" }] },
-                  { "path": ["address", "street_address"] },
-                  { "path": ["address", "locality"] },
-                  { "path": ["nickname"] }
-                ]
-              }
-            }
-            """.trimIndent()
-        )
-
-        val bundle = assertNotNull(
-            OcaBundleFactory.createOcaFromDisplayMetadata(
-                locale = "en",
-                stringResourceProvider = object : StringResourceProvider {
-                    override fun getString(stringName: String) = stringName
-                },
-                backgroundImage = null,
-                metadata = metadata,
-                vct = "urn:example:sdjwt",
-                jsonContent = """{"nickname":"Ali","address":{"street_address":"Main St","locality":"Bern"}}""",
+        val metadata =
+            Json { ignoreUnknownKeys = true }.decodeFromString<CredentialIssuerMetadataClaims>(
+                """
+                {
+                  "credential_issuer": "https://issuer.example",
+                  "credential_endpoint": "https://issuer.example/credential",
+                  "credential_configurations_supported": {
+                    "sdjwt": { "format": "dc+sd-jwt", "vct": "urn:example:sdjwt" }
+                  },
+                  "credential_metadata": {
+                    "claims": [
+                      { "path": ["address"], "display": [{ "name": "Address", "locale": "en" }, { "name": "Adresse", "locale": "de" }] },
+                      { "path": ["address", "street_address"] },
+                      { "path": ["address", "locality"] },
+                      { "path": ["nickname"] }
+                    ]
+                  }
+                }
+                """.trimIndent(),
             )
-        )
+
+        val bundle =
+            assertNotNull(
+                OcaBundleFactory.createOcaFromDisplayMetadata(
+                    locale = "en",
+                    stringResourceProvider =
+                        object : StringResourceProvider {
+                            override fun getString(stringName: String) = stringName
+                        },
+                    backgroundImage = null,
+                    metadata = metadata,
+                    vct = "urn:example:sdjwt",
+                    jsonContent = """{"nickname":"Ali","address":{"street_address":"Main St","locality":"Bern"}}""",
+                ),
+            )
 
         val clusterOverlays = bundle.overlays.filterIsInstance<ClusterOrderingOverlay>().associateBy { it.language }
         assertEquals(listOf("en", "de"), clusterOverlays.keys.toList())
@@ -187,40 +203,44 @@ class OcaBundleFactoryTest {
 
     @Test
     fun testRegionalIssuerLocalesMatchAppLanguage() {
-        val metadata = Json { ignoreUnknownKeys = true }.decodeFromString<CredentialIssuerMetadataClaims>(
-            """
-            {
-              "credential_issuer": "https://issuer.example",
-              "credential_endpoint": "https://issuer.example/credential",
-              "credential_configurations_supported": {
-                "sdjwt": {
-                  "format": "dc+sd-jwt",
-                  "vct": "urn:example:sdjwt",
-                  "credential_metadata": {
-                    "claims": [
-                      { "path": ["nickname"], "display": [{ "name": "Nickname", "locale": "en-US" }, { "name": "Spitzname", "locale": "de-CH" }] }
-                    ]
+        val metadata =
+            Json { ignoreUnknownKeys = true }.decodeFromString<CredentialIssuerMetadataClaims>(
+                """
+                {
+                  "credential_issuer": "https://issuer.example",
+                  "credential_endpoint": "https://issuer.example/credential",
+                  "credential_configurations_supported": {
+                    "sdjwt": {
+                      "format": "dc+sd-jwt",
+                      "vct": "urn:example:sdjwt",
+                      "credential_metadata": {
+                        "claims": [
+                          { "path": ["nickname"], "display": [{ "name": "Nickname", "locale": "en-US" }, { "name": "Spitzname", "locale": "de-CH" }] }
+                        ]
+                      }
+                    }
                   }
                 }
-              }
-            }
-            """.trimIndent()
-        )
+                """.trimIndent(),
+            )
         val payload = """{"nickname":"Ali"}"""
 
         // Issued while the app language was "de", the issuer only provides regional locales
-        val bundle = assertNotNull(
-            OcaBundleFactory.createOcaFromDisplayMetadata(
-                locale = "de",
-                stringResourceProvider = object : StringResourceProvider {
-                    override fun getString(stringName: String) = stringName
-                },
-                backgroundImage = null,
-                metadata = metadata,
-                vct = "urn:example:sdjwt",
-                jsonContent = payload,
+        val bundle =
+            assertNotNull(
+                OcaBundleFactory.createOcaFromDisplayMetadata(
+                    locale = "de",
+                    stringResourceProvider =
+                        object : StringResourceProvider {
+                            override fun getString(stringName: String) = stringName
+                        },
+                    backgroundImage = null,
+                    metadata = metadata,
+                    vct = "urn:example:sdjwt",
+                    jsonContent = payload,
+                ),
             )
-        )
+
         fun label(userLanguage: String) =
             OcaProcessor(userLanguage, payload, bundle).processAttribute("/nickname")?.label
 

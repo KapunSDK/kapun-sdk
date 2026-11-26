@@ -11,34 +11,33 @@ software distributed under the License is distributed on an
 "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
-under the License.   
+under the License.
  */
 package org.kapunsdk.sample.verifier
 
 import android.app.Application
-import org.kapunsdk.wallet.KapunSdk
 import org.kapunsdk.proximity.KapunProximity
 import org.kapunsdk.sample.verifier.di.networkModule
 import org.kapunsdk.sample.verifier.di.repositoryModule
 import org.kapunsdk.sample.verifier.di.viewModelsModule
+import org.kapunsdk.wallet.KapunSdk
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.context.startKoin
 
 class VerifierApplication : Application() {
+    override fun onCreate() {
+        super.onCreate()
 
-	override fun onCreate() {
-		super.onCreate()
+        KapunSdk(this).initialize()
+        KapunProximity(this).initialize()
 
-		KapunSdk(this).initialize()
-		KapunProximity(this).initialize()
-
-		startKoin {
-			androidContext(this@VerifierApplication)
-			modules(
-				networkModule,
-				repositoryModule,
-				viewModelsModule,
-			)
-		}
-	}
+        startKoin {
+            androidContext(this@VerifierApplication)
+            modules(
+                networkModule,
+                repositoryModule,
+                viewModelsModule,
+            )
+        }
+    }
 }

@@ -23,20 +23,30 @@ import kotlin.uuid.toJavaUuid
 
 internal actual class MdlCharacteristicsFactory {
     internal actual fun createServerWalletCharacteristics(): List<BleGattCharacteristic> {
-        val notify = BluetoothGattDescriptor(MdlPeripheralServerModeTransportProtocol.characteristicConfigurationUuid.toJavaUuid(),BluetoothGattDescriptor.PERMISSION_WRITE)
-        val stateChar = BluetoothGattCharacteristic(
-            MdlPeripheralServerModeTransportProtocol.characteristicStateUuid.toJavaUuid(),
-            BluetoothGattCharacteristic.PROPERTY_NOTIFY or BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE,
-            BluetoothGattCharacteristic.PERMISSION_WRITE,
-        )
+        val notify =
+            BluetoothGattDescriptor(
+                MdlPeripheralServerModeTransportProtocol.characteristicConfigurationUuid.toJavaUuid(),
+                BluetoothGattDescriptor.PERMISSION_WRITE,
+            )
+        val stateChar =
+            BluetoothGattCharacteristic(
+                MdlPeripheralServerModeTransportProtocol.characteristicStateUuid.toJavaUuid(),
+                BluetoothGattCharacteristic.PROPERTY_NOTIFY or BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE,
+                BluetoothGattCharacteristic.PERMISSION_WRITE,
+            )
         notify.setValue(BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE)
         stateChar.addDescriptor(notify)
-        val server2ClientChar = BluetoothGattCharacteristic(
-            MdlPeripheralServerModeTransportProtocol.characteristicServer2ClientUuid.toJavaUuid(),
-            BluetoothGattCharacteristic.PROPERTY_NOTIFY,
-            BluetoothGattCharacteristic.PERMISSION_WRITE,
-        )
-        val notify2 = BluetoothGattDescriptor(MdlPeripheralServerModeTransportProtocol.characteristicConfigurationUuid.toJavaUuid(),BluetoothGattDescriptor.PERMISSION_WRITE)
+        val server2ClientChar =
+            BluetoothGattCharacteristic(
+                MdlPeripheralServerModeTransportProtocol.characteristicServer2ClientUuid.toJavaUuid(),
+                BluetoothGattCharacteristic.PROPERTY_NOTIFY,
+                BluetoothGattCharacteristic.PERMISSION_WRITE,
+            )
+        val notify2 =
+            BluetoothGattDescriptor(
+                MdlPeripheralServerModeTransportProtocol.characteristicConfigurationUuid.toJavaUuid(),
+                BluetoothGattDescriptor.PERMISSION_WRITE,
+            )
         notify2.setValue(BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE)
         server2ClientChar.addDescriptor(notify2)
         return listOf(
@@ -46,31 +56,44 @@ internal actual class MdlCharacteristicsFactory {
                 BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE,
                 BluetoothGattCharacteristic.PERMISSION_WRITE,
             ),
-            server2ClientChar
+            server2ClientChar,
         ).map { BleGattCharacteristic(it) }
     }
 
     internal actual fun createServerVerifierCharacteristics(): List<BleGattCharacteristic> {
-        val notify = BluetoothGattDescriptor(MdlPeripheralServerModeTransportProtocol.characteristicConfigurationUuid.toJavaUuid(),BluetoothGattDescriptor.PERMISSION_WRITE)
-        val stateChar = BluetoothGattCharacteristic(
-            MdlCentralClientModeTransportProtocol.characteristicStateUuid.toJavaUuid(),
-            BluetoothGattCharacteristic.PROPERTY_NOTIFY or BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE,
-            BluetoothGattCharacteristic.PERMISSION_WRITE,
-        )
+        val notify =
+            BluetoothGattDescriptor(
+                MdlPeripheralServerModeTransportProtocol.characteristicConfigurationUuid.toJavaUuid(),
+                BluetoothGattDescriptor.PERMISSION_WRITE,
+            )
+        val stateChar =
+            BluetoothGattCharacteristic(
+                MdlCentralClientModeTransportProtocol.characteristicStateUuid.toJavaUuid(),
+                BluetoothGattCharacteristic.PROPERTY_NOTIFY or BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE,
+                BluetoothGattCharacteristic.PERMISSION_WRITE,
+            )
         notify.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE)
         stateChar.addDescriptor(notify)
-        val server2ClientChar = BluetoothGattCharacteristic(
-            MdlCentralClientModeTransportProtocol.characteristicServer2ClientUuid.toJavaUuid(),
-            BluetoothGattCharacteristic.PROPERTY_NOTIFY,
-            BluetoothGattCharacteristic.PERMISSION_WRITE,
-        )
-        val notify2 = BluetoothGattDescriptor(MdlPeripheralServerModeTransportProtocol.characteristicConfigurationUuid.toJavaUuid(),BluetoothGattDescriptor.PERMISSION_WRITE)
+        val server2ClientChar =
+            BluetoothGattCharacteristic(
+                MdlCentralClientModeTransportProtocol.characteristicServer2ClientUuid.toJavaUuid(),
+                BluetoothGattCharacteristic.PROPERTY_NOTIFY,
+                BluetoothGattCharacteristic.PERMISSION_WRITE,
+            )
+        val notify2 =
+            BluetoothGattDescriptor(
+                MdlPeripheralServerModeTransportProtocol.characteristicConfigurationUuid.toJavaUuid(),
+                BluetoothGattDescriptor.PERMISSION_WRITE,
+            )
         notify2.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE)
         server2ClientChar.addDescriptor(notify2)
 
-        val ident = BluetoothGattCharacteristic(MdlCentralClientModeTransportProtocol.characteristicIdentUuid.toJavaUuid(),
-            BluetoothGattCharacteristic.PROPERTY_READ,
-            BluetoothGattCharacteristic.PERMISSION_WRITE)
+        val ident =
+            BluetoothGattCharacteristic(
+                MdlCentralClientModeTransportProtocol.characteristicIdentUuid.toJavaUuid(),
+                BluetoothGattCharacteristic.PROPERTY_READ,
+                BluetoothGattCharacteristic.PERMISSION_WRITE,
+            )
 
         return listOf(
             stateChar,
@@ -80,7 +103,7 @@ internal actual class MdlCharacteristicsFactory {
                 BluetoothGattCharacteristic.PERMISSION_WRITE,
             ),
             server2ClientChar,
-            ident
+            ident,
         ).map { BleGattCharacteristic(it) }
     }
 }

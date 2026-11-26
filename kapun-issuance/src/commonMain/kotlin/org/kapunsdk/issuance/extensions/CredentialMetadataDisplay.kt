@@ -24,12 +24,12 @@ import org.kapunsdk.util.locale.LocaleMatcher
  * Returns the label matching the given locale, falling back to english and then to any available label.
  */
 fun List<Display>?.getLocalizedLabel(locale: String): String? {
-	if (this == null) return null
-	getLabelForLocale(locale)?.let { return it }
+    if (this == null) return null
+    getLabelForLocale(locale)?.let { return it }
 
-	firstOrNull { it.locale.equals("en", ignoreCase = true) && !it.name.isNullOrBlank() }?.name?.let { return it }
+    firstOrNull { it.locale.equals("en", ignoreCase = true) && !it.name.isNullOrBlank() }?.name?.let { return it }
 
-	return firstOrNull { !it.name.isNullOrBlank() }?.name
+    return firstOrNull { !it.name.isNullOrBlank() }?.name
 }
 
 /**
@@ -37,8 +37,8 @@ fun List<Display>?.getLocalizedLabel(locale: String): String? {
  * An exact match is preferred over a match of the language only (e.g. "de-DE" for "de-CH").
  */
 fun List<Display>?.getLabelForLocale(locale: String): String? {
-	if (this == null) return null
-	val labels = filter { it.locale != null && !it.name.isNullOrBlank() }
-	return labels.firstOrNull { it.locale.equals(locale, ignoreCase = true) }?.name
-		?: labels.firstOrNull { LocaleMatcher.matches(it.locale!!, locale, allowLanguageOnlyMatch = true) }?.name
+    if (this == null) return null
+    val labels = filter { it.locale != null && !it.name.isNullOrBlank() }
+    return labels.firstOrNull { it.locale.equals(locale, ignoreCase = true) }?.name
+        ?: labels.firstOrNull { LocaleMatcher.matches(it.locale!!, locale, allowLanguageOnlyMatch = true) }?.name
 }

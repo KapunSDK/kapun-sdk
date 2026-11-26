@@ -11,14 +11,14 @@ software distributed under the License is distributed on an
 "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
-under the License.   
+under the License.
  */
 package org.kapunsdk.proximity
 
 enum class ProximityProtocol {
-	/** ISO 18013-5 mDL */
-	MDL,
+    /** ISO 18013-5 mDL */
+    MDL,
 
-	/** OpenID for Verifiable Presentations over BLE */
-	OPENID4VP,
+    /** OpenID for Verifiable Presentations over BLE */
+    OPENID4VP,
 }

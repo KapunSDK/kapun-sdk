@@ -11,7 +11,7 @@ software distributed under the License is distributed on an
 "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
-under the License.   
+under the License.
  */
 package org.kapunsdk.sample.wallet.compose.theme
 
@@ -22,14 +22,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
 // Set of Material typography styles to start with
-val Typography = Typography(
-	bodyLarge = TextStyle(
-		fontFamily = FontFamily.Default,
-		fontWeight = FontWeight.Normal,
-		fontSize = 16.sp,
-		lineHeight = 24.sp,
-		letterSpacing = 0.5.sp
-	)
+val Typography =
+    Typography(
+        bodyLarge =
+            TextStyle(
+                fontFamily = FontFamily.Default,
+                fontWeight = FontWeight.Normal,
+                fontSize = 16.sp,
+                lineHeight = 24.sp,
+                letterSpacing = 0.5.sp,
+            ),
 	/* Other default text styles to override
     titleLarge = TextStyle(
         fontFamily = FontFamily.Default,
@@ -45,5 +47,5 @@ val Typography = Typography(
         lineHeight = 16.sp,
         letterSpacing = 0.5.sp
     )
-    */
-)
+	 */
+    )

@@ -11,21 +11,20 @@ software distributed under the License is distributed on an
 "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
-under the License.   
+under the License.
  */
 package org.kapunsdk.proximity.ble.server
 
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
 import org.kapunsdk.proximity.ProximityError
 import org.kapunsdk.proximity.ProximityOperation
 import org.kapunsdk.proximity.ble.client.toByteArray
 import org.kapunsdk.proximity.ble.gatt.BleGattCharacteristic
 import org.kapunsdk.util.extensions.toData
 import org.kapunsdk.util.log.Logger
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.runBlocking
-import kotlin.collections.ArrayDeque
-import platform.CoreBluetooth.CBAdvertisementDataServiceUUIDsKey
 import platform.CoreBluetooth.CBATTRequest
+import platform.CoreBluetooth.CBAdvertisementDataServiceUUIDsKey
 import platform.CoreBluetooth.CBCentral
 import platform.CoreBluetooth.CBCharacteristic
 import platform.CoreBluetooth.CBMutableCharacteristic
@@ -40,11 +39,13 @@ import platform.CoreBluetooth.CBPeripheralManagerStateUnsupported
 import platform.CoreBluetooth.CBService
 import platform.CoreBluetooth.CBUUID
 import platform.Foundation.NSError
+import kotlin.collections.ArrayDeque
 import kotlin.uuid.Uuid
 
-internal class GattServer (
-    private val serviceUuid: Uuid
-): BleGattServer, GattServerDelegate.Handler {
+internal class GattServer(
+    private val serviceUuid: Uuid,
+) : BleGattServer,
+    GattServerDelegate.Handler {
     private var listener: BleGattServerListener? = null
     private var advertiserListener: BleAdvertiserListener? = null
     private var service: CBMutableService? = null
@@ -58,51 +59,59 @@ internal class GattServer (
 
     private val delegate = GattServerDelegate(this)
 
-	init {
-		manager = CBPeripheralManager(delegate, null)
-	}
+    init {
+        manager = CBPeripheralManager(delegate, null)
+    }
 
     override fun setListener(listener: BleGattServerListener?) {
         this.listener = listener
     }
 
-	override fun start(characteristics: List<BleGattCharacteristic>): Boolean {
-		Logger("GattServer").debug("GattServer.start requested, waiting for poweredOn state (current=${describePeripheralState(lastPeripheralManagerState)})")
-		while(!isReady) {
-			runBlocking { delay(300) }
-		}
-		Logger("GattServer").debug("GattServer ready, adding service=$serviceUuid with ${characteristics.size} characteristics")
-		service = CBMutableService(CBUUID.UUIDWithString(serviceUuid.toString()), true).also {
-			it.setCharacteristics(characteristics.map { it.characteristic })
-		}
-		manager?.addService(service!!)
+    override fun start(characteristics: List<BleGattCharacteristic>): Boolean {
+        Logger(
+            "GattServer",
+        ).debug(
+            "GattServer.start requested, waiting for poweredOn state (current=${describePeripheralState(
+                lastPeripheralManagerState,
+            )})",
+        )
+        while (!isReady) {
+            runBlocking { delay(300) }
+        }
+        Logger(
+            "GattServer",
+        ).debug("GattServer ready, adding service=$serviceUuid with ${characteristics.size} characteristics")
+        service =
+            CBMutableService(CBUUID.UUIDWithString(serviceUuid.toString()), true).also {
+                it.setCharacteristics(characteristics.map { it.characteristic })
+            }
+        manager?.addService(service!!)
 
-		service?.characteristics?.forEach {
-			val mut = it as? CBMutableCharacteristic
-		}
+        service?.characteristics?.forEach {
+            val mut = it as? CBMutableCharacteristic
+        }
 
-		return true
-	}
+        return true
+    }
 
-
-	override fun startAdvertising(listener: BleAdvertiserListener) {
-		advertiserListener = listener
-		Logger("GattServer").debug(
-			"GattServer.startAdvertising requested, state=${describePeripheralState(lastPeripheralManagerState)}, " +
-				"service=$serviceUuid, hasService=${service != null}"
-		)
-		manager?.startAdvertising(mapOf(
-			CBAdvertisementDataServiceUUIDsKey to listOf(CBUUID.UUIDWithString(serviceUuid.toString()))
-		))
-	}
+    override fun startAdvertising(listener: BleAdvertiserListener) {
+        advertiserListener = listener
+        Logger("GattServer").debug(
+            "GattServer.startAdvertising requested, state=${describePeripheralState(lastPeripheralManagerState)}, " +
+                "service=$serviceUuid, hasService=${service != null}",
+        )
+        manager?.startAdvertising(
+            mapOf(
+                CBAdvertisementDataServiceUUIDsKey to listOf(CBUUID.UUIDWithString(serviceUuid.toString())),
+            ),
+        )
+    }
 
     override fun stopAdvertising() {
         manager?.stopAdvertising()
     }
 
-    override fun supportsSessionTermination(): Boolean {
-        return true
-    }
+    override fun supportsSessionTermination(): Boolean = true
 
     override fun stop() {
         manager?.stopAdvertising()
@@ -110,34 +119,46 @@ internal class GattServer (
         pendingWrites.clear()
     }
 
-	override fun writeCharacteristic(
-		charUuid: Uuid,
-		data: ByteArray,
-		onProgress: ((sent: Int, total: Int) -> Unit)?
-	) {
-		val progress = onProgress?.let { WriteProgress(total = data.size, onProgress = it) }
-		service?.characteristics?.map { it as CBMutableCharacteristic }?.find { it.UUID == CBUUID.UUIDWithString(charUuid.toString()) }?.let {
-			chunkMessage(data) { chunked ->
-				val payloadSize = (chunked.size - 1).coerceAtLeast(0)
-				pendingWrites.addLast(PendingWrite(it, chunked, progress, payloadSize))
-			}
-			flushPendingWrites()
-		} ?: run {
-				Logger("GattServer").error("GattServer: characteristic not found for write: $charUuid")
-				listener?.onError(ProximityError.CharacteristicNotFound(ProximityOperation.WRITE))
-			}
-		}
+    override fun writeCharacteristic(
+        charUuid: Uuid,
+        data: ByteArray,
+        onProgress: ((sent: Int, total: Int) -> Unit)?,
+    ) {
+        val progress = onProgress?.let { WriteProgress(total = data.size, onProgress = it) }
+        service
+            ?.characteristics
+            ?.map { it as CBMutableCharacteristic }
+            ?.find {
+                it.UUID ==
+                    CBUUID.UUIDWithString(charUuid.toString())
+            }?.let {
+                chunkMessage(data) { chunked ->
+                    val payloadSize = (chunked.size - 1).coerceAtLeast(0)
+                    pendingWrites.addLast(PendingWrite(it, chunked, progress, payloadSize))
+                }
+                flushPendingWrites()
+            } ?: run {
+            Logger("GattServer").error("GattServer: characteristic not found for write: $charUuid")
+            listener?.onError(ProximityError.CharacteristicNotFound(ProximityOperation.WRITE))
+        }
+    }
 
     override fun writeCharacteristicNonChunked(
-		charUuid: Uuid,
-		data: ByteArray,
-		onProgress: ((sent: Int, total: Int) -> Unit)?
-	) {
+        charUuid: Uuid,
+        data: ByteArray,
+        onProgress: ((sent: Int, total: Int) -> Unit)?,
+    ) {
         val progress = onProgress?.let { WriteProgress(total = data.size, onProgress = it) }
-        service?.characteristics?.map { it as CBMutableCharacteristic }?.find { it.UUID == CBUUID.UUIDWithString(charUuid.toString()) }?.let {
-            pendingWrites.addLast(PendingWrite(it, data, progress, data.size))
-            flushPendingWrites()
-        } ?: run {
+        service
+            ?.characteristics
+            ?.map { it as CBMutableCharacteristic }
+            ?.find {
+                it.UUID ==
+                    CBUUID.UUIDWithString(charUuid.toString())
+            }?.let {
+                pendingWrites.addLast(PendingWrite(it, data, progress, data.size))
+                flushPendingWrites()
+            } ?: run {
             Logger("GattServer").error("GattServer: characteristic not found for non-chunked write: $charUuid")
             listener?.onError(ProximityError.CharacteristicNotFound(ProximityOperation.WRITE))
         }
@@ -146,20 +167,22 @@ internal class GattServer (
     override val characteristicValueSize: Int
         get() = 512
 
-	override fun onStateUpdated(peripheral: CBPeripheralManager) {
-		val state = peripheral.state
-		val wasReady = isReady
-		isReady = state == CBPeripheralManagerStatePoweredOn
-		lastPeripheralManagerState = state
-		Logger("GattServer").debug("GattServer state updated: ${describePeripheralState(state)} (wasReady=$wasReady, isReady=$isReady)")
-		if (!isReady) {
-			chunkAccumulator.clear()
-			pendingWrites.clear()
-			canUpdateSubscribers = false
+    override fun onStateUpdated(peripheral: CBPeripheralManager) {
+        val state = peripheral.state
+        val wasReady = isReady
+        isReady = state == CBPeripheralManagerStatePoweredOn
+        lastPeripheralManagerState = state
+        Logger(
+            "GattServer",
+        ).debug("GattServer state updated: ${describePeripheralState(state)} (wasReady=$wasReady, isReady=$isReady)")
+        if (!isReady) {
+            chunkAccumulator.clear()
+            pendingWrites.clear()
+            canUpdateSubscribers = false
             if (wasReady) {
                 Logger("GattServer").warn("GattServer: BLE became unavailable while active, reporting disconnect/error")
                 listener?.onError(
-                    ProximityError.BluetoothUnavailable("peripheralManagerState=${describePeripheralState(state)}")
+                    ProximityError.BluetoothUnavailable("peripheralManagerState=${describePeripheralState(state)}"),
                 )
                 listener?.onPeerDisconnected()
             }
@@ -169,12 +192,18 @@ internal class GattServer (
         }
     }
 
-    override fun onRead(peripheral: CBPeripheralManager, request: CBATTRequest) {
+    override fun onRead(
+        peripheral: CBPeripheralManager,
+        request: CBATTRequest,
+    ) {
         val characteristic = request.characteristic ?: return
         listener?.onCharacteristicReadRequest(BleGattCharacteristic(characteristic))
     }
 
-    override fun onWrite(peripheral: CBPeripheralManager, requests: List<*>) {
+    override fun onWrite(
+        peripheral: CBPeripheralManager,
+        requests: List<*>,
+    ) {
         requests.forEach { anyReq ->
             val request = anyReq as? CBATTRequest ?: return@forEach
             val characteristic = request.characteristic ?: return@forEach
@@ -187,32 +216,43 @@ internal class GattServer (
 
             when (val chunkResult = chunkAccumulator.consume(uuidString, value)) {
                 ChunkProcessingResult.Waiting -> { }
+
                 is ChunkProcessingResult.Complete -> {
                     listener?.onCharacteristicWriteRequest(
-                        BleGattCharacteristic(characteristic, chunkResult.payload)
+                        BleGattCharacteristic(characteristic, chunkResult.payload),
                     )
                 }
+
                 is ChunkProcessingResult.Single -> {
                     listener?.onCharacteristicWriteRequest(
-                        BleGattCharacteristic(characteristic, chunkResult.payload)
+                        BleGattCharacteristic(characteristic, chunkResult.payload),
                     )
                 }
             }
         }
     }
 
-	override fun onStartAdvertising(peripheral: CBPeripheralManager, error: NSError?) {
-		Logger("GattServer").debug(
-			"Peripheral Manager did start advertising: error=$error, state=${describePeripheralState(peripheral.state)}"
-		)
-	}
+    override fun onStartAdvertising(
+        peripheral: CBPeripheralManager,
+        error: NSError?,
+    ) {
+        Logger("GattServer").debug(
+            "Peripheral Manager did start advertising: error=$error, state=${describePeripheralState(
+                peripheral.state,
+            )}",
+        )
+    }
 
-	override fun onAddService(peripheral: CBPeripheralManager, service: CBService, error: NSError?) {
-		Logger("GattServer").debug(
-			"Peripheral Manager didAddService: service=${service.UUID?.UUIDString}, error=$error, " +
-				"state=${describePeripheralState(peripheral.state)}"
-		)
-	}
+    override fun onAddService(
+        peripheral: CBPeripheralManager,
+        service: CBService,
+        error: NSError?,
+    ) {
+        Logger("GattServer").debug(
+            "Peripheral Manager didAddService: service=${service.UUID?.UUIDString}, error=$error, " +
+                "state=${describePeripheralState(peripheral.state)}",
+        )
+    }
 
     override fun onReadyToUpdateSubscribers(peripheral: CBPeripheralManager) {
         Logger("GattServer").debug("Peripheral Manager peripheralManagerIsReadyToUpdateSubscribers")
@@ -223,9 +263,11 @@ internal class GattServer (
     override fun onSubscribe(
         peripheral: CBPeripheralManager,
         central: CBCentral,
-        characteristic: CBCharacteristic
+        characteristic: CBCharacteristic,
     ) {
-        Logger("GattServer").debug("Peripheral Manager did didSubscribeToCharacteristic: ${characteristic.UUID.UUIDString}")
+        Logger(
+            "GattServer",
+        ).debug("Peripheral Manager did didSubscribeToCharacteristic: ${characteristic.UUID.UUIDString}")
     }
 
     private fun flushPendingWrites() {
@@ -242,7 +284,7 @@ internal class GattServer (
             } else {
                 Logger("GattServer").warn(
                     "GattServer: updateValue returned false, pausing writes. " +
-                        "queued=${pendingWrites.size}, state=${describePeripheralState(lastPeripheralManagerState)}"
+                        "queued=${pendingWrites.size}, state=${describePeripheralState(lastPeripheralManagerState)}",
                 )
                 canUpdateSubscribers = false
                 break
@@ -250,15 +292,16 @@ internal class GattServer (
         }
     }
 
-    private fun describePeripheralState(state: Long): String = when (state) {
-		CBPeripheralManagerStateUnknown -> "unknown"
-		CBPeripheralManagerStateResetting -> "resetting"
-		CBPeripheralManagerStateUnsupported -> "unsupported"
-		CBPeripheralManagerStateUnauthorized -> "unauthorized"
-		CBPeripheralManagerStatePoweredOff -> "poweredOff"
-		CBPeripheralManagerStatePoweredOn -> "poweredOn"
-        else -> "state=$state"
-    }
+    private fun describePeripheralState(state: Long): String =
+        when (state) {
+            CBPeripheralManagerStateUnknown -> "unknown"
+            CBPeripheralManagerStateResetting -> "resetting"
+            CBPeripheralManagerStateUnsupported -> "unsupported"
+            CBPeripheralManagerStateUnauthorized -> "unauthorized"
+            CBPeripheralManagerStatePoweredOff -> "poweredOff"
+            CBPeripheralManagerStatePoweredOn -> "poweredOn"
+            else -> "state=$state"
+        }
 
     private data class PendingWrite(
         val characteristic: CBMutableCharacteristic,
@@ -269,7 +312,7 @@ internal class GattServer (
 
     private class WriteProgress(
         private val total: Int,
-        private val onProgress: ((sent: Int, total: Int) -> Unit)?
+        private val onProgress: ((sent: Int, total: Int) -> Unit)?,
     ) {
         private var sent: Int = 0
 

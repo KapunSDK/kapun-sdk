@@ -21,14 +21,14 @@ import org.kapunsdk.credentials.models.issuer.IssuerModel
 import org.kapunsdk.credentials.models.metadata.Tokens
 
 data class IdentityModel(
-	val id: Long,
-	val name: String,
-	val tokens: Tokens,
-	val emergencyTokens: Tokens?,
-	val frostBlob: String?,
-	val oidcSettings: String?,
-	val issuer: IssuerModel,
-	val credentialConfigurationIds: String?,
-	val credentials: List<CredentialModel>,
-	val isPid: Boolean,
+    val id: Long,
+    val name: String,
+    val tokens: Tokens,
+    val emergencyTokens: Tokens?,
+    val frostBlob: String?,
+    val oidcSettings: String?,
+    val issuer: IssuerModel,
+    val credentialConfigurationIds: String?,
+    val credentials: List<CredentialModel>,
+    val isPid: Boolean,
 )

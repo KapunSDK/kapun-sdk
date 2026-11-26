@@ -16,6 +16,4 @@ under the License.
 
 package org.kapunsdk.wallet.extensions
 
-inline fun <reified T> MutableList<T>.pop() :T? {
-    return this.firstOrNull().also { this.remove(it)}
-}
+inline fun <reified T> MutableList<T>.pop(): T? = this.firstOrNull().also { this.remove(it) }

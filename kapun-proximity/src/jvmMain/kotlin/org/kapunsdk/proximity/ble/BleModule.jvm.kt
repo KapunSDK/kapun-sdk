@@ -19,4 +19,4 @@ package org.kapunsdk.proximity.ble
 import org.koin.core.module.Module
 
 internal actual val bleModule: Module
-	get() = TODO("Not yet implemented")
+    get() = TODO("Not yet implemented")

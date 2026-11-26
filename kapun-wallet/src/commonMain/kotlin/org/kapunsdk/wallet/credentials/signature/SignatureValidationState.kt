@@ -17,7 +17,7 @@ under the License.
 package org.kapunsdk.wallet.credentials.signature
 
 enum class SignatureValidationState {
-	VALID,
-	INVALID,
-	EXPIRED
+    VALID,
+    INVALID,
+    EXPIRED,
 }

@@ -19,12 +19,13 @@ package org.kapunsdk.issuance.networking.di
 import kotlinx.serialization.json.Json
 import org.koin.dsl.module
 
-internal fun jsonModule() = module {
-	single {
-		Json {
-			encodeDefaults = true
-			explicitNulls = false
-			ignoreUnknownKeys = true
-		}
-	}
-}
+internal fun jsonModule() =
+    module {
+        single {
+            Json {
+                encodeDefaults = true
+                explicitNulls = false
+                ignoreUnknownKeys = true
+            }
+        }
+    }

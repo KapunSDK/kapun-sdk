@@ -20,15 +20,15 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class AgentInformation(
-	val type: AgentType,
-	val domain: String,
-	val displayName: String,
-	val trustFrameworkId: String?,
-	val logoUri: String?,
-	val isTrusted: Boolean,
-	val isVerified: Boolean,
-	val identityTrust: String? = null,
-	val issuanceTrust: String? = null,
-	val verificationTrust: String? = null,
-	val untrustedTrustAnchor: TrustAnchorInfo? = null,
+    val type: AgentType,
+    val domain: String,
+    val displayName: String,
+    val trustFrameworkId: String?,
+    val logoUri: String?,
+    val isTrusted: Boolean,
+    val isVerified: Boolean,
+    val identityTrust: String? = null,
+    val issuanceTrust: String? = null,
+    val verificationTrust: String? = null,
+    val untrustedTrustAnchor: TrustAnchorInfo? = null,
 )

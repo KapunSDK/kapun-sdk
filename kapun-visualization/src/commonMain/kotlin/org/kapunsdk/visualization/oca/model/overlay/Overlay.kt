@@ -16,15 +16,19 @@ under the License.
 
 package org.kapunsdk.visualization.oca.model.overlay
 
-import org.kapunsdk.visualization.oca.model.content.SAID
-import org.kapunsdk.visualization.oca.serialization.OverlaySerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import org.kapunsdk.visualization.oca.model.content.SAID
+import org.kapunsdk.visualization.oca.serialization.OverlaySerializer
 
 @Serializable(with = OverlaySerializer::class)
 interface Overlay {
-	val captureBase: SAID
-	val type: String
-	val digest: SAID
-	fun updateDigest(digest: SAID, captureBase: SAID = this.captureBase) : Overlay
+    val captureBase: SAID
+    val type: String
+    val digest: SAID
+
+    fun updateDigest(
+        digest: SAID,
+        captureBase: SAID = this.captureBase,
+    ): Overlay
 }

@@ -20,6 +20,11 @@ import uniffi.kapun_crypto_rust.SessionCipher
 import uniffi.kapun_util_rust.Value
 
 interface MdlTransportProtocolExtensions {
-    fun getSessionCipher(engagementBytes: ByteArray ,eReaderKeyBytes: ByteArray, peerCoseKey: ByteArray? = null) : SessionCipher?
+    fun getSessionCipher(
+        engagementBytes: ByteArray,
+        eReaderKeyBytes: ByteArray,
+        peerCoseKey: ByteArray? = null,
+    ): SessionCipher?
+
     var sessionTranscript: Value?
 }

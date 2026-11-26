@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [lib]
-crate-type = ["cdylib", "staticlib", "lib"]
 name = "kapun_util_rust"
 
 [dependencies]
@@ -18,6 +17,7 @@ sha2.workspace = true
 chrono.workspace = true
 openid-federation.workspace = true
 flate2 = "1.1.1"
+workspace-hack = { version = "0.1", path = "../../workspace-hack" }
 [target.'cfg(any(target_os = "android"))'.dependencies]
 libc.workspace = true
 [dev-dependencies]

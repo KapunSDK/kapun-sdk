@@ -16,4 +16,6 @@ under the License.
 
 package org.kapunsdk.util.json
 
-class JsonPointerException(override val message: String) : Exception(message)
+class JsonPointerException(
+    override val message: String,
+) : Exception(message)

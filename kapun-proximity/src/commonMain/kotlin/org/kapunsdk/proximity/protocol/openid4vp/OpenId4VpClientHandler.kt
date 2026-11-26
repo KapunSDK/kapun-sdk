@@ -11,7 +11,7 @@ software distributed under the License is distributed on an
 "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
-under the License.   
+under the License.
  */
 package org.kapunsdk.proximity.protocol.openid4vp
 
@@ -24,101 +24,103 @@ import org.kapunsdk.proximity.protocol.TransportProtocol
 import kotlin.uuid.Uuid
 
 internal class OpenId4VpClientHandler(
-	private val gattClient: BleGattClient,
-	private val serviceUuid: Uuid,
-	private val onConnecting: () -> Unit,
-	private val onConnected: () -> Unit,
-	private val onSessionTermination: () -> Unit,
-	private val onDisconnected: () -> Unit,
-	private val onMessageReceived: (ByteArray) -> Unit,
-	private val onError: (ProximityError) -> Unit,
+    private val gattClient: BleGattClient,
+    private val serviceUuid: Uuid,
+    private val onConnecting: () -> Unit,
+    private val onConnected: () -> Unit,
+    private val onSessionTermination: () -> Unit,
+    private val onDisconnected: () -> Unit,
+    private val onMessageReceived: (ByteArray) -> Unit,
+    private val onError: (ProximityError) -> Unit,
 ) : BleGattClientListener {
+    /** The size in bytes of the document request the verifier wants to transmit */
+    private var documentRequestSize: Int? = null
 
-	/** The size in bytes of the document request the verifier wants to transmit */
-	private var documentRequestSize: Int? = null
+    override fun onServicesDiscovered(services: List<BleGattService>): List<BleGattCharacteristic> {
+        val service = services.singleOrNull { it.uuid == serviceUuid }
+        if (service != null) {
+            val uuids =
+                listOf(
+                    OpenId4VpTransportProtocol.charRequestSizeUuid,
+                    OpenId4VpTransportProtocol.charRequestUuid,
+                    OpenId4VpTransportProtocol.charIdentifyUuid,
+                    OpenId4VpTransportProtocol.charContentSizeUuid,
+                    OpenId4VpTransportProtocol.charSubmitVcUuid,
+                    OpenId4VpTransportProtocol.charTransferSummaryRequestUuid,
+                    OpenId4VpTransportProtocol.charTransferSummaryReportUuid,
+                    OpenId4VpTransportProtocol.charDisconnectUuid,
+                )
+            return uuids.mapNotNull { uuid -> service.characteristics.singleOrNull { it.uuid == uuid } }
+        } else {
+            onError.invoke(ProximityError.Unknown("Service not found"))
+            return emptyList()
+        }
+    }
 
-	override fun onServicesDiscovered(services: List<BleGattService>): List<BleGattCharacteristic> {
-		val service = services.singleOrNull { it.uuid == serviceUuid }
-		if (service != null) {
-			val uuids = listOf(
-				OpenId4VpTransportProtocol.charRequestSizeUuid,
-				OpenId4VpTransportProtocol.charRequestUuid,
-				OpenId4VpTransportProtocol.charIdentifyUuid,
-				OpenId4VpTransportProtocol.charContentSizeUuid,
-				OpenId4VpTransportProtocol.charSubmitVcUuid,
-				OpenId4VpTransportProtocol.charTransferSummaryRequestUuid,
-				OpenId4VpTransportProtocol.charTransferSummaryReportUuid,
-				OpenId4VpTransportProtocol.charDisconnectUuid,
-			)
-			return uuids.mapNotNull { uuid -> service.characteristics.singleOrNull { it.uuid == uuid } }
-		} else {
-			onError.invoke(ProximityError.Unknown("Service not found"))
-			return emptyList()
-		}
-	}
+    override fun onPeerConnecting() {
+        onConnecting.invoke()
+    }
 
-	override fun onPeerConnecting() {
-		onConnecting.invoke()
-	}
+    override fun onPeerConnected() {
+        documentRequestSize = null
 
-	override fun onPeerConnected() {
-		documentRequestSize = null
+        onConnected.invoke()
+        // TODO Establish session encryption first
+        gattClient.readCharacteristic(OpenId4VpTransportProtocol.charRequestSizeUuid)
+    }
 
-		onConnected.invoke()
-		// TODO Establish session encryption first
-		gattClient.readCharacteristic(OpenId4VpTransportProtocol.charRequestSizeUuid)
-	}
+    override fun onPeerDisconnected() {
+        documentRequestSize = null
 
-	override fun onPeerDisconnected() {
-		documentRequestSize = null
+        onDisconnected.invoke()
+    }
 
-		onDisconnected.invoke()
-	}
+    override fun onError(error: ProximityError) {
+        onError.invoke(error)
+    }
 
-	override fun onError(error: ProximityError) {
-		onError.invoke(error)
-	}
+    override fun onCharacteristicRead(characteristic: BleGattCharacteristic) {
+        when (characteristic.uuid) {
+            OpenId4VpTransportProtocol.charRequestSizeUuid -> {
+                // The verifier document request size was successfully read, we can now read the request itself
+                documentRequestSize = characteristic.value?.decodeToString()?.toIntOrNull() ?: 0
+                gattClient.readCharacteristic(OpenId4VpTransportProtocol.charRequestUuid)
+            }
 
-	override fun onCharacteristicRead(characteristic: BleGattCharacteristic) {
-		when (characteristic.uuid) {
-			OpenId4VpTransportProtocol.charRequestSizeUuid -> {
-				// The verifier document request size was successfully read, we can now read the request itself
-				documentRequestSize = characteristic.value?.decodeToString()?.toIntOrNull() ?: 0
-				gattClient.readCharacteristic(OpenId4VpTransportProtocol.charRequestUuid)
-			}
-			OpenId4VpTransportProtocol.charRequestUuid -> {
-				val request = characteristic.value ?: TransportProtocol.EMPTY_MESSAGE
-				if (request.size != documentRequestSize) {
-					onError.invoke(ProximityError.Unknown("Request size mismatch"))
-				} else {
-					// The verifier document request was successfully read, let the wallet process it
-					onMessageReceived.invoke(request)
-				}
-			}
-		}
-	}
+            OpenId4VpTransportProtocol.charRequestUuid -> {
+                val request = characteristic.value ?: TransportProtocol.EMPTY_MESSAGE
+                if (request.size != documentRequestSize) {
+                    onError.invoke(ProximityError.Unknown("Request size mismatch"))
+                } else {
+                    // The verifier document request was successfully read, let the wallet process it
+                    onMessageReceived.invoke(request)
+                }
+            }
+        }
+    }
 
-	override fun onCharacteristicWrite(characteristic: BleGattCharacteristic) {
-		when (characteristic.uuid) {
-			OpenId4VpTransportProtocol.charSubmitVcUuid -> {
-				gattClient.writeCharacteristic(
-					OpenId4VpTransportProtocol.charTransferSummaryRequestUuid,
-					TransportProtocol.EMPTY_MESSAGE
-				)
-			}
-		}
-	}
+    override fun onCharacteristicWrite(characteristic: BleGattCharacteristic) {
+        when (characteristic.uuid) {
+            OpenId4VpTransportProtocol.charSubmitVcUuid -> {
+                gattClient.writeCharacteristic(
+                    OpenId4VpTransportProtocol.charTransferSummaryRequestUuid,
+                    TransportProtocol.EMPTY_MESSAGE,
+                )
+            }
+        }
+    }
 
-	override fun onCharacteristicChanged(characteristic: BleGattCharacteristic) {
-		when (characteristic.uuid) {
-			OpenId4VpTransportProtocol.charTransferSummaryReportUuid -> {
-				// The verifier has confirmed the transfer, send an empty message to the wallet to notify it
-				// TODO Sending an empty message relies on the wallet keeping track of the correct state and interpreting it accordingly
-				onMessageReceived.invoke(TransportProtocol.EMPTY_MESSAGE)
-			}
-			OpenId4VpTransportProtocol.charDisconnectUuid -> {
-				onSessionTermination.invoke()
-			}
-		}
-	}
+    override fun onCharacteristicChanged(characteristic: BleGattCharacteristic) {
+        when (characteristic.uuid) {
+            OpenId4VpTransportProtocol.charTransferSummaryReportUuid -> {
+                // The verifier has confirmed the transfer, send an empty message to the wallet to notify it
+                // TODO Sending an empty message relies on the wallet keeping track of the correct state and interpreting it accordingly
+                onMessageReceived.invoke(TransportProtocol.EMPTY_MESSAGE)
+            }
+
+            OpenId4VpTransportProtocol.charDisconnectUuid -> {
+                onSessionTermination.invoke()
+            }
+        }
+    }
 }

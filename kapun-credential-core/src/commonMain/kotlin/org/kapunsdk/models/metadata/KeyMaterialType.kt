@@ -17,8 +17,8 @@ under the License.
 package org.kapunsdk.credentials.models.metadata
 
 enum class KeyMaterialType {
-	LOCAL,
-	CLOUD,
-	FROST,
-	UNUSABLE,
+    LOCAL,
+    CLOUD,
+    FROST,
+    UNUSABLE,
 }

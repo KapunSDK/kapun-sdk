@@ -11,29 +11,28 @@ software distributed under the License is distributed on an
 "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
-under the License.   
+under the License.
  */
 package org.kapunsdk.issuance.di
 
+import org.kapunsdk.util.network.KapunNetworkConfiguration
 import org.koin.core.Koin
 import org.koin.core.KoinApplication
 import org.koin.dsl.koinApplication
-import org.kapunsdk.util.network.KapunNetworkConfiguration
 
 internal object KapunIssuanceKoinContext {
+    private lateinit var koinApp: KoinApplication
+    lateinit var koin: Koin
 
-	private lateinit var koinApp: KoinApplication
-	lateinit var koin: Koin
-
-	fun initialize(
-		networkConfiguration: KapunNetworkConfiguration = KapunNetworkConfiguration(),
-		appConfiguration: KoinApplication.() -> Unit = {},
-	) {
-		koinApp = koinApplication {
-			issuanceModules(networkConfiguration)
-			appConfiguration()
-		}
-		koin = koinApp.koin
-	}
-
+    fun initialize(
+        networkConfiguration: KapunNetworkConfiguration = KapunNetworkConfiguration(),
+        appConfiguration: KoinApplication.() -> Unit = {},
+    ) {
+        koinApp =
+            koinApplication {
+                issuanceModules(networkConfiguration)
+                appConfiguration()
+            }
+        koin = koinApp.koin
+    }
 }
